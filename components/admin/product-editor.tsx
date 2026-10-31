@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent, type InvalidEvent } from 'react'
+import { useRef, useState, type FormEvent, type InvalidEvent } from 'react'
 import useSWR from 'swr'
 import { LoaderCircle, Plus, X } from 'lucide-react'
 import { createProduct, getAdminCategories, setProductRelations, updateProduct } from '@/app/actions/catalog-admin'
@@ -13,6 +13,11 @@ type SpecRow = { label: string; value: string }
 
 const diameterAndCurveOptions = Array.from({ length: 121 }, (_, index) => (index / 10).toFixed(2))
 const waterContentOptions = Array.from({ length: 101 }, (_, index) => `${index}%`)
+const sectionClass = 'grid gap-4 rounded-xl border border-[#cfe2eb] bg-[#f7fcff] p-4 sm:grid-cols-2 sm:p-5'
+
+function optionsWithSavedValue(options: string[], savedValue: string) {
+  return savedValue && !options.includes(savedValue) ? [...options, savedValue] : options
+}
 
 export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminProduct; onSaved: () => void; onCancel: () => void }) {
   const { data: categoryData } = useSWR('admin-categories', () => getAdminCategories())
@@ -26,6 +31,11 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
   const [specs, setSpecs] = useState<SpecRow[]>(product?.specs ?? [])
   const [related, setRelated] = useState<string[]>(product?.relatedProductIds ?? [])
   const [relatedQuery, setRelatedQuery] = useState('')
+  const [diameterMm, setDiameterMm] = useState(product?.diameterMm ?? '')
+  const [baseCurve, setBaseCurve] = useState(product?.baseCurve ?? '')
+  const [waterContent, setWaterContent] = useState(product?.waterContent ?? '')
+  const [powerRange, setPowerRange] = useState(product?.powerRange ?? '')
+  const powerRangeInput = useRef<HTMLInputElement>(null)
   const variantManaged = Boolean(product?.variants.some((variant) => variant.isActive !== false))
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -89,19 +99,26 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
   const candidates = products
     .filter((item) => item.id !== product?.id && !related.includes(item.id) && item.name.toLowerCase().includes(relatedQuery.toLowerCase()))
     .slice(0, 6)
+  const diameterOptions = optionsWithSavedValue(diameterAndCurveOptions, diameterMm)
+  const baseCurveOptions = optionsWithSavedValue(diameterAndCurveOptions, baseCurve)
+  const waterOptions = optionsWithSavedValue(waterContentOptions, waterContent)
 
   return (
-    <form key={product?.id ?? 'new'} onSubmit={submit} onInvalidCapture={showRequiredFieldError} className="rounded-2xl border border-[#1c1c1a]/10 bg-white p-5">
+    <form onSubmit={submit} onInvalidCapture={showRequiredFieldError} className="rounded-2xl border border-[#cfe2eb] bg-white p-4 sm:p-6">
       <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="font-medium">{product ? `Edit ${product.name}` : 'Add a product'}</h2>
-        <button type="button" onClick={onCancel} aria-label="Close product editor" className="rounded-full p-2 hover:bg-[#f2f1ed]"><X size={17} /></button>
+        <div>
+          <h2 className="text-lg font-semibold text-[#15384d]">{product ? `Edit ${product.name}` : 'Add a product'}</h2>
+          <p className="mt-1 text-sm leading-5 text-[#526b7b]">Saved values are prefilled. Missing lens specifications stay blank until verified.</p>
+        </div>
+        <button type="button" onClick={onCancel} aria-label="Close product editor" className="grid size-10 shrink-0 place-items-center rounded-full text-[#526b7b] hover:bg-[#e8f6fb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ba5]"><X size={17} /></button>
       </div>
       {error && <div className="mb-4"><Alert>{error}</Alert></div>}
       {variantManaged && <div className="mb-4"><Alert tone="info">Price and stock are calculated from active lens options.</Alert></div>}
       {categories.length === 0 && <div className="mb-4"><Alert tone="info">Products can be saved without categories. You can attach categories later.</Alert></div>}
 
-      <fieldset className="grid gap-4 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold">Basics</legend>
+      <fieldset className={sectionClass}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Product identity</legend>
+        <p className="text-xs leading-5 text-[#526b7b] sm:col-span-2">Name, catalog placement, and availability.</p>
         <Field label="Name" required><input name="name" required maxLength={200} defaultValue={product?.name} className={inputClass} /></Field>
         <Field label="Slug (blank = from name)"><input name="slug" maxLength={120} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={product?.slug} className={inputClass} /></Field>
         <Field label="Categories">
@@ -122,43 +139,73 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
             <option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option>
           </select>
         </Field>
+      </fieldset>
+
+      <fieldset className={`${sectionClass} mt-4`}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Pricing</legend>
+        <p className="text-xs leading-5 text-[#526b7b] sm:col-span-2">Price and currency shown on the product listing.</p>
         <Field label="Price" required><input name="price" required inputMode="decimal" pattern="\d+(\.\d{1,2})?" readOnly={variantManaged} defaultValue={product?.price} className={inputClass} /></Field>
         <div className="grid grid-cols-[1fr_90px] gap-3">
           <Field label="Compare-at (old) price"><input name="compareAtPrice" inputMode="decimal" pattern="\d+(\.\d{1,2})?" defaultValue={product?.compareAtPrice ?? ''} className={inputClass} /></Field>
           <Field label="Currency"><input name="currency" maxLength={3} defaultValue={product?.currency ?? 'PKR'} className={inputClass} /></Field>
         </div>
-        <div className="sm:col-span-2"><Field label="Short description"><input name="shortDescription" maxLength={400} defaultValue={product?.shortDescription ?? ''} className={inputClass} /></Field></div>
-        <div className="sm:col-span-2"><Field label="Description"><textarea name="description" rows={5} maxLength={10000} defaultValue={product?.description ?? ''} className={inputClass} /></Field></div>
-        <label className="flex items-start gap-2 text-sm sm:col-span-2">
-          <input name="fdaApproved" type="checkbox" defaultChecked={product?.fdaApproved ?? false} className="mt-0.5" />
-          <span>
-            <span className="font-medium">FDA Approved</span>
-            <span className="mt-1 block text-xs leading-5 text-[#526b7b]">Only enable after verifying current FDA approval documentation. This adds an FDA Approved stamp to product photos.</span>
-          </span>
-        </label>
       </fieldset>
 
-      <fieldset className="mt-6 grid gap-4 sm:grid-cols-3">
-        <legend className="mb-3 text-sm font-semibold">Lens details</legend>
-        <p className="text-xs leading-5 text-[#526b7b] sm:col-span-3">Select each lens measurement before saving. All three selectors start blank.</p>
-        <Field label="Diameter (DIA) · mm" required>
-          <select name="diameterMm" required defaultValue="" className={inputClass}>
-            <option value="" disabled>Select diameter</option>
-            {diameterAndCurveOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </Field>
-        <Field label="Base curve (BC) · mm" required>
-          <select name="baseCurve" required defaultValue="" className={inputClass}>
-            <option value="" disabled>Select base curve</option>
-            {diameterAndCurveOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </Field>
-        <Field label="Water content · %" required>
-          <select name="waterContent" required defaultValue="" className={inputClass}>
-            <option value="" disabled>Select water content</option>
-            {waterContentOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </Field>
+      <fieldset className={`${sectionClass} mt-4`}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Lens specifications</legend>
+        <p className="text-xs leading-5 text-[#526b7b] sm:col-span-2">Recorded values are prefilled. New or unverified measurements stay unselected.</p>
+        <Field label="Power type"><input name="powerType" placeholder="Zero power / Prescription" defaultValue={product?.powerType ?? ''} className={inputClass} /></Field>
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <Field label="Power range">
+            <input
+              ref={powerRangeInput}
+              name="powerRange"
+              placeholder="Use the product's verified range"
+              value={powerRange}
+              onChange={(event) => setPowerRange(event.target.value)}
+              className={inputClass}
+            />
+            </Field>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setPowerRange('')
+              powerRangeInput.current?.focus()
+            }}
+            disabled={!powerRange}
+            aria-label="Clear power range"
+            className="mb-0.5 inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-[#b8d4e0] px-3 text-xs font-medium text-[#526b7b] hover:bg-[#e8f6fb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ba5] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X size={14} aria-hidden="true" /> Clear
+          </button>
+        </div>
+        <div className="grid gap-4 sm:col-span-2 sm:grid-cols-3">
+          <Field label="Diameter (DIA) · mm" required>
+            <select name="diameterMm" required value={diameterMm} onChange={(event) => setDiameterMm(event.target.value)} className={inputClass}>
+              <option value="" disabled>Select diameter</option>
+              {diameterOptions.map((value) => <option key={value} value={value}>{value}{!diameterAndCurveOptions.includes(value) ? ' (saved value)' : ''}</option>)}
+            </select>
+          </Field>
+          <Field label="Base curve (BC) · mm" required>
+            <select name="baseCurve" required value={baseCurve} onChange={(event) => setBaseCurve(event.target.value)} className={inputClass}>
+              <option value="" disabled>Select base curve</option>
+              {baseCurveOptions.map((value) => <option key={value} value={value}>{value}{!diameterAndCurveOptions.includes(value) ? ' (saved value)' : ''}</option>)}
+            </select>
+          </Field>
+          <Field label="Water content · %" required>
+            <select name="waterContent" required value={waterContent} onChange={(event) => setWaterContent(event.target.value)} className={inputClass}>
+              <option value="" disabled>Select water content</option>
+              {waterOptions.map((value) => <option key={value} value={value}>{value}{!waterContentOptions.includes(value) ? ' (saved value)' : ''}</option>)}
+            </select>
+          </Field>
+        </div>
+      </fieldset>
+
+      <fieldset className={`${sectionClass} mt-4`}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Wear &amp; construction</legend>
+        <p className="text-xs leading-5 text-[#526b7b] sm:col-span-2">Group the remaining product construction and usage details.</p>
         <Field label="Material"><input name="material" defaultValue={product?.material ?? ''} className={inputClass} /></Field>
         <Field label="Lens type">
           <select name="lensTypeId" defaultValue={product?.lensTypeId ?? ''} className={inputClass}>
@@ -168,13 +215,18 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
         </Field>
         <Field label="Wear duration"><input name="wearDuration" placeholder="Monthly / One day" defaultValue={product?.wearDuration ?? ''} className={inputClass} /></Field>
         <Field label="Pack contents"><input name="packContents" placeholder="2 lenses (1 pair)" defaultValue={product?.packContents ?? ''} className={inputClass} /></Field>
-        <Field label="Power type"><input name="powerType" placeholder="Zero power / Prescription" defaultValue={product?.powerType ?? ''} className={inputClass} /></Field>
-        <Field label="Power range"><input name="powerRange" placeholder="0.00 to -8.00" defaultValue={product?.powerRange ?? ''} className={inputClass} /></Field>
-        <label className="flex items-center gap-2 self-end pb-2 text-sm"><input name="uvProtection" type="checkbox" defaultChecked={product?.uvProtection} /> UV protection</label>
+        <label className="flex min-h-11 items-center gap-2 self-end text-sm text-[#15384d]"><input name="uvProtection" type="checkbox" defaultChecked={product?.uvProtection ?? false} className="size-4 accent-[#006f9b]" /> UV protection</label>
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <input name="fdaApproved" type="checkbox" defaultChecked={product?.fdaApproved ?? false} className="mt-0.5 size-4 accent-[#006f9b]" />
+          <span>
+            <span className="font-medium text-[#15384d]">FDA Approved</span>
+            <span className="mt-1 block text-xs leading-5 text-[#526b7b]">Only enable after verifying current FDA approval documentation. This adds an FDA Approved stamp to product photos.</span>
+          </span>
+        </label>
       </fieldset>
 
-      <fieldset className="mt-6 grid gap-4 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold">Lens shade</legend>
+      <fieldset className={`${sectionClass} mt-4`}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Shade</legend>
         <Field label="Shade">
           <select name="lensShadeId" defaultValue={product?.lensShadeId ?? ''} className={inputClass}>
             <option value="">No shade</option>
@@ -184,16 +236,22 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
         <p className="self-end pb-2 text-xs leading-5 text-[#68675f]">Add or edit shades in the Lens shades section.</p>
       </fieldset>
 
-      <fieldset className="mt-6 grid gap-4">
-        <legend className="mb-3 text-sm font-semibold">Features &amp; specifications</legend>
-        <Field label="Key features (one per line)"><textarea name="features" rows={4} defaultValue={(product?.features ?? []).join('\n')} className={inputClass} /></Field>
+      <fieldset className={`${sectionClass} mt-4`}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Product description</legend>
+        <Field label="Short description"><input name="shortDescription" maxLength={400} defaultValue={product?.shortDescription ?? ''} className={inputClass} /></Field>
+        <Field label="Description"><textarea name="description" rows={4} maxLength={10000} defaultValue={product?.description ?? ''} className={inputClass} /></Field>
+      </fieldset>
+
+      <fieldset className={`${sectionClass} mt-4`}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Features &amp; specifications</legend>
+        <div className="sm:col-span-2"><Field label="Key features (one per line)"><textarea name="features" rows={4} defaultValue={(product?.features ?? []).join('\n')} className={inputClass} /></Field></div>
         <div>
           <p className="text-xs font-medium text-[#55544e]">Extra specification rows</p>
           <ul className="mt-1.5 space-y-2">
             {specs.map((spec, index) => (
-              <li key={index} className="flex gap-2">
-                <input aria-label="Label" placeholder="Label" value={spec.label} onChange={(event) => setSpecs(specs.map((row, i) => i === index ? { ...row, label: event.target.value } : row))} className={inputClass} />
-                <input aria-label="Value" placeholder="Value" value={spec.value} onChange={(event) => setSpecs(specs.map((row, i) => i === index ? { ...row, value: event.target.value } : row))} className={inputClass} />
+              <li key={index} className="flex flex-col gap-2 sm:flex-row">
+                <input aria-label="Label" placeholder="Label" value={spec.label} onChange={(event) => setSpecs(specs.map((row, i) => i === index ? { ...row, label: event.target.value } : row))} className={`${inputClass} min-w-0`} />
+                <input aria-label="Value" placeholder="Value" value={spec.value} onChange={(event) => setSpecs(specs.map((row, i) => i === index ? { ...row, value: event.target.value } : row))} className={`${inputClass} min-w-0`} />
                 <button type="button" aria-label="Remove row" onClick={() => setSpecs(specs.filter((_, i) => i !== index))} className="grid size-9 shrink-0 place-items-center rounded-full hover:bg-[#f2f1ed]"><X size={15} /></button>
               </li>
             ))}
@@ -203,8 +261,9 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
         <Field label="Usage / care instructions"><textarea name="usageInstructions" rows={3} defaultValue={product?.usageInstructions ?? ''} className={inputClass} /></Field>
       </fieldset>
 
-      <fieldset className="mt-6">
-        <legend className="mb-3 text-sm font-semibold">Hand-picked related products</legend>
+      <fieldset className={`${sectionClass} mt-4`}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Related products</legend>
+        <p className="text-xs leading-5 text-[#526b7b] sm:col-span-2">Add optional cross-links to other catalog listings.</p>
         <div className="flex flex-wrap gap-2">
           {related.map((id) => {
             const item = products.find((row) => row.id === id)
@@ -215,13 +274,13 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
         {relatedQuery && <ul className="mt-1 rounded-lg border border-[#1c1c1a]/10">{candidates.map((item) => <li key={item.id}><button type="button" onClick={() => { setRelated([...related, item.id]); setRelatedQuery('') }} className="block w-full px-3 py-2 text-left text-sm hover:bg-[#f2f1ed]">{item.name} <span className="text-xs text-[#68675f]">· {item.category}</span></button></li>)}{candidates.length === 0 && <li className="px-3 py-2 text-xs text-[#68675f]">No matches.</li>}</ul>}
       </fieldset>
 
-      <fieldset className="mt-6 grid gap-4 sm:grid-cols-2">
-        <legend className="mb-3 text-sm font-semibold">SEO</legend>
+      <fieldset className={`${sectionClass} mt-4`}>
+        <legend className="px-1 text-sm font-semibold text-[#15384d]">Search listing</legend>
         <Field label="SEO title"><input name="seoTitle" maxLength={160} defaultValue={product?.seoTitle ?? ''} className={inputClass} /></Field>
         <Field label="SEO description"><input name="seoDescription" maxLength={320} defaultValue={product?.seoDescription ?? ''} className={inputClass} /></Field>
       </fieldset>
 
-      <div className="mt-6 flex flex-wrap gap-2">
+      <div className="sticky bottom-2 z-10 mt-4 flex flex-wrap gap-2 rounded-xl border border-[#cfe2eb] bg-white/95 p-3 shadow-[0_8px_24px_rgba(21,56,77,.12)]">
         <button type="submit" disabled={saving || categories.length === 0} className={primaryButton}>{saving && <LoaderCircle size={15} className="animate-spin" />}{saving ? 'Saving…' : product ? 'Save product' : 'Create product'}</button>
         <button type="button" onClick={onCancel} className={secondaryButton}>Cancel</button>
       </div>

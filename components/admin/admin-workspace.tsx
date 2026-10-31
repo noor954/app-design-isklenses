@@ -409,7 +409,7 @@ function ProductWorkspace({ canEdit }: { canEdit: boolean }) {
         </div>}
       />
       {(message || isError) && <div className="mb-4"><Notice tone={message ? messageTone : 'error'}>{message || errorMessage(error)}</Notice></div>}
-      {(creating || editing) && <div className="mb-5"><ProductEditor product={editing} onSaved={() => void refresh()} onCancel={() => { setCreating(false); setEditing(undefined) }} /></div>}
+      {(creating || editing) && <div className="mb-5"><ProductEditor key={editing?.id ?? 'new-product'} product={editing} onSaved={() => void refresh()} onCancel={() => { setCreating(false); setEditing(undefined) }} /></div>}
       <div className="mb-4 flex items-center gap-2 rounded-xl border border-[#1c1c1a]/10 bg-white px-3">
         <Search size={16} className="text-[#68675f]" />
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter catalog" aria-label="Filter products" className="w-full bg-transparent py-3 text-sm outline-none" />
