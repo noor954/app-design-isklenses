@@ -25,6 +25,7 @@ const FILES_TO_CHECK = [
   'db/migrations/0015_delivery_rules.sql',
   'db/migrations/0016_database_media_store.sql',
   'db/migrations/0017_crm_meta_leads.sql',
+  'db/migrations/0019_chatbot_settings.sql',
   'lib/server/media-storage.mjs',
   'lib/media-url.mjs',
   'app/api/media/[...path]/route.ts',
