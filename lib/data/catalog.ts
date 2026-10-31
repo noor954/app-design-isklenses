@@ -162,6 +162,7 @@ const productColumns = {
   packContents: storeProducts.packContents,
   powerType: storeProducts.powerType,
   powerRange: storeProducts.powerRange,
+  availablePowerRanges: storeProducts.availablePowerRanges,
   uvProtection: storeProducts.uvProtection,
   fdaApproved: storeProducts.fdaApproved,
   features: storeProducts.features,

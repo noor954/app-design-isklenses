@@ -14,6 +14,7 @@ import {
   storeSettings,
 } from '@/lib/db/schema'
 import { CustomerAuthError, getCustomerSession, getOrderReceipt, type StoreCustomerSession } from '@/lib/auth/store-customer'
+import { isPowerRangeOption } from '@/lib/power-ranges'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const moneyPattern = /^(\d{1,10})(?:\.(\d{1,2}))?$/
@@ -22,6 +23,8 @@ const maxMoneyCents = 999_999_999_999
 type CheckoutLineInput = {
   productId: string
   variantId: string | null
+  leftPowerRange: string | null
+  rightPowerRange: string | null
   quantity: number
   quotedUnitPrice: string
   quotedCurrency: string
@@ -87,6 +90,14 @@ function moneyString(cents: number) {
   return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`
 }
 
+function optionalPowerRange(value: unknown, eye: 'left' | 'right') {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'string' || !isPowerRangeOption(value)) {
+    throw new CheckoutError(`The ${eye}-eye power range is invalid.`)
+  }
+  return value
+}
+
 function parseOrderInput(value: unknown) {
   if (!isRecord(value)) throw new CheckoutError('Order details are required.')
   if (typeof value.checkoutKey !== 'string' || !uuidPattern.test(value.checkoutKey)) {
@@ -107,7 +118,9 @@ function parseOrderInput(value: unknown) {
     if (!Number.isSafeInteger(entry.quantity) || Number(entry.quantity) < 1 || Number(entry.quantity) > 100) {
       throw new CheckoutError('Each quantity must be a whole number from 1 to 100.')
     }
-    const key = `${entry.productId}:${variantId ?? 'standard'}`
+    const leftPowerRange = optionalPowerRange(entry.leftPowerRange, 'left')
+    const rightPowerRange = optionalPowerRange(entry.rightPowerRange, 'right')
+    const key = `${entry.productId}:${variantId ?? 'standard'}:${leftPowerRange ?? ''}:${rightPowerRange ?? ''}`
     if (seen.has(key)) throw new CheckoutError('The bag contains a duplicate item. Review it and try again.')
     seen.add(key)
     if (typeof entry.quotedCurrency !== 'string' || !/^[A-Z]{3}$/.test(entry.quotedCurrency)) {
@@ -118,6 +131,8 @@ function parseOrderInput(value: unknown) {
     return {
       productId: entry.productId,
       variantId,
+      leftPowerRange,
+      rightPowerRange,
       quantity: Number(entry.quantity),
       quotedUnitPrice: entry.quotedUnitPrice,
       quotedCurrency: entry.quotedCurrency,
@@ -239,6 +254,20 @@ async function submitCodOrderImpl(value: unknown) {
         }
         if (!item.variantId && (activeVariantsByProduct.get(product.id)?.length ?? 0) > 0) {
           throw new CheckoutError('Choose an available listed option for each product.', 409)
+        }
+        const powerRanges = product.availablePowerRanges ?? []
+        const hasPowerSelection = Boolean(item.leftPowerRange || item.rightPowerRange)
+        if (powerRanges.length) {
+          if (
+            !item.leftPowerRange ||
+            !item.rightPowerRange ||
+            !powerRanges.includes(item.leftPowerRange) ||
+            !powerRanges.includes(item.rightPowerRange)
+          ) {
+            throw new CheckoutError('Choose an available power range for each eye.', 409)
+          }
+        } else if (hasPowerSelection) {
+          throw new CheckoutError('This product does not offer customer-selected power ranges.', 409)
         }
         const unitPrice = variant?.price ?? product.price
         const lineCurrency = variant?.currency ?? product.currency
@@ -373,6 +402,8 @@ async function submitCodOrderImpl(value: unknown) {
         orderId: order.id,
         productId: product.id,
         variantId: variant?.id ?? null,
+        powerLeft: item.leftPowerRange,
+        powerRight: item.rightPowerRange,
         inventoryReserved: true,
         productName: variant ? `${product.name} — ${variant.name}` : product.name,
         unitPrice,
@@ -433,6 +464,8 @@ export async function getOrderConfirmation() {
   const items = await db
     .select({
       productName: storeOrderItems.productName,
+      powerLeft: storeOrderItems.powerLeft,
+      powerRight: storeOrderItems.powerRight,
       unitPrice: storeOrderItems.unitPrice,
       quantity: storeOrderItems.quantity,
       lineTotal: storeOrderItems.lineTotal,

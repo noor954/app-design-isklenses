@@ -5,6 +5,7 @@ import { invalidateCache } from '@/lib/cache'
 import { requireAdminSession } from '@/lib/auth/admin'
 import { buildCategoryPaths, DEFAULT_PRODUCT_PAGE, descendantIds, SECTION_SOURCES, type ProductPageSettings } from '@/lib/catalog-types'
 import { db } from '@/lib/db'
+import { isPowerRangeOption, POWER_RANGE_OPTIONS } from '@/lib/power-ranges'
 import { deleteMedia, mediaPathFromOwnedUrl } from '@/lib/server/media-storage.mjs'
 import {
   storeActivityEvents,
@@ -246,6 +247,7 @@ export type AdminProductInput = {
   packContents?: unknown
   powerType?: unknown
   powerRange?: unknown
+  availablePowerRanges?: unknown
   uvProtection?: unknown
   fdaApproved?: unknown
   features?: unknown
@@ -310,6 +312,16 @@ function parseProduct(input: AdminProductInput) {
     return label && value ? [{ label, value }] : []
   })
   const currency = typeof input.currency === 'string' && /^[A-Z]{3}$/.test(input.currency) ? input.currency : 'PKR'
+  if (input.availablePowerRanges !== undefined && !Array.isArray(input.availablePowerRanges)) {
+    throw new Error('Choose valid customer power ranges.')
+  }
+  const selectedPowerRanges = new Set((input.availablePowerRanges ?? []).map((value) => {
+    if (typeof value !== 'string' || !isPowerRangeOption(value)) {
+      throw new Error('One or more selected customer power ranges are invalid.')
+    }
+    return value
+  }))
+  const availablePowerRanges = POWER_RANGE_OPTIONS.filter((range) => selectedPowerRanges.has(range))
   return {
     name,
     slug,
@@ -333,6 +345,7 @@ function parseProduct(input: AdminProductInput) {
     packContents: text(input.packContents, 120, 'Pack contents'),
     powerType: text(input.powerType, 120, 'Power type'),
     powerRange: text(input.powerRange, 200, 'Power range'),
+    availablePowerRanges,
     uvProtection: input.uvProtection === true,
     fdaApproved: input.fdaApproved === true,
     features,

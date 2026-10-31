@@ -11,6 +11,7 @@ export function ProductCard({ product }: { product: Product }) {
   const { add } = useStorefrontCart()
   const { price, currency, hasOptions } = lowestPrice(product)
   const available = isAvailable(product)
+  const requiresPowerSelection = Boolean(product.availablePowerRanges?.length)
   const href = `/product/${product.slug}`
 
   return (
@@ -34,7 +35,7 @@ export function ProductCard({ product }: { product: Product }) {
         {product.ratingCount ? <p className="mt-1 flex items-center gap-1 text-xs text-[#4a5568]"><Star size={13} className="fill-[#f5a623] text-[#f5a623]" aria-hidden="true" />{product.ratingAvg?.toFixed(1)} ({product.ratingCount})</p> : null}
         <p className="mt-1.5 text-base font-bold text-[#033473]">{hasOptions && 'From '}{formatPrice(price, currency)}{product.compareAtPrice && Number(product.compareAtPrice) > Number(price) && <s className="ml-2 text-sm font-normal text-[#6b7a90]">{formatPrice(product.compareAtPrice, currency)}</s>}</p>
         <div className="mt-auto pt-3">
-          {hasOptions || !available ? (
+          {hasOptions || requiresPowerSelection || !available ? (
             <Link href={href} className="block rounded-full border border-[#033473] py-2.5 text-center text-sm font-semibold text-[#033473] hover:bg-[#033473] hover:text-white">
               {available ? 'Select options' : 'View details'}
             </Link>

@@ -7,31 +7,45 @@ export type CartLine = {
   product: Product
   variant: ProductVariant | null
   quantity: number
+  leftPowerRange: string | null
+  rightPowerRange: string | null
 }
+
+type PowerSelection = { left: string; right: string } | null
 
 type StorefrontCartValue = {
   lines: Array<CartLine & { key: string }>
   count: number
-  add: (product: Product, variant?: ProductVariant | null) => void
+  add: (product: Product, variant?: ProductVariant | null, powerSelection?: PowerSelection) => void
   setQuantity: (key: string, quantity: number) => void
   clear: () => void
   syncProducts: (products: Product[]) => void
-  keyFor: (product: Product, variant?: ProductVariant | null) => string
+  keyFor: (product: Product, variant?: ProductVariant | null, powerSelection?: PowerSelection) => string
 }
 
 const CartContext = createContext<StorefrontCartValue | null>(null)
 
 export function StorefrontCartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Record<string, CartLine>>({})
-  const keyFor = useCallback((product: Product, variant?: ProductVariant | null) => `${product.id}:${variant?.id ?? 'standard'}`, [])
+  const keyFor = useCallback((product: Product, variant?: ProductVariant | null, powerSelection?: PowerSelection) =>
+    `${product.id}:${variant?.id ?? 'standard'}:${powerSelection?.left ?? ''}:${powerSelection?.right ?? ''}`, [])
 
-  const add = useCallback((product: Product, variant: ProductVariant | null = null) => {
-    const key = keyFor(product, variant)
+  const add = useCallback((product: Product, variant: ProductVariant | null = null, powerSelection: PowerSelection = null) => {
+    const key = keyFor(product, variant, powerSelection)
     const available = variant?.stockQuantity ?? product.stockQuantity
     setItems((current) => {
       const quantity = current[key]?.quantity ?? 0
       if (quantity >= available) return current
-      return { ...current, [key]: { product, variant, quantity: quantity + 1 } }
+      return {
+        ...current,
+        [key]: {
+          product,
+          variant,
+          quantity: quantity + 1,
+          leftPowerRange: powerSelection?.left ?? null,
+          rightPowerRange: powerSelection?.right ?? null,
+        },
+      }
     })
   }, [keyFor])
 
@@ -66,9 +80,29 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
           changed = true
           continue
         }
+        const powerRanges = product.availablePowerRanges ?? []
+        const hasPowerSelection = Boolean(line.leftPowerRange || line.rightPowerRange)
+        const validPowerSelection = powerRanges.length
+          ? Boolean(
+              line.leftPowerRange &&
+              line.rightPowerRange &&
+              powerRanges.includes(line.leftPowerRange) &&
+              powerRanges.includes(line.rightPowerRange),
+            )
+          : !hasPowerSelection
+        if (!validPowerSelection) {
+          changed = true
+          continue
+        }
         const quantity = Math.min(line.quantity, available)
         changed ||= quantity !== line.quantity || line.product !== product || line.variant !== variant
-        next[key] = { product, variant, quantity }
+        next[key] = {
+          product,
+          variant,
+          quantity,
+          leftPowerRange: line.leftPowerRange,
+          rightPowerRange: line.rightPowerRange,
+        }
       }
       return changed ? next : current
     })

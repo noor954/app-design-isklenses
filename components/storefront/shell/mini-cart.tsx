@@ -54,6 +54,9 @@ export function MiniCart({ open, onClose }: { open: boolean; onClose: () => void
                     <div className="min-w-0 flex-1">
                       <Link href={`/product/${line.product.slug}`} onClick={onClose} className="line-clamp-2 text-sm font-semibold hover:underline">{line.product.name}</Link>
                       {line.variant && <p className="mt-0.5 text-xs text-[#4a5568]">{line.variant.name}</p>}
+                      {(line.leftPowerRange || line.rightPowerRange) && (
+                        <p className="mt-0.5 text-xs text-[#526b7b]">L {line.leftPowerRange ?? '—'} D · R {line.rightPowerRange ?? '—'} D</p>
+                      )}
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <div className="flex items-center overflow-hidden rounded-full border border-[#033473]/25 text-sm">
                           <button type="button" aria-label="Decrease quantity" onClick={() => setQuantity(line.key, line.quantity - 1)} className="size-8 hover:bg-[#eef3fa]">−</button>

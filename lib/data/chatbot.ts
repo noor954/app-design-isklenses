@@ -28,6 +28,7 @@ export type ChatbotKnowledge = {
     packContents: string | null
     powerType: string | null
     powerRange: string | null
+    availablePowerRanges: string[]
     availability: 'in_stock' | 'out_of_stock'
     url: string
   }>
@@ -108,6 +109,7 @@ export async function getChatbotKnowledge(query: string): Promise<ChatbotKnowled
           packContents: storeProducts.packContents,
           powerType: storeProducts.powerType,
           powerRange: storeProducts.powerRange,
+          availablePowerRanges: storeProducts.availablePowerRanges,
         })
         .from(storeProducts)
         .leftJoin(storeCategories, eq(storeCategories.id, storeProducts.categoryId))

@@ -42,6 +42,7 @@ export interface Product {
   packContents?: string | null
   powerType?: string | null
   powerRange?: string | null
+  availablePowerRanges?: string[]
   uvProtection?: boolean
   fdaApproved?: boolean
   features?: string[]

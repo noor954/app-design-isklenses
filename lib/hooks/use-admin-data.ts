@@ -40,7 +40,7 @@ export interface AdminOrder {
   shippingAddress: Record<string, string>
   createdAt: string
   customer: { email: string; firstName: string | null; lastName: string | null } | null
-  items: Array<{ id: string; productName: string; unitPrice: string; quantity: number; lineTotal: string }>
+  items: Array<{ id: string; productName: string; powerLeft: string | null; powerRight: string | null; unitPrice: string; quantity: number; lineTotal: string }>
 }
 
 export interface AdminCustomer {

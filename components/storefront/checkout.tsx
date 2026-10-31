@@ -180,6 +180,8 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
             return {
               productId: line.product.id,
               variantId: line.variant?.id ?? null,
+              leftPowerRange: line.leftPowerRange,
+              rightPowerRange: line.rightPowerRange,
               quantity: line.quantity,
               quotedUnitPrice: price,
               quotedCurrency: lineCurrency,

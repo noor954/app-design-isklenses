@@ -102,6 +102,8 @@ export function StorefrontProductDetail({
       ? initialOptionId
       : variants[0]?.id ?? '',
   )
+  const [leftPowerRange, setLeftPowerRange] = useState('')
+  const [rightPowerRange, setRightPowerRange] = useState('')
   const [mediaIndex, setMediaIndex] = useState(0)
   const router = useRouter()
   const { add } = useStorefrontCart()
@@ -114,6 +116,11 @@ export function StorefrontProductDetail({
   const price = selectedVariant?.price ?? product.price
   const currency = selectedVariant?.currency ?? product.currency
   const stockQuantity = selectedVariant?.stockQuantity ?? product.stockQuantity
+  const availablePowerRanges = product.availablePowerRanges ?? []
+  const requiresPowerSelection = availablePowerRanges.length > 0
+  const powerSelectionReady = !requiresPowerSelection || (
+    availablePowerRanges.includes(leftPowerRange) && availablePowerRanges.includes(rightPowerRange)
+  )
 
   function changeMedia(index: number) {
     setMediaIndex((index + media.length) % media.length)
@@ -235,6 +242,41 @@ export function StorefrontProductDetail({
             </div>
           )}
 
+          {requiresPowerSelection && (
+            <fieldset className="mt-7 w-full rounded-2xl border border-[#b8d4e0] bg-[#e8f6fb] p-5">
+              <legend className="px-1 text-base font-semibold text-[#15384d]">Choose lens power</legend>
+              <p className="text-sm leading-5 text-[#526b7b]">Choose one available range for each eye. The two eyes can have different powers.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-semibold text-[#15384d]">
+                  Left eye
+                  <select
+                    required
+                    value={leftPowerRange}
+                    onChange={(event) => setLeftPowerRange(event.target.value)}
+                    aria-label="Left eye power range"
+                    className="mt-1.5 min-h-12 w-full rounded-xl border border-[#b8d4e0] bg-white px-3 py-3 text-base font-normal text-[#15384d] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#087ba5]"
+                  >
+                    <option value="" disabled>Choose a power range</option>
+                    {availablePowerRanges.map((range) => <option key={range} value={range}>{range} D</option>)}
+                  </select>
+                </label>
+                <label className="block text-sm font-semibold text-[#15384d]">
+                  Right eye
+                  <select
+                    required
+                    value={rightPowerRange}
+                    onChange={(event) => setRightPowerRange(event.target.value)}
+                    aria-label="Right eye power range"
+                    className="mt-1.5 min-h-12 w-full rounded-xl border border-[#b8d4e0] bg-white px-3 py-3 text-base font-normal text-[#15384d] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#087ba5]"
+                  >
+                    <option value="" disabled>Choose a power range</option>
+                    {availablePowerRanges.map((range) => <option key={range} value={range}>{range} D</option>)}
+                  </select>
+                </label>
+              </div>
+            </fieldset>
+          )}
+
           {variants.length > 0 && (
             <div id="listed-options" className="mt-8 w-full scroll-mt-8">
               <label htmlFor="product-variant" className="mb-2 block font-mono text-xs font-bold uppercase tracking-[.15em]">Choose a listed option</label>
@@ -278,13 +320,21 @@ export function StorefrontProductDetail({
           <button
             type="button"
             onClick={() => {
-              add(product, selectedVariant)
+              add(
+                product,
+                selectedVariant,
+                requiresPowerSelection ? { left: leftPowerRange, right: rightPowerRange } : null,
+              )
               router.push('/cart')
             }}
-            disabled={stockQuantity < 1}
+            disabled={stockQuantity < 1 || !powerSelectionReady}
             className="mt-8 w-full bg-[#152a52] px-5 py-4 text-xs font-black uppercase tracking-[.15em] text-[#d3ff48] hover:bg-[#16468a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16468a] disabled:cursor-not-allowed disabled:bg-[#dbe7e1] disabled:text-[#314a63]"
           >
-            {stockQuantity > 0 ? 'Add selected option to bag' : 'Currently unavailable'}
+            {stockQuantity < 1
+              ? 'Currently unavailable'
+              : requiresPowerSelection && !powerSelectionReady
+                ? 'Select power for both eyes'
+                : 'Add selected option to bag'}
           </button>
           <p className="mt-3 w-full text-center text-xs font-mono uppercase tracking-[.1em] text-[#314a63]">Cash on delivery · guest or account checkout</p>
         </section>

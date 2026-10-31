@@ -8,6 +8,7 @@ import { getAdminBrands, getAdminLensShades, getAdminLensTypes } from '@/app/act
 import { Alert, Field, flattenCategories, inputClass, primaryButton, secondaryButton, type AdminCategory } from '@/components/admin/admin-ui'
 import { useAdminProducts, type AdminProduct } from '@/lib/hooks/use-admin-data'
 import { notify, reportError } from '@/lib/ui/notifications'
+import { POWER_RANGE_OPTIONS } from '@/lib/power-ranges'
 
 type SpecRow = { label: string; value: string }
 
@@ -35,6 +36,7 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
   const [baseCurve, setBaseCurve] = useState(product?.baseCurve ?? '')
   const [waterContent, setWaterContent] = useState(product?.waterContent ?? '')
   const [powerRange, setPowerRange] = useState(product?.powerRange ?? '')
+  const [availablePowerRanges, setAvailablePowerRanges] = useState(product?.availablePowerRanges ?? [])
   const powerRangeInput = useRef<HTMLInputElement>(null)
   const variantManaged = Boolean(product?.variants.some((variant) => variant.isActive !== false))
 
@@ -64,6 +66,7 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
       packContents: text('packContents'),
       powerType: text('powerType'),
       powerRange: text('powerRange'),
+      availablePowerRanges: form.getAll('availablePowerRanges'),
       uvProtection: form.get('uvProtection') === 'on',
       fdaApproved: form.get('fdaApproved') === 'on',
       features: text('features').split('\n'),
@@ -157,11 +160,11 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
         <Field label="Power type"><input name="powerType" placeholder="Zero power / Prescription" defaultValue={product?.powerType ?? ''} className={inputClass} /></Field>
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1">
-            <Field label="Power range">
+            <Field label="Power range notes (optional)">
             <input
               ref={powerRangeInput}
               name="powerRange"
-              placeholder="Use the product's verified range"
+              placeholder="Verified note shown in specifications"
               value={powerRange}
               onChange={(event) => setPowerRange(event.target.value)}
               className={inputClass}
@@ -175,11 +178,67 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
               powerRangeInput.current?.focus()
             }}
             disabled={!powerRange}
-            aria-label="Clear power range"
+            aria-label="Clear power range notes"
             className="mb-0.5 inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-[#b8d4e0] px-3 text-xs font-medium text-[#526b7b] hover:bg-[#e8f6fb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ba5] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <X size={14} aria-hidden="true" /> Clear
           </button>
+        </div>
+        <div className="sm:col-span-2">
+          <p className="text-sm font-medium text-[#15384d]">Power ranges offered to customers</p>
+          <p id="power-range-help" className="mt-1 text-xs leading-5 text-[#526b7b]">
+            Select the ranges shoppers can choose separately for their left and right eyes. Leave all unchecked to hide power selection.
+          </p>
+          <details className="relative mt-2">
+            <summary
+              aria-describedby="power-range-help"
+              className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-[#b8d4e0] bg-[#e8f6fb] px-4 py-3 text-sm text-[#15384d] transition-colors hover:border-[#087ba5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ba5] [&::-webkit-details-marker]:hidden"
+            >
+              <span>{availablePowerRanges.length ? `${availablePowerRanges.length} ranges selected` : 'Choose one or more power ranges'}</span>
+              <span className="text-xs font-medium text-[#006f9b]">{availablePowerRanges.length ? 'Edit selection' : 'Open list'}</span>
+            </summary>
+            <div className="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-[#b8d4e0] bg-white p-2 shadow-[0_12px_28px_rgba(21,56,77,.18)]">
+              <div className="flex items-center justify-between gap-3 border-b border-[#cfe2eb] px-2 py-2">
+                <span className="text-xs font-semibold text-[#526b7b]">Available diopter ranges</span>
+                <button
+                  type="button"
+                  onClick={() => setAvailablePowerRanges([])}
+                  disabled={availablePowerRanges.length === 0}
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-[#006f9b] hover:bg-[#e8f6fb] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#087ba5] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="grid gap-1 p-1 sm:grid-cols-2">
+                {POWER_RANGE_OPTIONS.map((range) => {
+                  const checked = availablePowerRanges.includes(range)
+                  return (
+                    <label
+                      key={range}
+                      className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm transition-colors hover:bg-[#e8f6fb] ${checked ? 'bg-[#e8f6fb] font-semibold text-[#15384d]' : 'text-[#526b7b]'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        name="availablePowerRanges"
+                        value={range}
+                        checked={checked}
+                        onChange={() => setAvailablePowerRanges((current) => checked
+                          ? current.filter((value) => value !== range)
+                          : POWER_RANGE_OPTIONS.filter((value) => value === range || current.includes(value)))}
+                        className="size-4 accent-[#006f9b]"
+                      />
+                      {range} D
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          </details>
+          {availablePowerRanges.length > 0 && (
+            <p className="mt-2 text-xs text-[#526b7b]">
+              Customer choices: {availablePowerRanges.join(' D, ')} D
+            </p>
+          )}
         </div>
         <div className="grid gap-4 sm:col-span-2 sm:grid-cols-3">
           <Field label="Diameter (DIA) · mm" required>

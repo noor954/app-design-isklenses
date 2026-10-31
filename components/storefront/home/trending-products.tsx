@@ -69,6 +69,7 @@ function CatalogProduct({ product }: { product: Product }) {
   const { add } = useStorefrontCart()
   const { price, currency, hasOptions } = lowestPrice(product)
   const available = isAvailable(product)
+  const requiresPowerSelection = Boolean(product.availablePowerRanges?.length)
   const href = `/product/${product.slug}`
 
   return (
@@ -100,7 +101,7 @@ function CatalogProduct({ product }: { product: Product }) {
           {product.compareAtPrice && Number(product.compareAtPrice) > Number(price) && <s className="ml-2 text-sm font-normal text-[#526b7b]">{formatPrice(product.compareAtPrice, currency)}</s>}
         </p>
         <div className="mt-4">
-          {hasOptions || !available ? (
+          {hasOptions || requiresPowerSelection || !available ? (
             <Link href={href} className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#15384d]/25 px-4 text-sm font-semibold text-[#15384d] transition-colors hover:border-[#006f9b] hover:bg-[#006f9b] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ba5]">
               {available ? 'Choose options' : 'View details'}
             </Link>

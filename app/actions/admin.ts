@@ -472,6 +472,8 @@ export async function getAllOrders(limit = 50, offset = 0, status = '') {
           id: storeOrderItems.id,
           orderId: storeOrderItems.orderId,
           productName: storeOrderItems.productName,
+          powerLeft: storeOrderItems.powerLeft,
+          powerRight: storeOrderItems.powerRight,
           unitPrice: storeOrderItems.unitPrice,
           quantity: storeOrderItems.quantity,
           lineTotal: storeOrderItems.lineTotal,
