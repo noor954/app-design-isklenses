@@ -68,6 +68,10 @@ class StoreApi {
   final Dio _dio;
   final FlutterSecureStorage _storage;
 
+  String assetUrl(String path) => Uri.parse(
+    _dio.options.baseUrl,
+  ).resolve(path.startsWith('/') ? path.substring(1) : path).toString();
+
   static String _normalizeOrigin(String value) {
     final uri = Uri.tryParse(value.trim());
     if (uri == null ||
@@ -200,56 +204,14 @@ class StoreApi {
   }
 
   Future<StoreHomeData> getHomeData() async {
-    try {
-      final body = await _getObject('/api/storefront/home');
-      final data = body['data'];
-      if (data is! Map) {
-        throw const StoreApiException(
-          'The storefront home response is invalid.',
-        );
-      }
-      return StoreHomeData.fromJson(
-        Map<String, dynamic>.from(data),
-        Uri.parse(_dio.options.baseUrl),
-      );
-    } on StoreApiException catch (error) {
-      if (error.statusCode != 404) rethrow;
-      return _getHomeDataFromPublicCatalog();
+    final body = await _getObject('/api/storefront/home');
+    final data = body['data'];
+    if (data is! Map) {
+      throw const StoreApiException('The storefront home response is invalid.');
     }
-  }
-
-  Future<StoreHomeData> _getHomeDataFromPublicCatalog() async {
-    final responses = await Future.wait([
-      _getObject('/api/product-categories'),
-      _getObject('/api/brands'),
-      _getObject('/api/lens-shades'),
-      _getObject('/api/lens-types'),
-      getProducts(),
-    ]);
-    final origin = Uri.parse(_dio.options.baseUrl);
-    final categories = _asList((responses[0] as Map<String, dynamic>)['data'])
-        .map((item) => StoreCategory.fromJson(item, origin))
-        .toList(growable: false);
-    final brands = _asList(
-      (responses[1] as Map<String, dynamic>)['data'],
-    ).map((item) => StoreBrand.fromJson(item, origin)).toList(growable: false);
-    final shades = _asList(
-      (responses[2] as Map<String, dynamic>)['data'],
-    ).map((item) => StoreShade.fromJson(item, origin)).toList(growable: false);
-    final lensTypes = _asList((responses[3] as Map<String, dynamic>)['data'])
-        .map((item) => StoreLensType.fromJson(item, origin))
-        .toList(growable: false);
-    final products = (responses[4] as ProductPage).products;
-    return StoreHomeData(
-      banners: const [],
-      products: products,
-      categories: categories,
-      brands: brands,
-      shades: shades,
-      lensTypes: lensTypes,
-      reviews: const [],
-      chrome: const StoreChrome(contact: {}, footer: {}),
-      headings: const {},
+    return StoreHomeData.fromJson(
+      Map<String, dynamic>.from(data),
+      Uri.parse(_dio.options.baseUrl),
     );
   }
 
@@ -593,6 +555,9 @@ class StoreHomeData {
     required this.reviews,
     required this.chrome,
     required this.headings,
+    required this.appearance,
+    required this.configuration,
+    required this.origin,
   });
 
   final List<StoreBanner> banners;
@@ -604,6 +569,9 @@ class StoreHomeData {
   final List<StoreReview> reviews;
   final StoreChrome chrome;
   final Map<String, dynamic> headings;
+  final Map<String, dynamic> appearance;
+  final Map<String, dynamic> configuration;
+  final String origin;
 
   factory StoreHomeData.fromJson(Map<String, dynamic> value, Uri origin) {
     final content = _asMap(value['content']);
@@ -631,6 +599,9 @@ class StoreHomeData {
       ).map(StoreReview.fromJson).toList(growable: false),
       chrome: StoreChrome.fromJson(_asMap(value['chrome'])),
       headings: _asMap(content['headings']),
+      appearance: _asMap(content['appearance']),
+      configuration: _asMap(content['configuration']),
+      origin: origin.origin,
     );
   }
 }
@@ -839,6 +810,7 @@ class StoreProduct {
     required this.imageUrl,
     required this.images,
     required this.availablePowerRanges,
+    required this.availablePowerOptions,
     required this.variants,
     required this.description,
     required this.brand,
@@ -871,6 +843,7 @@ class StoreProduct {
   final String? imageUrl;
   final List<String> images;
   final List<String> availablePowerRanges;
+  final List<PowerLensOption> availablePowerOptions;
   final List<ProductVariant> variants;
   final String? description;
   final String? brand;
@@ -895,6 +868,7 @@ class StoreProduct {
 
   factory StoreProduct.fromJson(Map value, Uri apiOrigin) {
     final ranges = value['availablePowerRanges'];
+    final powerOptions = value['availablePowerOptions'];
     final variants = value['variants'];
     final assets = _asList(value['assets']);
     final imageUrls = assets
@@ -930,6 +904,12 @@ class StoreProduct {
       ],
       availablePowerRanges: ranges is List
           ? ranges.whereType<String>().toList(growable: false)
+          : const [],
+      availablePowerOptions: powerOptions is List
+          ? powerOptions
+                .whereType<Map>()
+                .map(PowerLensOption.fromJson)
+                .toList(growable: false)
           : const [],
       variants: variants is List
           ? variants
@@ -997,6 +977,24 @@ class ProductVariant {
   );
 }
 
+class PowerLensOption {
+  const PowerLensOption({
+    required this.value,
+    required this.label,
+    required this.surcharge,
+  });
+
+  final String value;
+  final String label;
+  final String surcharge;
+
+  factory PowerLensOption.fromJson(Map value) => PowerLensOption(
+    value: value['value']?.toString() ?? '',
+    label: value['label']?.toString() ?? value['value']?.toString() ?? '',
+    surcharge: value['surcharge']?.toString() ?? '0.00',
+  );
+}
+
 class CartLine {
   const CartLine({
     required this.product,
@@ -1012,7 +1010,23 @@ class CartLine {
   final String? rightPowerRange;
   final int quantity;
 
-  String get price => variant?.price ?? product.price;
+  String get price {
+    final basePrice = variant?.price ?? product.price;
+    final baseCents = _moneyToCents(basePrice);
+    final optionByValue = {
+      for (final option in product.availablePowerOptions)
+        option.value: _moneyToCents(option.surcharge),
+    };
+    final left = leftPowerRange == null
+        ? 0
+        : optionByValue[leftPowerRange];
+    final right = rightPowerRange == null
+        ? 0
+        : optionByValue[rightPowerRange];
+    if (baseCents == null || left == null || right == null) return basePrice;
+    final total = baseCents + left + right;
+    return '${total ~/ 100}.${(total % 100).toString().padLeft(2, '0')}';
+  }
   String get currency => variant?.currency ?? product.currency;
   String get key =>
       jsonEncode([product.id, variant?.id, leftPowerRange, rightPowerRange]);
@@ -1024,6 +1038,15 @@ class CartLine {
     rightPowerRange: rightPowerRange,
     quantity: value,
   );
+}
+
+int? _moneyToCents(String value) {
+  final match = RegExp(r'^(\d{1,10})(?:\.(\d{1,2}))?$').firstMatch(value);
+  if (match == null) return null;
+  final whole = int.tryParse(match.group(1)!);
+  final fraction = int.tryParse((match.group(2) ?? '').padRight(2, '0'));
+  if (whole == null || fraction == null) return null;
+  return whole * 100 + fraction;
 }
 
 class ShopperSession {

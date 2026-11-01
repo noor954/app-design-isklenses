@@ -23,33 +23,6 @@ class AdminProductEditorScreen extends StatefulWidget {
 }
 
 class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
-  static const _powerRanges = <String>[
-    '0.00-0.50',
-    '0.51-1.00',
-    '1.01-1.50',
-    '1.51-2.00',
-    '2.01-2.50',
-    '2.51-3.00',
-    '3.01-3.50',
-    '3.51-4.00',
-    '4.01-4.50',
-    '4.51-5.00',
-    '5.01-5.50',
-    '5.51-6.00',
-    '6.01-6.50',
-    '6.51-7.00',
-    '7.01-7.50',
-    '7.51-8.00',
-    '8.01-8.50',
-    '8.51-9.00',
-    '9.01-9.50',
-    '9.51-10.00',
-    '10.01-10.50',
-    '10.51-11.00',
-    '11.01-11.50',
-    '11.51-12.00',
-  ];
-
   final _formKey = GlobalKey<FormState>();
   final _controllers = <String, TextEditingController>{
     for (final field in const [
@@ -80,6 +53,7 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
   List<Map<String, dynamic>> _variants = [];
   List<Map<String, dynamic>> _assets = [];
   List<Map<String, dynamic>> _allProducts = [];
+  List<Map<String, dynamic>> _powerOptions = [];
   final Set<String> _categoryIds = {};
   final Set<String> _powerSelection = {};
   final Set<String> _relatedProductIds = {};
@@ -130,12 +104,16 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
         if (_editing) widget.api.get('/api/admin/products/$_currentProductId'),
         if (_editing)
           widget.api.get('/api/admin/products/$_currentProductId/variants'),
+        widget.api.get('/api/admin/content'),
         widget.api.get('/api/admin/products'),
       ]);
       _categories = _mapList(responses[0]['data']);
       _brands = _mapList(responses[1]['data']);
       _shades = _mapList(responses[2]['data']);
       _types = _mapList(responses[3]['data']);
+      final settings = responses[responses.length - 2]['settings'];
+      final powerOptions = settings is Map ? settings['power_options'] : null;
+      _powerOptions = _mapList(powerOptions);
       _allProducts = _mapList(responses.last['data']);
       if (_editing) {
         final product = responses[4]['data'];
@@ -223,7 +201,8 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
       'diameterMm': _diameter,
       'baseCurve': _baseCurve,
       'waterContent': _waterContent,
-      'availablePowerRanges': _powerRanges
+      'availablePowerRanges': _powerOptions
+          .map((option) => option['value']?.toString() ?? '')
           .where(_powerSelection.contains)
           .toList(growable: false),
       'status': _status,
@@ -481,11 +460,14 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 4,
-                      children: _powerRanges
-                          .map((range) {
+                      children: _powerOptions
+                          .map((option) {
+                            final range = option['value']?.toString() ?? '';
+                            final label = option['label']?.toString() ?? range;
+                            final surcharge = option['surcharge']?.toString() ?? '0';
                             final selected = _powerSelection.contains(range);
                             return FilterChip(
-                              label: Text(range),
+                              label: Text('$label · Rs $surcharge / eye'),
                               selected: selected,
                               onSelected: (value) => setState(() {
                                 if (value) {

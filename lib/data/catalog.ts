@@ -26,6 +26,11 @@ import {
   type CategoryNode,
   type ProductPageSettings,
 } from '@/lib/catalog-types'
+import { getSettings } from '@/lib/data/site-content'
+import {
+  normalizePowerLensOptions,
+  resolvePowerOptionValues,
+} from '@/lib/power-lens-options'
 
 export const CATALOG_NAMESPACE = 'catalog'
 
@@ -180,7 +185,7 @@ const productColumns = {
 async function enrich<T extends { id: string; categoryId: string | null; lensShadeId: string | null; lensTypeId: string | null }>(products: T[]) {
   const ids = products.map((product) => product.id)
   if (!ids.length) return []
-  const [assets, variants, ratings, categories, assignments, shades, types, imageCandidates] = await Promise.all([
+  const [assets, variants, ratings, categories, assignments, shades, types, imageCandidates, settings] = await Promise.all([
     db.select().from(storeProductAssets).where(inArray(storeProductAssets.productId, ids)).orderBy(asc(storeProductAssets.sortOrder), asc(storeProductAssets.createdAt)),
     db.select().from(storeProductVariants).where(and(inArray(storeProductVariants.productId, ids), eq(storeProductVariants.isActive, true))).orderBy(asc(storeProductVariants.price)),
     db
@@ -196,7 +201,9 @@ async function enrich<T extends { id: string; categoryId: string | null; lensSha
     db.select().from(storeLensShades).where(inArray(storeLensShades.id, products.map((product) => product.lensShadeId).filter((id): id is string => Boolean(id)))),
     db.select().from(storeLensTypes).where(inArray(storeLensTypes.id, products.map((product) => product.lensTypeId).filter((id): id is string => Boolean(id)))),
     getProductImageCandidates(),
+    getSettings(),
   ])
+  const powerOptions = normalizePowerLensOptions(settings.power_options)
   const group = <R extends { productId: string }>(rows: R[]) => {
     const map = new Map<string, R[]>()
     for (const row of rows) map.set(row.productId, [...(map.get(row.productId) ?? []), row])
@@ -213,18 +220,23 @@ async function enrich<T extends { id: string; categoryId: string | null; lensSha
     fallbackImageUrl: imageCandidates.find((candidate) => candidate.lensShadeId === shade.id)?.imageUrl ?? null,
   }]))
   const typesById = new Map(types.map((type) => [type.id, type]))
-  return products.map((product) => ({
-    ...product,
-    categoryPath: product.categoryId ? pathMap.get(product.categoryId) ?? '' : '',
-    categoryIds: assigned.get(product.id)?.map((category) => category.id) ?? (product.categoryId ? [product.categoryId] : []),
-    categories: assigned.get(product.id) ?? [],
-    lensShade: product.lensShadeId ? shadesById.get(product.lensShadeId) ?? null : null,
-    lensType: product.lensTypeId ? typesById.get(product.lensTypeId) ?? null : null,
-    assets: assetMap.get(product.id) ?? [],
-    variants: variantMap.get(product.id) ?? [],
-    ratingAvg: ratingMap.get(product.id) ? Math.round(Number(ratingMap.get(product.id)!.avg) * 10) / 10 : null,
-    ratingCount: ratingMap.get(product.id)?.count ?? 0,
-  }))
+  return products.map((product) => {
+    const availablePowerRanges = resolvePowerOptionValues(product.availablePowerRanges, powerOptions)
+    return {
+      ...product,
+      availablePowerRanges,
+      availablePowerOptions: powerOptions.filter((option) => availablePowerRanges.includes(option.value)),
+      categoryPath: product.categoryId ? pathMap.get(product.categoryId) ?? '' : '',
+      categoryIds: assigned.get(product.id)?.map((category) => category.id) ?? (product.categoryId ? [product.categoryId] : []),
+      categories: assigned.get(product.id) ?? [],
+      lensShade: product.lensShadeId ? shadesById.get(product.lensShadeId) ?? null : null,
+      lensType: product.lensTypeId ? typesById.get(product.lensTypeId) ?? null : null,
+      assets: assetMap.get(product.id) ?? [],
+      variants: variantMap.get(product.id) ?? [],
+      ratingAvg: ratingMap.get(product.id) ? Math.round(Number(ratingMap.get(product.id)!.avg) * 10) / 10 : null,
+      ratingCount: ratingMap.get(product.id)?.count ?? 0,
+    }
+  })
 }
 
 type CatalogSort = 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'featured'

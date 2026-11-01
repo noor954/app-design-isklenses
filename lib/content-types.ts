@@ -1,7 +1,20 @@
+import type { AppearanceConfiguration, HomeConfiguration } from '@/lib/home-configuration'
+import type { PowerLensOption } from '@/lib/power-lens-options'
+
 export const BANNER_PLACEMENTS = ['hero', 'promo', 'brand', 'category', 'service', 'new_arrival', 'feature', 'why_choose'] as const
 export type BannerPlacement = (typeof BANNER_PLACEMENTS)[number]
 
-export const SETTING_KEYS = ['announcements', 'contact', 'headings', 'seo_sections', 'footer', 'chatbot'] as const
+export const SETTING_KEYS = [
+  'announcements',
+  'contact',
+  'headings',
+  'seo_sections',
+  'footer',
+  'chatbot',
+  'appearance',
+  'home_configuration',
+  'power_options',
+] as const
 export type SettingKey = (typeof SETTING_KEYS)[number]
 
 export interface BannerContent {
@@ -71,4 +84,7 @@ export interface HomeContent {
   banners: BannerContent[]
   headings: HeadingSettings
   seoSections: SeoSection[]
+  appearance: AppearanceConfiguration
+  configuration: HomeConfiguration
+  powerOptions: PowerLensOption[]
 }

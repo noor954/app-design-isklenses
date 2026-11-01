@@ -17,6 +17,8 @@ export const ADMIN_SECTION_IDS = [
   'crm',
   'analytics',
   'content',
+  'home-design',
+  'power-options',
   'hero-slider',
   'delivery',
   'system-users',

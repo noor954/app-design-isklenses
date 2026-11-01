@@ -5,11 +5,41 @@ import 'package:flutter/material.dart';
 import 'store_api.dart';
 
 const _ink = Color(0xff15384d);
-const _navy = Color(0xff033473);
+const _navy = _ink;
 const _blue = Color(0xff006f9b);
 const _paper = Color(0xfff7fcff);
 const _pale = Color(0xffe8f6fb);
 const _rule = Color(0xffcfe2eb);
+
+List<StoreBanner> _heroSlides(List<StoreBanner> banners) =>
+    banners.take(7).toList();
+
+Map<String, dynamic> _homeSection(StoreHomeData data, String id) {
+  final sections = data.configuration['sections'];
+  if (sections is! List) return const {};
+  for (final section in sections) {
+    if (section is Map && section['id'] == id) {
+      return Map<String, dynamic>.from(section);
+    }
+  }
+  return const {};
+}
+
+bool _homeSectionEnabled(StoreHomeData data, String id) =>
+    _homeSection(data, id)['enabled'] == true;
+
+int _homeSectionOrder(StoreHomeData data, String id) =>
+    (_homeSection(data, id)['order'] as num?)?.toInt() ?? 0;
+
+String _homeSectionTitle(StoreHomeData data, String id, String fallback) {
+  final value = _homeSection(data, id)['title'];
+  return value is String && value.isNotEmpty ? value : fallback;
+}
+
+String _homeSectionDescription(StoreHomeData data, String id, String fallback) {
+  final value = _homeSection(data, id)['description'];
+  return value is String && value.isNotEmpty ? value : fallback;
+}
 
 class StorefrontHomeScreen extends StatefulWidget {
   const StorefrontHomeScreen({
@@ -31,33 +61,59 @@ class StorefrontHomeScreen extends StatefulWidget {
   State<StorefrontHomeScreen> createState() => _StorefrontHomeScreenState();
 }
 
-class _StorefrontHomeScreenState extends State<StorefrontHomeScreen> {
+class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
+    with WidgetsBindingObserver {
   late Future<StoreHomeData> _data;
   final _heroController = PageController();
   Timer? _heroTimer;
-  int _heroPage = 0;
+  Duration? _heroTimerDuration;
+  var _appIsResumed = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _appIsResumed =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     _data = widget.api.getHomeData();
-    _heroTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (!_heroController.hasClients) return;
+    _configureHeroTimer(const Duration(milliseconds: 5500));
+  }
+
+  void _configureHeroTimer(Duration duration) {
+    if (_heroTimerDuration == duration) return;
+    _heroTimer?.cancel();
+    _heroTimerDuration = duration;
+    _heroTimer = Timer.periodic(duration, (_) {
+      if (!mounted ||
+          !_appIsResumed ||
+          !TickerMode.of(context) ||
+          MediaQuery.disableAnimationsOf(context) ||
+          !_heroController.hasClients) {
+        return;
+      }
       final count = _cachedBanners.length;
       if (count < 2) return;
-      _heroPage = (_heroPage + 1) % count;
+      final currentPage = _heroController.page?.round() ?? 0;
+      final nextPage = (currentPage + 1) % count;
       _heroController.animateToPage(
-        _heroPage,
+        nextPage,
         duration: const Duration(milliseconds: 540),
         curve: Curves.easeOutCubic,
       );
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appIsResumed = state == AppLifecycleState.resumed;
+  }
+
   List<StoreBanner> _cachedBanners = const [];
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _heroTimer?.cancel();
     _heroController.dispose();
     super.dispose();
@@ -91,10 +147,20 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen> {
             return const Center(child: CircularProgressIndicator(color: _blue));
           }
           final data = snapshot.data!;
+          final configuredAutoplay = data.configuration['heroAutoplayMs'];
+          final autoplayDuration = Duration(
+            milliseconds:
+                configuredAutoplay is num &&
+                    configuredAutoplay >= 3000 &&
+                    configuredAutoplay <= 15000
+                ? configuredAutoplay.toInt()
+                : 5500,
+          );
+          _configureHeroTimer(autoplayDuration);
           final heroBanners = data.banners
               .where((banner) => banner.placement == 'hero')
               .toList();
-          _cachedBanners = heroBanners;
+          _cachedBanners = _heroSlides(heroBanners);
           final products = data.products;
           final categories = data.categories
               .where(
@@ -127,179 +193,333 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen> {
                       second.ratingAvg!.compareTo(first.ratingAvg!),
                 );
 
+          final configuredSections =
+              <({String id, List<Widget> slivers})>[
+                (
+                  id: 'hero',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _HeroCarousel(
+                        banners: heroBanners,
+                        controller: _heroController,
+                        onPage: widget.onPage,
+                        layout:
+                            data.configuration['heroLayout']?.toString() ??
+                            'full-bleed',
+                        sectionTitle: _homeSectionTitle(
+                          data,
+                          'hero',
+                          'Featured lens collections',
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Power surcharge: Rs ${_powerSurcharge()} for both eyes',
+                            style: const TextStyle(color: _ink, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
+                        child: _SearchPanel(onSearch: widget.onBrowse),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _FindYourLookBanner(
+                        onTap: () => widget.onPage('/find-your-look'),
+                      ),
+                    ),
+                  ],
+                ),
+                (
+                  id: 'bloom',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _DirectorySection<StoreCategory>(
+                        title: _homeSectionTitle(
+                          data,
+                          'bloom',
+                          'Find your collection',
+                        ),
+                        subtitle: _homeSectionDescription(
+                          data,
+                          'bloom',
+                          'Browse lenses by collection',
+                        ),
+                        items: categories,
+                        itemBuilder: (item) => _ImageDirectoryCard(
+                          title: item.name,
+                          count: item.productCount,
+                          imageUrl: item.imageUrl,
+                          icon: Icons.category_outlined,
+                          onTap: () => widget.onBrowse(
+                            StoreBrowseFilter(category: item.slug),
+                          ),
+                        ),
+                        onViewAll: () => widget.onPage('/product-category'),
+                      ),
+                    ),
+                  ],
+                ),
+                (
+                  id: 'brands',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _DirectorySection<StoreBrand>(
+                        title: _homeSectionTitle(
+                          data,
+                          'brands',
+                          'Shop by brand',
+                        ),
+                        subtitle: _homeSectionDescription(
+                          data,
+                          'brands',
+                          'Explore the brand directory',
+                        ),
+                        items: brands,
+                        itemBuilder: (item) => _ImageDirectoryCard(
+                          title: item.name,
+                          count: item.productCount,
+                          imageUrl: item.imageUrl,
+                          icon: Icons.remove_red_eye_outlined,
+                          onTap: () => widget.onBrowse(
+                            StoreBrowseFilter(brand: item.slug),
+                          ),
+                        ),
+                        onViewAll: () => widget.onPage('/brands'),
+                      ),
+                    ),
+                  ],
+                ),
+                (
+                  id: 'shades',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _DirectorySection<StoreShade>(
+                        title: _homeSectionTitle(
+                          data,
+                          'shades',
+                          'Explore lens shades',
+                        ),
+                        subtitle: _homeSectionDescription(
+                          data,
+                          'shades',
+                          'Browse the shades linked to active listings',
+                        ),
+                        items: shades,
+                        itemBuilder: (item) => _ImageDirectoryCard(
+                          title: item.name,
+                          count: item.productCount,
+                          imageUrl: item.imageUrl,
+                          icon: Icons.palette_outlined,
+                          swatch: _colorFromHex(item.hex),
+                          onTap: () => widget.onBrowse(
+                            StoreBrowseFilter(shadeId: item.id),
+                          ),
+                        ),
+                        onViewAll: () => widget.onPage('/shop'),
+                      ),
+                    ),
+                  ],
+                ),
+                (
+                  id: 'trending',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _HomeSectionIntro(
+                        title: _homeSectionTitle(
+                          data,
+                          'trending',
+                          'Browse the catalog',
+                        ),
+                        description: _homeSectionDescription(
+                          data,
+                          'trending',
+                          'Product details and prices come from active listings.',
+                        ),
+                      ),
+                    ),
+                    if (featured.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _ProductShelf(
+                          title: 'Featured for you',
+                          products: featured,
+                          onProduct: widget.onProduct,
+                          onCompare: widget.onCompare,
+                          onViewAll: () => widget.onBrowse(
+                            const StoreBrowseFilter(sort: 'featured'),
+                          ),
+                        ),
+                      ),
+                    if (featured.isEmpty && products.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _ProductShelf(
+                          title: 'Explore the collection',
+                          products: products.take(10).toList(),
+                          onProduct: widget.onProduct,
+                          onCompare: widget.onCompare,
+                          onViewAll: () =>
+                              widget.onBrowse(const StoreBrowseFilter()),
+                        ),
+                      ),
+                    if (topRated.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _ProductShelf(
+                          title: 'Top-rated listings',
+                          products: topRated.take(10).toList(),
+                          onProduct: widget.onProduct,
+                          onCompare: widget.onCompare,
+                          onViewAll: () => widget.onBrowse(
+                            const StoreBrowseFilter(sort: 'featured'),
+                          ),
+                        ),
+                      ),
+                    if (arrivals.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _ProductShelf(
+                          title: 'Just arrived',
+                          products: arrivals,
+                          onProduct: widget.onProduct,
+                          onCompare: widget.onCompare,
+                          onViewAll: () =>
+                              widget.onBrowse(const StoreBrowseFilter()),
+                        ),
+                      ),
+                    if (offers.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _ProductShelf(
+                          title: 'On sale',
+                          products: offers,
+                          onProduct: widget.onProduct,
+                          onCompare: widget.onCompare,
+                          onViewAll: () =>
+                              widget.onBrowse(const StoreBrowseFilter()),
+                        ),
+                      ),
+                  ],
+                ),
+                (
+                  id: 'types',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _DirectorySection<StoreLensType>(
+                        title: _homeSectionTitle(
+                          data,
+                          'types',
+                          'Browse by lens type',
+                        ),
+                        subtitle: _homeSectionDescription(
+                          data,
+                          'types',
+                          'See the options in each listing',
+                        ),
+                        items: data.lensTypes
+                            .where((item) => item.productCount > 0)
+                            .toList(),
+                        itemBuilder: (item) => _ImageDirectoryCard(
+                          title: item.name,
+                          count: item.productCount,
+                          imageUrl: item.imageUrl,
+                          icon: Icons.remove_red_eye_outlined,
+                          onTap: () => widget.onBrowse(
+                            StoreBrowseFilter(lensTypeId: item.id),
+                          ),
+                        ),
+                        onViewAll: () => widget.onPage('/find-your-look'),
+                      ),
+                    ),
+                  ],
+                ),
+                (
+                  id: 'why-us',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _HomeSectionIntro(
+                        title: _homeSectionTitle(
+                          data,
+                          'why-us',
+                          'Browse with confidence',
+                        ),
+                        description: _homeSectionDescription(
+                          data,
+                          'why-us',
+                          'Review product details and follow your eye-care professional’s guidance.',
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _ShoppingGuideBanner(
+                        onTap: () => widget.onPage('/shopping-guide'),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _GuidanceBanner(
+                        onTap: () => widget.onPage('/faq'),
+                      ),
+                    ),
+                  ],
+                ),
+                (
+                  id: 'reviews',
+                  slivers: [
+                    if (data.reviews.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _ReviewSection(
+                          reviews: data.reviews,
+                          title: _homeSectionTitle(
+                            data,
+                            'reviews',
+                            'Product reviews',
+                          ),
+                          subtitle: _homeSectionDescription(
+                            data,
+                            'reviews',
+                            'Approved reviews linked to active products',
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                (
+                  id: 'contact',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _HomeSectionIntro(
+                        title: _homeSectionTitle(
+                          data,
+                          'contact',
+                          'Questions about a listing or an order?',
+                        ),
+                        description: _homeSectionDescription(
+                          data,
+                          'contact',
+                          'Contact the store team about catalog or order questions.',
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: StoreSiteFooter(data: data, onPage: widget.onPage),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  ],
+                ),
+              ]..sort(
+                (left, right) => _homeSectionOrder(
+                  data,
+                  left.id,
+                ).compareTo(_homeSectionOrder(data, right.id)),
+              );
+          final homeSlivers = configuredSections
+              .where((section) => _homeSectionEnabled(data, section.id))
+              .expand((section) => section.slivers)
+              .toList(growable: false);
+
           return RefreshIndicator(
             onRefresh: _refresh,
             color: _blue,
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _HeroCarousel(
-                    banners: heroBanners,
-                    controller: _heroController,
-                    onPage: widget.onPage,
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
-                    child: _SearchPanel(onSearch: widget.onBrowse),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _FindYourLookBanner(
-                    onTap: () => widget.onPage('/find-your-look'),
-                  ),
-                ),
-                if (categories.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _DirectorySection<StoreCategory>(
-                      title: 'Find your collection',
-                      subtitle: 'Browse lenses by collection',
-                      items: categories,
-                      itemBuilder: (item) => _ImageDirectoryCard(
-                        title: item.name,
-                        count: item.productCount,
-                        imageUrl: item.imageUrl,
-                        icon: Icons.category_outlined,
-                        onTap: () => widget.onBrowse(
-                          StoreBrowseFilter(category: item.slug),
-                        ),
-                      ),
-                      onViewAll: () => widget.onPage('/product-category'),
-                    ),
-                  ),
-                if (brands.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _DirectorySection<StoreBrand>(
-                      title: 'Shop by brand',
-                      subtitle: 'Explore the brand directory',
-                      items: brands,
-                      itemBuilder: (item) => _ImageDirectoryCard(
-                        title: item.name,
-                        count: item.productCount,
-                        imageUrl: item.imageUrl,
-                        icon: Icons.remove_red_eye_outlined,
-                        onTap: () => widget.onBrowse(
-                          StoreBrowseFilter(brand: item.slug),
-                        ),
-                      ),
-                      onViewAll: () => widget.onPage('/brands'),
-                    ),
-                  ),
-                if (shades.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _DirectorySection<StoreShade>(
-                      title: 'Explore lens shades',
-                      subtitle: 'Browse the shades linked to active listings',
-                      items: shades,
-                      itemBuilder: (item) => _ImageDirectoryCard(
-                        title: item.name,
-                        count: item.productCount,
-                        imageUrl: item.imageUrl,
-                        icon: Icons.palette_outlined,
-                        swatch: _colorFromHex(item.hex),
-                        onTap: () => widget.onBrowse(
-                          StoreBrowseFilter(shadeId: item.id),
-                        ),
-                      ),
-                      onViewAll: () => widget.onPage('/shop'),
-                    ),
-                  ),
-                if (featured.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _ProductShelf(
-                      title: 'Featured for you',
-                      products: featured,
-                      onProduct: widget.onProduct,
-                      onCompare: widget.onCompare,
-                      onViewAll: () => widget.onBrowse(
-                        const StoreBrowseFilter(sort: 'featured'),
-                      ),
-                    ),
-                  ),
-                if (featured.isEmpty && products.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _ProductShelf(
-                      title: 'Explore the collection',
-                      products: products.take(10).toList(),
-                      onProduct: widget.onProduct,
-                      onCompare: widget.onCompare,
-                      onViewAll: () =>
-                          widget.onBrowse(const StoreBrowseFilter()),
-                    ),
-                  ),
-                if (topRated.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _ProductShelf(
-                      title: 'Top-rated listings',
-                      products: topRated.take(10).toList(),
-                      onProduct: widget.onProduct,
-                      onCompare: widget.onCompare,
-                      onViewAll: () => widget.onBrowse(
-                        const StoreBrowseFilter(sort: 'featured'),
-                      ),
-                    ),
-                  ),
-                if (arrivals.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _ProductShelf(
-                      title: 'Just arrived',
-                      products: arrivals,
-                      onProduct: widget.onProduct,
-                      onCompare: widget.onCompare,
-                      onViewAll: () =>
-                          widget.onBrowse(const StoreBrowseFilter()),
-                    ),
-                  ),
-                if (offers.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _ProductShelf(
-                      title: 'On sale',
-                      products: offers,
-                      onProduct: widget.onProduct,
-                      onCompare: widget.onCompare,
-                      onViewAll: () =>
-                          widget.onBrowse(const StoreBrowseFilter()),
-                    ),
-                  ),
-                if (data.lensTypes.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _DirectorySection<StoreLensType>(
-                      title: 'Browse by lens type',
-                      subtitle: 'See the options in each listing',
-                      items: data.lensTypes
-                          .where((item) => item.productCount > 0)
-                          .toList(),
-                      itemBuilder: (item) => _ImageDirectoryCard(
-                        title: item.name,
-                        count: item.productCount,
-                        imageUrl: item.imageUrl,
-                        icon: Icons.remove_red_eye_outlined,
-                        onTap: () => widget.onBrowse(
-                          StoreBrowseFilter(lensTypeId: item.id),
-                        ),
-                      ),
-                      onViewAll: () => widget.onPage('/find-your-look'),
-                    ),
-                  ),
-                if (data.reviews.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _ReviewSection(reviews: data.reviews),
-                  ),
-                SliverToBoxAdapter(
-                  child: _ShoppingGuideBanner(
-                    onTap: () => widget.onPage('/shopping-guide'),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _GuidanceBanner(onTap: () => widget.onPage('/faq')),
-                ),
-                SliverToBoxAdapter(
-                  child: StoreSiteFooter(data: data, onPage: widget.onPage),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 32)),
-              ],
-            ),
+            child: CustomScrollView(slivers: homeSlivers),
           );
         },
       ),
@@ -307,146 +527,257 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen> {
   }
 }
 
-class _HeroCarousel extends StatelessWidget {
+class _HeroCarousel extends StatefulWidget {
   const _HeroCarousel({
     required this.banners,
     required this.controller,
     required this.onPage,
+    required this.layout,
+    required this.sectionTitle,
   });
 
   final List<StoreBanner> banners;
   final PageController controller;
   final ValueChanged<String> onPage;
+  final String layout;
+  final String sectionTitle;
+
+  @override
+  State<_HeroCarousel> createState() => _HeroCarouselState();
+}
+
+class _HeroCarouselState extends State<_HeroCarousel> {
+  int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    final slides = banners.isEmpty
-        ? const [
-            StoreBanner(
-              id: 'editorial-one',
-              placement: 'hero',
-              title: 'See color differently.',
-              body:
-                  'Explore lens shades, browse the catalog, and compare the details.',
-              imageUrl:
-                  'https://www.isklenses.online/isk-home/hero-editorial-1.jpg',
-              href: '/shop',
+    final slides = _heroSlides(widget.banners);
+    if (slides.isEmpty) {
+      return const SizedBox(
+        height: 340,
+        child: ColoredBox(
+          color: _blue,
+          child: Center(
+            child: Text(
+              'Featured collections are unavailable.',
+              style: TextStyle(color: Colors.white),
             ),
-            StoreBanner(
-              id: 'editorial-two',
-              placement: 'hero',
-              title: 'A shade for your point of view.',
-              body: 'Find your next look in the ISK Lenses collection.',
-              imageUrl:
-                  'https://www.isklenses.online/isk-home/hero-editorial-2.jpg',
-              href: '/shop',
-            ),
-            StoreBanner(
-              id: 'editorial-three',
-              placement: 'hero',
-              title: 'Let your look take the lead.',
-              body: 'Discover colors and compare active lens listings.',
-              imageUrl:
-                  'https://www.isklenses.online/isk-home/hero-editorial-3.jpg',
-              href: '/shop',
-            ),
-          ]
-        : banners.take(7).toList();
+          ),
+        ),
+      );
+    }
+    final activeIndex = _currentIndex < slides.length ? _currentIndex : 0;
+    final activeSlide = slides[activeIndex];
+    final motionDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 360);
     final wide = MediaQuery.sizeOf(context).width >= 760;
     final height = wide ? 390.0 : 340.0;
+    final centered = widget.layout == 'centered';
+    final split = widget.layout == 'split';
+    final editorial = widget.layout == 'editorial';
     return SizedBox(
       height: height,
-      child: PageView.builder(
-        controller: controller,
-        itemCount: slides.length,
-        itemBuilder: (context, index) {
-          final slide = slides[index];
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              if (slide.imageUrl.isNotEmpty)
-                Image.network(
-                  slide.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const ColoredBox(color: _navy),
-                )
-              else
-                const ColoredBox(color: _navy),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xe615384d), Color(0x0015384d)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: wide ? 42 : 24,
-                right: wide ? 42 : 24,
-                bottom: wide ? 52 : 42,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 700),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        slide.title.isEmpty ? 'ISK Lenses' : slide.title,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineLarge
-                            ?.copyWith(
-                              color: Colors.white,
-                              height: 1,
-                              fontWeight: FontWeight.w900,
-                            ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            controller: widget.controller,
+            itemCount: slides.length,
+            onPageChanged: (index) {
+              if (_currentIndex != index) setState(() => _currentIndex = index);
+            },
+            itemBuilder: (context, index) {
+              final slide = slides[index];
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (slide.imageUrl.isNotEmpty)
+                    Image.network(
+                      slide.imageUrl,
+                      fit: BoxFit.contain,
+                      alignment: split || editorial
+                          ? Alignment.centerRight
+                          : Alignment.center,
+                      errorBuilder: (_, __, ___) =>
+                          const ColoredBox(color: _blue),
+                    )
+                  else
+                    const ColoredBox(color: _blue),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: centered
+                            ? [const Color(0x9921384d), const Color(0xb321384d)]
+                            : split
+                            ? [
+                                const Color(0xf515384d),
+                                const Color(0xe015384d),
+                                const Color(0x1415384d),
+                              ]
+                            : [
+                                const Color(0xd9006f9b),
+                                const Color(0x00006f9b),
+                              ],
+                        begin: centered
+                            ? Alignment.topCenter
+                            : Alignment.centerLeft,
+                        end: centered
+                            ? Alignment.bottomCenter
+                            : Alignment.centerRight,
                       ),
-                      if (slide.body?.isNotEmpty == true) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          slide.body!,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(color: Colors.white.withAlpha(225)),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          Positioned(
+            left: centered
+                ? 20
+                : wide
+                ? 42
+                : 24,
+            right: centered
+                ? 20
+                : wide
+                ? 42
+                : 24,
+            top: centered ? 0 : null,
+            bottom: centered
+                ? 0
+                : wide
+                ? 52
+                : 42,
+            child: Align(
+              alignment: centered ? Alignment.center : Alignment.bottomLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: editorial ? 760 : 700),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: centered
+                      ? CrossAxisAlignment.center
+                      : CrossAxisAlignment.start,
+                  children: [
+                    IgnorePointer(
+                      child: AnimatedSwitcher(
+                        duration: motionDuration,
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: animation.drive(
+                              Tween(
+                                begin: const Offset(0.06, 0),
+                                end: Offset.zero,
+                              ).chain(CurveTween(curve: Curves.easeOutCubic)),
+                            ),
+                            child: child,
+                          ),
                         ),
-                      ],
-                      const SizedBox(height: 18),
-                      FilledButton.icon(
-                        onPressed: () => onPage(slide.href ?? '/shop'),
+                        child: Column(
+                          key: ValueKey(activeSlide.id),
+                          crossAxisAlignment: centered
+                              ? CrossAxisAlignment.center
+                              : CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              activeSlide.title.isEmpty
+                                  ? widget.sectionTitle
+                                  : activeSlide.title,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.headlineLarge
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    height: 1,
+                                    fontWeight: editorial
+                                        ? FontWeight.w600
+                                        : FontWeight.w900,
+                                  ),
+                            ),
+                            if (activeSlide.body?.isNotEmpty == true) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                activeSlide.body!,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(
+                                      color: Colors.white.withAlpha(225),
+                                    ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Align(
+                      alignment: centered
+                          ? Alignment.center
+                          : Alignment.centerLeft,
+                      child: FilledButton.icon(
+                        onPressed: () =>
+                            widget.onPage(activeSlide.href ?? '/shop'),
                         icon: const Icon(Icons.arrow_forward_rounded),
                         label: const Text('Explore the collection'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              Positioned(
-                top: 20,
-                right: 20,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withAlpha(90),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    child: Text(
-                      '${index + 1} / ${slides.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
+            ),
+          ),
+          Positioned(
+            top: 20,
+            right: 20,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _blue.withAlpha(220),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var index = 0; index < slides.length; index++)
+                      AnimatedContainer(
+                        duration: motionDuration,
+                        curve: Curves.easeOutCubic,
+                        width: index == activeIndex ? 18 : 6,
+                        height: 6,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(
+                            index == activeIndex ? 255 : 140,
+                          ),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    AnimatedSwitcher(
+                      duration: motionDuration,
+                      child: Text(
+                        '${activeIndex + 1} / ${slides.length}',
+                        key: ValueKey(activeIndex),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -502,7 +833,7 @@ class _FindYourLookBanner extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
     child: Material(
-      color: _navy,
+      color: _blue,
       borderRadius: BorderRadius.circular(22),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -810,7 +1141,7 @@ class StoreProductCard extends StatelessWidget {
                       top: 10,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: _navy,
+                          color: _blue,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Padding(
@@ -876,7 +1207,7 @@ class StoreProductCard extends StatelessWidget {
                   Text(
                     _money(product.price, product.currency),
                     style: const TextStyle(
-                      color: _navy,
+                      color: _blue,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -923,10 +1254,46 @@ class _ProductPlaceholder extends StatelessWidget {
   );
 }
 
+class _HomeSectionIntro extends StatelessWidget {
+  const _HomeSectionIntro({required this.title, required this.description});
+
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 28, 20, 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: _ink,
+            fontWeight: FontWeight.w900,
+            height: 1.05,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          description,
+          style: const TextStyle(color: Color(0xff526b7b), height: 1.5),
+        ),
+      ],
+    ),
+  );
+}
+
 class _ReviewSection extends StatelessWidget {
-  const _ReviewSection({required this.reviews});
+  const _ReviewSection({
+    required this.reviews,
+    required this.title,
+    required this.subtitle,
+  });
 
   final List<StoreReview> reviews;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -934,10 +1301,7 @@ class _ReviewSection extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeading(
-          title: 'Product reviews',
-          subtitle: 'Approved reviews linked to active products',
-        ),
+        _SectionHeading(title: title, subtitle: subtitle),
         const SizedBox(height: 12),
         SizedBox(
           height: 170,
@@ -1015,7 +1379,7 @@ class _GuidanceBanner extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(18, 30, 18, 0),
     child: Material(
-      color: _navy,
+      color: _blue,
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
         borderRadius: BorderRadius.circular(22),
@@ -1068,7 +1432,7 @@ class _ShoppingGuideBanner extends StatelessWidget {
                     Text(
                       'A clearer way to shop',
                       style: TextStyle(
-                        color: _navy,
+                        color: _blue,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -1100,26 +1464,39 @@ class StoreSiteFooter extends StatelessWidget {
     final about = data.chrome.footer['about']?.toString();
     final email = data.chrome.contact['email']?.toString();
     final phone = data.chrome.contact['phone']?.toString();
+    final theme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(top: 30),
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
-      color: _navy,
+      color: theme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'ISK Lenses',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.network(
+                '${data.origin}/icon-light-32x32.png',
+                width: 38,
+                height: 38,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.remove_red_eye_outlined, size: 32),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'ISK Lenses',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: theme.onSurface,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
           if (about != null && about.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               about,
-              style: TextStyle(color: Colors.white.withAlpha(210), height: 1.4),
+              style: TextStyle(color: theme.onSurfaceVariant, height: 1.4),
             ),
           ],
           const SizedBox(height: 18),
@@ -1141,9 +1518,12 @@ class StoreSiteFooter extends StatelessWidget {
               ])
                 ActionChip(
                   label: Text(label),
-                  backgroundColor: Colors.white.withAlpha(20),
-                  side: BorderSide(color: Colors.white.withAlpha(85)),
-                  labelStyle: const TextStyle(color: Colors.white),
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: theme.outlineVariant),
+                  labelStyle: TextStyle(
+                    color: theme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                   onPressed: () => onPage(route),
                 ),
             ],
@@ -1151,15 +1531,9 @@ class StoreSiteFooter extends StatelessWidget {
           if (email?.isNotEmpty == true || phone?.isNotEmpty == true) ...[
             const SizedBox(height: 16),
             if (email?.isNotEmpty == true)
-              Text(
-                email!,
-                style: TextStyle(color: Colors.white.withAlpha(220)),
-              ),
+              Text(email!, style: TextStyle(color: theme.onSurface)),
             if (phone?.isNotEmpty == true)
-              Text(
-                phone!,
-                style: TextStyle(color: Colors.white.withAlpha(220)),
-              ),
+              Text(phone!, style: TextStyle(color: theme.onSurface)),
           ],
           const Divider(color: Color(0x55ffffff), height: 28),
           Text(
@@ -2466,6 +2840,8 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
         .where((variant) => variant.stockQuantity > 0)
         .toList();
     final available = product.stockQuantity > 0 || availableVariants.isNotEmpty;
+    final selectedBasePrice = _variant?.price ?? product.price;
+    final selectedPrice = _powerAdjustedPrice(selectedBasePrice);
     final wide = MediaQuery.sizeOf(context).width >= 760;
     final gallery = SizedBox(
       height: wide ? 480 : 380,
@@ -2543,7 +2919,7 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
             ),
           const SizedBox(height: 12),
           Text(
-            _money(_variant?.price ?? product.price, product.currency),
+            _money(selectedPrice, _variant?.currency ?? product.currency),
             style: const TextStyle(
               color: _navy,
               fontSize: 23,
@@ -2581,17 +2957,19 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
           if (product.availablePowerRanges.isNotEmpty) ...[
             const SizedBox(height: 18),
             const Text(
-              'Power selection',
+              'Power selection · surcharge per eye',
               style: TextStyle(color: _ink, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _leftPower,
               decoration: const InputDecoration(labelText: 'Left eye'),
-              items: product.availablePowerRanges
-                  .map(
-                    (item) => DropdownMenuItem(value: item, child: Text(item)),
-                  )
+              items: product.availablePowerOptions
+                  .where((option) => product.availablePowerRanges.contains(option.value))
+                  .map((option) => DropdownMenuItem(
+                    value: option.value,
+                    child: Text('${option.label} D · +Rs ${option.surcharge}'),
+                  ))
                   .toList(),
               onChanged: (value) => setState(() {
                 _leftPower = value;
@@ -2602,10 +2980,12 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
             DropdownButtonFormField<String>(
               initialValue: _rightPower,
               decoration: const InputDecoration(labelText: 'Right eye'),
-              items: product.availablePowerRanges
-                  .map(
-                    (item) => DropdownMenuItem(value: item, child: Text(item)),
-                  )
+              items: product.availablePowerOptions
+                  .where((option) => product.availablePowerRanges.contains(option.value))
+                  .map((option) => DropdownMenuItem(
+                    value: option.value,
+                    child: Text('${option.label} D · +Rs ${option.surcharge}'),
+                  ))
                   .toList(),
               onChanged: (value) => setState(() {
                 _rightPower = value;
@@ -2671,6 +3051,21 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
             )
           : ListView(padding: EdgeInsets.zero, children: [gallery, details]),
     );
+  }
+
+  int _powerSurcharge() {
+    final byValue = {
+      for (final option in widget.product.availablePowerOptions)
+        option.value: _moneyToCents(option.surcharge) ?? 0,
+    };
+    return (byValue[_leftPower] ?? 0) + (byValue[_rightPower] ?? 0);
+  }
+
+  String _powerAdjustedPrice(String basePrice) {
+    final base = _moneyToCents(basePrice);
+    if (base == null) return basePrice;
+    final total = base + _powerSurcharge();
+    return '${total ~/ 100}.${(total % 100).toString().padLeft(2, '0')}';
   }
 
   void _add() {

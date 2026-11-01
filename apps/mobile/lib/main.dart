@@ -9,11 +9,9 @@ import 'isk_controls.dart';
 import 'store_api.dart';
 import 'storefront_screens.dart';
 
-const _navy = Color(0xff033473);
-const _paleBlue = Color(0xffeef4fc);
+const _navy = Color(0xff15384d);
+const _paleBlue = Color(0xffe8f6fb);
 const _controlBlue = Color(0xff006f9b);
-const _controlLine = Color(0xffb8d4e0);
-const _controlFill = Color(0xffe8f6fb);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +36,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
   final List<CartLine> _cart = [];
   final List<StoreProduct> _comparison = [];
   ShopperSession? _session;
+  Map<String, dynamic> _appearance = const {};
   var _tab = 0;
   StoreBrowseFilter _browseFilter = const StoreBrowseFilter();
 
@@ -49,7 +48,78 @@ class _IskLensesAppState extends State<IskLensesApp> {
     _api = widget.api ?? StoreApi();
     _adminApi = widget.adminApi ?? AdminApi();
     _loadSession();
+    _loadAppearance();
   }
+
+  Future<void> _loadAppearance() async {
+    try {
+      final home = await _api.getHomeData();
+      if (mounted) setState(() => _appearance = home.appearance);
+    } on StoreApiException catch (error) {
+      debugPrint('Shared storefront appearance unavailable: ${error.message}');
+    }
+  }
+
+  Color _appearanceColor(String key, int fallback) {
+    final palettes = {
+      'sky': {
+        'ink': 0xff15384d,
+        'sky': 0xff087ba5,
+        'primary': 0xff006f9b,
+        'light': 0xffb8e8f5,
+        'surface': 0xffe8f6fb,
+        'paper': 0xfff7fcff,
+        'muted': 0xff526b7b,
+        'rule': 0xffcfe2eb,
+      },
+      'clear': {
+        'ink': 0xff15384d,
+        'sky': 0xff1686ad,
+        'primary': 0xff087ba5,
+        'light': 0xffc3eff8,
+        'surface': 0xffeaf8fc,
+        'paper': 0xfffbfeff,
+        'muted': 0xff526b7b,
+        'rule': 0xffc6e4ed,
+      },
+      'lagoon': {
+        'ink': 0xff123d4c,
+        'sky': 0xff087e8b,
+        'primary': 0xff08727c,
+        'light': 0xffb7eee8,
+        'surface': 0xffe5f7f5,
+        'paper': 0xfff7fdfc,
+        'muted': 0xff4d6d73,
+        'rule': 0xffc6e4e0,
+      },
+      'ocean': {
+        'ink': 0xff14364f,
+        'sky': 0xff237da6,
+        'primary': 0xff12658d,
+        'light': 0xffc1e6f4,
+        'surface': 0xffe9f4f9,
+        'paper': 0xfff8fcff,
+        'muted': 0xff526b7b,
+        'rule': 0xffc8dfe9,
+      },
+    };
+    final palette = palettes[_appearance['palette']] ?? palettes['sky']!;
+    return Color(palette[key] ?? fallback);
+  }
+
+  double _controlRadius(String setting, double fallback) =>
+      switch (setting == 'textbox'
+      ? _appearance['textbox']
+      : _appearance['button']) {
+        'pill' => 999,
+        'rounded' => 14,
+        'square' => 4,
+        'underline' => 0,
+        'filled' => 12,
+        'soft' => 16,
+        'outline' => 999,
+        _ => fallback,
+      };
 
   Future<void> _loadSession() async {
     try {
@@ -359,6 +429,36 @@ class _IskLensesAppState extends State<IskLensesApp> {
 
   @override
   Widget build(BuildContext context) {
+    final ink = _appearanceColor('ink', 0xff15384d);
+    final blue = _appearanceColor('primary', 0xff006f9b);
+    final focusBlue = _appearanceColor('sky', 0xff087ba5);
+    final paper = _appearanceColor('paper', 0xfff7fcff);
+    final surface = _appearanceColor('surface', 0xffe8f6fb);
+    final line = _appearanceColor('rule', 0xffcfe2eb);
+    final controlStyle = _appearance['button']?.toString() ?? 'pill';
+    final softButton = controlStyle == 'soft' || controlStyle == 'outline';
+    final textboxStyle = _appearance['textbox']?.toString() ?? 'rounded';
+    final inputRadius = BorderRadius.circular(_controlRadius('textbox', 14));
+    final buttonShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(_controlRadius('button', 999)),
+    );
+    final menuRadius = BorderRadius.circular(
+      switch (_appearance['menu']) {
+        'compact' => 8,
+        'underline' => 0,
+        'segmented' => 999,
+        'floating' => 16,
+        _ => 12,
+      }.toDouble(),
+    );
+    final navigationRadius = BorderRadius.circular(
+      switch (_appearance['navigation']) {
+        'capsule' => 999,
+        'boxed' => 10,
+        'minimal' || 'underline' => 0,
+        _ => 14,
+      }.toDouble(),
+    );
     return MaterialApp(
       title: 'ISK Lenses',
       debugShowCheckedModeBanner: false,
@@ -366,37 +466,45 @@ class _IskLensesAppState extends State<IskLensesApp> {
         useMaterial3: true,
         canvasColor: Colors.white,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: _controlBlue,
-          primary: _controlBlue,
-          surface: Colors.white,
+          seedColor: blue,
+          primary: blue,
+          surface: paper,
         ),
-        scaffoldBackgroundColor: const Color(0xfff8faff),
-        appBarTheme: const AppBarTheme(
+        scaffoldBackgroundColor: paper,
+        appBarTheme: AppBarTheme(
           backgroundColor: Colors.white,
-          foregroundColor: _navy,
+          foregroundColor: ink,
           centerTitle: false,
           elevation: 0,
           scrolledUnderElevation: 1,
         ),
         inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
+          filled: textboxStyle == 'filled',
+          fillColor: surface,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 15,
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _controlLine),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _controlLine),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _controlBlue, width: 2),
-          ),
+          border: textboxStyle == 'underline'
+              ? UnderlineInputBorder(borderSide: BorderSide(color: line))
+              : OutlineInputBorder(
+                  borderRadius: inputRadius,
+                  borderSide: BorderSide(color: line),
+                ),
+          enabledBorder: textboxStyle == 'underline'
+              ? UnderlineInputBorder(borderSide: BorderSide(color: line))
+              : OutlineInputBorder(
+                  borderRadius: inputRadius,
+                  borderSide: BorderSide(color: line),
+                ),
+          focusedBorder: textboxStyle == 'underline'
+              ? UnderlineInputBorder(
+                  borderSide: BorderSide(color: focusBlue, width: 2),
+                )
+              : OutlineInputBorder(
+                  borderRadius: inputRadius,
+                  borderSide: BorderSide(color: focusBlue, width: 2),
+                ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: Color(0xffb4233e)),
@@ -407,31 +515,50 @@ class _IskLensesAppState extends State<IskLensesApp> {
           ),
         ),
         dropdownMenuTheme: DropdownMenuThemeData(
-          textStyle: const TextStyle(color: Color(0xff15384d)),
+          textStyle: TextStyle(color: ink),
           menuStyle: MenuStyle(
             backgroundColor: const WidgetStatePropertyAll(Colors.white),
-            elevation: const WidgetStatePropertyAll(8),
+            elevation: WidgetStatePropertyAll(
+              _appearance['menu'] == 'floating' ? 12 : 8,
+            ),
             shape: WidgetStatePropertyAll(
               RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: _controlLine),
+                borderRadius: menuRadius,
+                side: BorderSide(color: line),
               ),
             ),
           ),
         ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: paper,
+          indicatorColor: surface,
+          indicatorShape: RoundedRectangleBorder(
+            borderRadius: navigationRadius,
+          ),
+          labelTextStyle: WidgetStatePropertyAll(
+            TextStyle(color: ink, fontWeight: FontWeight.w600),
+          ),
+        ),
+        navigationRailTheme: NavigationRailThemeData(
+          backgroundColor: paper,
+          indicatorColor: surface,
+          indicatorShape: RoundedRectangleBorder(
+            borderRadius: navigationRadius,
+          ),
+          selectedIconTheme: IconThemeData(color: blue),
+        ),
         checkboxTheme: CheckboxThemeData(
           fillColor: WidgetStateProperty.resolveWith(
-            (states) => states.contains(WidgetState.selected)
-                ? _controlBlue
-                : Colors.white,
+            (states) =>
+                states.contains(WidgetState.selected) ? blue : Colors.white,
           ),
-          side: const BorderSide(color: _controlLine, width: 1.5),
+          side: BorderSide(color: line, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
         ),
         radioTheme: RadioThemeData(
           fillColor: WidgetStateProperty.resolveWith(
             (states) => states.contains(WidgetState.selected)
-                ? _controlBlue
+                ? blue
                 : const Color(0xff7893a2),
           ),
         ),
@@ -442,22 +569,18 @@ class _IskLensesAppState extends State<IskLensesApp> {
                 : const Color(0xfff7fcff),
           ),
           trackColor: WidgetStateProperty.resolveWith(
-            (states) => states.contains(WidgetState.selected)
-                ? _controlBlue
-                : _controlFill,
+            (states) => states.contains(WidgetState.selected) ? blue : surface,
           ),
           trackOutlineColor: WidgetStateProperty.resolveWith(
-            (states) => states.contains(WidgetState.selected)
-                ? _controlBlue
-                : _controlLine,
+            (states) => states.contains(WidgetState.selected) ? blue : line,
           ),
         ),
         chipTheme: ChipThemeData(
           backgroundColor: Colors.white,
-          selectedColor: _controlFill,
-          checkmarkColor: _controlBlue,
-          labelStyle: const TextStyle(color: Color(0xff15384d)),
-          side: const BorderSide(color: _controlLine),
+          selectedColor: surface,
+          checkmarkColor: blue,
+          labelStyle: TextStyle(color: ink),
+          side: BorderSide(color: line),
           showCheckmark: true,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -465,41 +588,39 @@ class _IskLensesAppState extends State<IskLensesApp> {
         ),
         popupMenuTheme: PopupMenuThemeData(
           color: Colors.white,
-          elevation: 8,
+          elevation: _appearance['menu'] == 'floating' ? 12 : 8,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: _controlLine),
+            borderRadius: menuRadius,
+            side: BorderSide(color: line),
           ),
         ),
-        listTileTheme: const ListTileThemeData(
-          iconColor: _controlBlue,
-          textColor: Color(0xff15384d),
-        ),
-        expansionTileTheme: const ExpansionTileThemeData(
-          collapsedBackgroundColor: _controlFill,
-          backgroundColor: _controlFill,
+        listTileTheme: ListTileThemeData(iconColor: blue, textColor: ink),
+        expansionTileTheme: ExpansionTileThemeData(
+          collapsedBackgroundColor: surface,
+          backgroundColor: surface,
           collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(14)),
-            side: BorderSide(color: _controlLine),
+            borderRadius: navigationRadius,
+            side: BorderSide(color: line),
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(14)),
-            side: BorderSide(color: _controlLine),
+            borderRadius: navigationRadius,
+            side: BorderSide(color: line),
           ),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            backgroundColor: _controlBlue,
-            foregroundColor: Colors.white,
-            shape: const StadiumBorder(),
+            backgroundColor: softButton ? surface : blue,
+            foregroundColor: softButton ? blue : Colors.white,
+            side: controlStyle == 'outline' ? BorderSide(color: blue) : null,
+            shape: buttonShape,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            foregroundColor: _controlBlue,
-            side: const BorderSide(color: _controlLine),
-            shape: const StadiumBorder(),
+            foregroundColor: blue,
+            side: BorderSide(color: line),
+            shape: buttonShape,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           ),
         ),
@@ -544,12 +665,29 @@ class _IskLensesAppState extends State<IskLensesApp> {
             key: _scaffoldKey,
             drawer: _pageDrawer(),
             appBar: AppBar(
-              title: Text(
-                _tab == 0
-                    ? 'ISK Lenses'
-                    : ['Home', 'Shop', 'Compare', 'Help', 'Account'][_tab],
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
+              title: _tab == 0
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.network(
+                          _api.assetUrl('/icon-light-32x32.png'),
+                          width: 34,
+                          height: 34,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) =>
+                              const Icon(Icons.remove_red_eye_outlined),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'ISK Lenses',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      ['Home', 'Shop', 'Compare', 'Help', 'Account'][_tab],
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
               actions: [
                 IconButton(
                   onPressed: _openCart,
@@ -816,7 +954,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       if (_lensTypeId != null) 'Lens type',
     ];
     return Scaffold(
-      backgroundColor: const Color(0xfff8faff),
+      backgroundColor: const Color(0xfff7fcff),
       body: RefreshIndicator(
         onRefresh: () => _load(reset: true),
         child: CustomScrollView(
@@ -1866,7 +2004,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(13),
                     decoration: BoxDecoration(
-                      color: isUser ? _navy : _paleBlue,
+                      color: isUser ? _controlBlue : _paleBlue,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -2094,7 +2232,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   color: _paleBlue,
                   child: ListTile(
                     leading: const CircleAvatar(
-                      backgroundColor: _navy,
+                      backgroundColor: _controlBlue,
                       child: Icon(Icons.person, color: Colors.white),
                     ),
                     title: Text(

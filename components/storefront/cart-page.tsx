@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ShoppingBag, Trash2 } from 'lucide-react'
 import { cartTotals } from '@/components/storefront/shell/mini-cart'
 import { getProductImageSources, StorefrontProductImage } from '@/components/storefront/product-image'
-import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
+import { getCartLinePrice, useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { useProducts } from '@/lib/hooks/use-storefront-data'
 import { formatPrice } from '@/lib/store-config'
 
@@ -35,8 +35,7 @@ export function CartPage() {
       <div className="mt-8 grid items-start gap-10 lg:grid-cols-[1fr_380px]">
         <ul className="divide-y divide-[#033473]/10 border-y border-[#033473]/10">
           {lines.map((line) => {
-            const price = line.variant?.price ?? line.product.price
-            const currency = line.variant?.currency ?? line.product.currency
+            const { price, currency } = getCartLinePrice(line)
             const max = line.variant?.stockQuantity ?? line.product.stockQuantity
             return (
               <li key={line.key} className="grid grid-cols-[88px_1fr] gap-4 py-5 sm:grid-cols-[112px_1fr_auto]">
@@ -45,7 +44,7 @@ export function CartPage() {
                   alt={line.product.name}
                   fdaApproved={line.product.fdaApproved}
                   className="size-[88px] overflow-hidden rounded-lg bg-[#eef3fa] sm:size-28"
-                  imageClassName="size-full object-cover"
+                  imageClassName="size-full object-contain"
                   fallback={<div className="product-placeholder size-full" />}
                 />
                 <div className="min-w-0">

@@ -5,7 +5,7 @@ import { invalidateCache } from '@/lib/cache'
 import { requireAdminSession } from '@/lib/auth/admin'
 import { buildCategoryPaths, DEFAULT_PRODUCT_PAGE, descendantIds, SECTION_SOURCES, type ProductPageSettings } from '@/lib/catalog-types'
 import { db } from '@/lib/db'
-import { isPowerRangeOption, POWER_RANGE_OPTIONS } from '@/lib/power-ranges'
+import { normalizePowerLensOptions } from '@/lib/power-lens-options'
 import { deleteMedia, mediaPathFromOwnedUrl } from '@/lib/server/media-storage.mjs'
 import { titleCase } from '@/lib/store-config'
 import {
@@ -293,7 +293,12 @@ function waterContent(value: unknown) {
   return result
 }
 
-function parseProduct(input: AdminProductInput) {
+async function currentPowerOptionValues() {
+  const [setting] = await db.select({ value: storeSettings.value }).from(storeSettings).where(eq(storeSettings.key, 'power_options')).limit(1)
+  return normalizePowerLensOptions(setting?.value).map((option) => option.value)
+}
+
+function parseProduct(input: AdminProductInput, validPowerOptionValues: string[]) {
   const name = text(input.name, 200, 'Name', true)!
   const slug = typeof input.slug === 'string' && input.slug.trim() ? input.slug.trim().toLowerCase() : slugify(name)
   if (!slugPattern.test(slug) || slug.length > 120) throw new Error('Slug may use lowercase letters, numbers and hyphens only.')
@@ -317,13 +322,14 @@ function parseProduct(input: AdminProductInput) {
   if (input.availablePowerRanges !== undefined && !Array.isArray(input.availablePowerRanges)) {
     throw new Error('Choose valid customer power ranges.')
   }
+  const validPowerOptions = new Set(validPowerOptionValues)
   const selectedPowerRanges = new Set((input.availablePowerRanges ?? []).map((value) => {
-    if (typeof value !== 'string' || !isPowerRangeOption(value)) {
+    if (typeof value !== 'string' || !validPowerOptions.has(value)) {
       throw new Error('One or more selected customer power ranges are invalid.')
     }
     return value
   }))
-  const availablePowerRanges = POWER_RANGE_OPTIONS.filter((range) => selectedPowerRanges.has(range))
+  const availablePowerRanges = validPowerOptionValues.filter((value) => selectedPowerRanges.has(value))
   return {
     name,
     slug,
@@ -545,7 +551,7 @@ export async function getAdminProduct(id: string) {
 
 export async function createProduct(input: AdminProductInput) {
   await requireAdminSession('admin')
-  const values = parseProduct(input)
+  const values = parseProduct(input, await currentPowerOptionValues())
   try {
     await validateProductReferences(values.categoryIds, values.brandId, values.lensShadeId, values.lensTypeId)
     const [brand] = values.brandId ? await db.select({ name: storeBrands.name }).from(storeBrands).where(eq(storeBrands.id, values.brandId)) : []
@@ -574,7 +580,7 @@ export async function createProduct(input: AdminProductInput) {
 export async function updateProduct(id: string, input: AdminProductInput) {
   await requireAdminSession('admin')
   uuid(id, 'Product')
-  const values = parseProduct(input)
+  const values = parseProduct(input, await currentPowerOptionValues())
   try {
     await validateProductReferences(values.categoryIds, values.brandId, values.lensShadeId, values.lensTypeId)
     const [currentProduct] = await db.select({

@@ -7,6 +7,8 @@ import { invalidateCache } from '@/lib/cache'
 import { db } from '@/lib/db'
 import { storeActivityEvents, storeBanners, storeReviews, storeSettings } from '@/lib/db/schema'
 import { deleteMedia, isOwnedMediaUrl, mediaPathFromOwnedUrl } from '@/lib/server/media-storage.mjs'
+import { validateAppearance, validateHomeConfiguration } from '@/lib/home-configuration'
+import { validatePowerLensOptions } from '@/lib/power-lens-options'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -86,10 +88,14 @@ export async function getContentAdmin() {
     db.select().from(storeReviews).orderBy(asc(storeReviews.sortOrder)),
     db.select().from(storeSettings),
   ])
+  const settingValues = Object.fromEntries(settings.map((row) => [row.key, row.value])) as Partial<Record<SettingKey, unknown>>
   return {
     banners: banners.map((banner) => ({ ...banner, createdAt: banner.createdAt.toISOString(), updatedAt: banner.updatedAt.toISOString() })),
     reviews: reviews.map((review) => ({ ...review, createdAt: review.createdAt.toISOString(), updatedAt: review.updatedAt.toISOString() })),
-    settings: Object.fromEntries(settings.map((row) => [row.key, row.value])) as Partial<Record<SettingKey, unknown>>,
+    settings: {
+      ...settingValues,
+      power_options: normalizePowerLensOptions(settingValues.power_options),
+    },
   }
 }
 
@@ -188,6 +194,18 @@ function validateSetting(key: SettingKey, value: unknown) {
       for (const field of ['brands', 'collections']) if (value[field] !== undefined && !isStringArray(value[field], 40)) throw new Error(`Footer ${field} must be a list of text.`)
       for (const field of ['explore', 'information']) if (value[field] !== undefined && !isPairs(value[field])) throw new Error(`Footer ${field} must be a list of [label, link] pairs.`)
       for (const field of ['logo', 'about']) if (value[field] !== undefined && typeof value[field] !== 'string') throw new Error(`Footer ${field} must be text.`)
+      return
+    case 'appearance':
+      validateAppearance(value)
+      return
+    case 'home_configuration':
+      validateHomeConfiguration(value)
+      return
+    case 'power_options':
+      validatePowerLensOptions(value)
+      return
+    case 'chatbot':
+      return
   }
 }
 
@@ -201,4 +219,5 @@ export async function saveSetting(key: string, value: unknown) {
     .onConflictDoUpdate({ target: storeSettings.key, set: { value, updatedAt: new Date() } })
   await logChange('setting', key, 'setting.updated')
   await invalidateCache('content')
+  if (key === 'power_options') await invalidateCache('catalog')
 }

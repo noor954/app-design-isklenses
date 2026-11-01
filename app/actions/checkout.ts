@@ -14,7 +14,12 @@ import {
   storeSettings,
 } from '@/lib/db/schema'
 import { CustomerAuthError, getCustomerSession, getOrderReceipt, type StoreCustomerSession } from '@/lib/auth/store-customer'
-import { isPowerRangeOption } from '@/lib/power-ranges'
+import {
+  isPowerLensValue,
+  normalizePowerLensOptions,
+  powerSurchargeCents,
+  resolvePowerOptionValues,
+} from '@/lib/power-lens-options'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const moneyPattern = /^(\d{1,10})(?:\.(\d{1,2}))?$/
@@ -92,7 +97,7 @@ function moneyString(cents: number) {
 
 function optionalPowerRange(value: unknown, eye: 'left' | 'right') {
   if (value === undefined || value === null) return null
-  if (typeof value !== 'string' || !isPowerRangeOption(value)) {
+  if (typeof value !== 'string' || !isPowerLensValue(value)) {
     throw new CheckoutError(`The ${eye}-eye power range is invalid.`)
   }
   return value
@@ -241,6 +246,12 @@ async function submitCodOrderImpl(value: unknown) {
         return { ...duplicate, reused: true }
       }
 
+      const [powerOptionsSetting] = await tx
+        .select({ value: storeSettings.value })
+        .from(storeSettings)
+        .where(eq(storeSettings.key, 'power_options'))
+        .limit(1)
+      const powerOptions = normalizePowerLensOptions(powerOptionsSetting?.value)
       let currency = ''
       let subtotalCents = 0
       const resolvedLines = input.items.map((item) => {
@@ -255,7 +266,7 @@ async function submitCodOrderImpl(value: unknown) {
         if (!item.variantId && (activeVariantsByProduct.get(product.id)?.length ?? 0) > 0) {
           throw new CheckoutError('Choose an available listed option for each product.', 409)
         }
-        const powerRanges = product.availablePowerRanges ?? []
+        const powerRanges = resolvePowerOptionValues(product.availablePowerRanges, powerOptions)
         const hasPowerSelection = Boolean(item.leftPowerRange || item.rightPowerRange)
         if (powerRanges.length) {
           if (
@@ -269,14 +280,22 @@ async function submitCodOrderImpl(value: unknown) {
         } else if (hasPowerSelection) {
           throw new CheckoutError('This product does not offer customer-selected power ranges.', 409)
         }
-        const unitPrice = variant?.price ?? product.price
+        const basePrice = variant?.price ?? product.price
+        const surchargeCents = powerSurchargeCents(powerOptions, item.leftPowerRange, item.rightPowerRange)
+        if (surchargeCents === null) {
+          throw new CheckoutError('A selected power option is no longer available. Review your bag and try again.', 409)
+        }
+        const unitPriceCents = parseMoneyCents(basePrice, 'Product price') + surchargeCents
+        if (!Number.isSafeInteger(unitPriceCents) || unitPriceCents > maxMoneyCents) {
+          throw new CheckoutError('The selected lens price is outside the supported range.')
+        }
+        const unitPrice = moneyString(unitPriceCents)
         const lineCurrency = variant?.currency ?? product.currency
-        if (lineCurrency !== item.quotedCurrency || unitPrice !== item.quotedUnitPrice) {
+        if (lineCurrency !== item.quotedCurrency || unitPriceCents !== parseMoneyCents(item.quotedUnitPrice, 'Product price')) {
           throw new CheckoutError('A price changed since you added it to your bag. Review the current price and try again.', 409)
         }
         if (!currency) currency = lineCurrency
         if (currency !== lineCurrency) throw new CheckoutError('Items in one order must use the same currency.')
-        const unitPriceCents = parseMoneyCents(unitPrice, 'Product price')
         const lineTotalCents = unitPriceCents * item.quantity
         if (!Number.isSafeInteger(lineTotalCents) || subtotalCents > maxMoneyCents - lineTotalCents) {
           throw new CheckoutError('The order total is outside the supported range.')

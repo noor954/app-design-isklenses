@@ -1,15 +1,16 @@
 'use client'
 
-import { useRef, useState, type FormEvent, type InvalidEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type InvalidEvent } from 'react'
 import useSWR from 'swr'
 import { LoaderCircle, Plus, X } from 'lucide-react'
 import { createProduct, getAdminCategories, setProductRelations, updateProduct } from '@/app/actions/catalog-admin'
+import { getContentAdmin } from '@/app/actions/content'
 import { getAdminBrands, getAdminLensShades, getAdminLensTypes } from '@/app/actions/catalog-taxonomy'
 import { Alert, Field, flattenCategories, inputClass, primaryButton, secondaryButton, type AdminCategory } from '@/components/admin/admin-ui'
 import { MultiSelectField } from '@/components/admin/multi-select-field'
 import { useAdminProducts, type AdminProduct } from '@/lib/hooks/use-admin-data'
 import { notify, reportError } from '@/lib/ui/notifications'
-import { POWER_RANGE_OPTIONS } from '@/lib/power-ranges'
+import { normalizePowerLensOptions, resolvePowerOptionValues } from '@/lib/power-lens-options'
 
 type SpecRow = { label: string; value: string }
 
@@ -26,6 +27,7 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
   const { data: brandData } = useSWR('admin-brands', () => getAdminBrands())
   const { data: shadeData } = useSWR('admin-lens-shades', () => getAdminLensShades())
   const { data: lensTypeData } = useSWR('admin-lens-types', () => getAdminLensTypes())
+  const { data: contentData } = useSWR('admin-content-settings', () => getContentAdmin())
   const { products } = useAdminProducts()
   const categories = flattenCategories((categoryData ?? []) as AdminCategory[])
   const [saving, setSaving] = useState(false)
@@ -39,8 +41,14 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
   const [waterContent, setWaterContent] = useState(product?.waterContent ?? '')
   const [powerRange, setPowerRange] = useState(product?.powerRange ?? '')
   const [availablePowerRanges, setAvailablePowerRanges] = useState(product?.availablePowerRanges ?? [])
+  const powerOptions = normalizePowerLensOptions(contentData?.settings.power_options)
   const powerRangeInput = useRef<HTMLInputElement>(null)
   const variantManaged = Boolean(product?.variants.some((variant) => variant.isActive !== false))
+
+  useEffect(() => {
+    if (!product || !contentData) return
+    setAvailablePowerRanges(resolvePowerOptionValues(product.availablePowerRanges, powerOptions))
+  }, [contentData, product])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -212,7 +220,7 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
             </summary>
             <div className="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-[#b8d4e0] bg-white p-2 shadow-[0_12px_28px_rgba(21,56,77,.18)]">
               <div className="flex items-center justify-between gap-3 border-b border-[#cfe2eb] px-2 py-2">
-                <span className="text-xs font-semibold text-[#526b7b]">Available diopter ranges</span>
+                <span className="text-xs font-semibold text-[#526b7b]">Available powers · surcharge per eye</span>
                 <button
                   type="button"
                   onClick={() => setAvailablePowerRanges([])}
@@ -223,24 +231,27 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
                 </button>
               </div>
               <div className="grid gap-1 p-1 sm:grid-cols-2">
-                {POWER_RANGE_OPTIONS.map((range) => {
-                  const checked = availablePowerRanges.includes(range)
+                {powerOptions.map((option) => {
+                  const checked = availablePowerRanges.includes(option.value)
                   return (
                     <label
-                      key={range}
+                      key={option.value}
                       className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm transition-colors hover:bg-[#e8f6fb] ${checked ? 'bg-[#e8f6fb] font-semibold text-[#15384d]' : 'text-[#526b7b]'}`}
                     >
                       <input
                         type="checkbox"
                         name="availablePowerRanges"
-                        value={range}
+                        value={option.value}
                         checked={checked}
                         onChange={() => setAvailablePowerRanges((current) => checked
-                          ? current.filter((value) => value !== range)
-                          : POWER_RANGE_OPTIONS.filter((value) => value === range || current.includes(value)))}
+                          ? current.filter((value) => value !== option.value)
+                          : powerOptions.filter((value) => value.value === option.value || current.includes(value.value)).map((value) => value.value))}
                         className="size-4 accent-[#006f9b]"
                       />
-                      {range} D
+                      <span className="min-w-0 flex-1">{option.label}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-[#526b7b]">
+                        {Number(option.surcharge) === 0 ? 'Rs 0' : `+Rs ${Number(option.surcharge).toFixed(2)}`}
+                      </span>
                     </label>
                   )
                 })}

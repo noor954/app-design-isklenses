@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { Product, ProductVariant } from '@/lib/hooks/use-storefront-data'
+import { priceWithPowerSurcharge } from '@/lib/power-lens-options'
 
 export type CartLine = {
   product: Product
@@ -9,6 +10,19 @@ export type CartLine = {
   quantity: number
   leftPowerRange: string | null
   rightPowerRange: string | null
+}
+
+export function getCartLinePrice(line: CartLine) {
+  const basePrice = line.variant?.price ?? line.product.price
+  return {
+    price: priceWithPowerSurcharge(
+      basePrice,
+      line.product.availablePowerOptions,
+      line.leftPowerRange,
+      line.rightPowerRange,
+    ) ?? basePrice,
+    currency: line.variant?.currency ?? line.product.currency,
+  }
 }
 
 type PowerSelection = { left: string; right: string } | null

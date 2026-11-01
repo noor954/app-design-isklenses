@@ -13,6 +13,13 @@ import type {
   SettingKey,
   SiteChrome,
 } from '@/lib/content-types'
+import {
+  DEFAULT_APPEARANCE,
+  normalizeAppearance,
+  normalizeHomeConfiguration,
+} from '@/lib/home-configuration'
+import { normalizePowerLensOptions } from '@/lib/power-lens-options'
+import type { AppearanceConfiguration } from '@/lib/home-configuration'
 import { db } from '@/lib/db'
 import { getDeliveryAnnouncement, parseDeliveryRules } from '@/lib/delivery'
 import { storeBanners, storeReviews, storeSettings } from '@/lib/db/schema'
@@ -38,6 +45,78 @@ const LEGACY_FOOTER_EXPLORE = [
   ['Transparent', 'transparent-lenses'],
 ]
 const LEGACY_HERO_TITLES = new Set(['10.10 sale', 'Sunglasses collection', 'Shop now', 'Deals on contact lenses'])
+const DEFAULT_HERO_BANNERS: BannerContent[] = [
+  {
+    id: 'default-hero-1',
+    placement: 'hero',
+    title: 'See color differently.',
+    body: 'Explore the color lens catalog and compare product photos, prices, and details.',
+    imageUrl: '/isk-home/hero-editorial-1.jpg',
+    href: '/shop',
+    sortOrder: 0,
+    isActive: true,
+  },
+  {
+    id: 'default-hero-2',
+    placement: 'hero',
+    title: 'A shade for your point of view.',
+    body: 'Browse the collection and find the colors that speak to your style.',
+    imageUrl: '/isk-home/hero-editorial-2.jpg',
+    href: '/shop',
+    sortOrder: 1,
+    isActive: true,
+  },
+  {
+    id: 'default-hero-3',
+    placement: 'hero',
+    title: 'Let your look take the lead.',
+    body: 'Discover the range of lens colors and compare each listing before you choose.',
+    imageUrl: '/isk-home/hero-editorial-3.jpg',
+    href: '/shop',
+    sortOrder: 2,
+    isActive: true,
+  },
+  {
+    id: 'default-hero-4',
+    placement: 'hero',
+    title: 'Find your color.',
+    body: 'Explore the shades available across the lens catalog.',
+    imageUrl: '/isk-home/hero-editorial-4.jpg',
+    href: '/shop',
+    sortOrder: 3,
+    isActive: true,
+  },
+  {
+    id: 'default-hero-5',
+    placement: 'hero',
+    title: 'A look that feels like you.',
+    body: 'Browse lens colors and compare available listings.',
+    imageUrl: '/isk-home/hero-editorial-5.jpg',
+    href: '/shop',
+    sortOrder: 4,
+    isActive: true,
+  },
+  {
+    id: 'default-hero-6',
+    placement: 'hero',
+    title: 'A new shade, a new perspective.',
+    body: 'See the colors and product details in our catalog.',
+    imageUrl: '/isk-home/hero-editorial-6.jpg',
+    href: '/shop',
+    sortOrder: 5,
+    isActive: true,
+  },
+  {
+    id: 'default-hero-7',
+    placement: 'hero',
+    title: 'Make the color yours.',
+    body: 'Explore the lens range by shade and brand.',
+    imageUrl: '/isk-home/hero-editorial-7.jpg',
+    href: '/shop',
+    sortOrder: 6,
+    isActive: true,
+  },
+]
 
 function matchesStrings(value: string[] | undefined, expected: string[]) {
   return value?.length === expected.length && value.every((item, index) => item === expected[index])
@@ -60,6 +139,19 @@ async function loadSettings() {
 
 export function getSettings() {
   return cached(CONTENT_NAMESPACE, 'settings', TTL_SECONDS, async () => Object.fromEntries(await loadSettings()) as Partial<Record<StoredSettingKey, unknown>>)
+}
+
+export async function getStoreAppearance(): Promise<AppearanceConfiguration> {
+  try {
+    const settings = await getSettings()
+    return normalizeAppearance(settings.appearance)
+  } catch (error) {
+    console.error(
+      '[site-content] Appearance settings unavailable',
+      error instanceof Error ? error.name : 'UnknownError',
+    )
+    return DEFAULT_APPEARANCE
+  }
 }
 
 const asStrings = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [])
@@ -108,9 +200,37 @@ export async function getHomeContent(): Promise<HomeContent> {
   if (headings.serviceBody === 'Enjoy fast and secure delivery across Pakistan your lenses, delivered safely to your doorstep!') delete headings.serviceBody
   if (headings.reviews === 'Customer Love Us') delete headings.reviews
   if (headings.reviewsIntro === 'Loved by customers for exceptional service and quality.') delete headings.reviewsIntro
+  const defaultConfiguration = normalizeHomeConfiguration(undefined)
+  const configuration = settings.home_configuration === undefined
+    ? {
+        ...defaultConfiguration,
+        sections: defaultConfiguration.sections.map((section) => ({
+          ...section,
+          ...(section.id === 'bloom' && {
+            title: headings.categories ?? section.title,
+            description: headings.categoriesIntro ?? section.description,
+          }),
+          ...(section.id === 'reviews' && {
+            title: headings.reviews ?? section.title,
+            description: headings.reviewsIntro ?? section.description,
+          }),
+          ...(section.id === 'contact' && {
+            title: headings.serviceTitle ?? section.title,
+            description: headings.serviceBody ?? section.description,
+          }),
+        })),
+      }
+    : normalizeHomeConfiguration(settings.home_configuration)
+  const activeBanners = banners.filter((banner) => banner.isActive && !banner.imageUrl.startsWith('https://eyelenses.pk/') && !(banner.placement === 'hero' && LEGACY_HERO_TITLES.has(banner.title)))
+  const heroBanners = activeBanners.filter((banner) => banner.placement === 'hero')
   return {
-    banners: banners.filter((banner) => banner.isActive && !banner.imageUrl.startsWith('https://eyelenses.pk/') && !(banner.placement === 'hero' && LEGACY_HERO_TITLES.has(banner.title))),
+    banners: heroBanners.length > 0
+      ? activeBanners
+      : [...activeBanners, ...DEFAULT_HERO_BANNERS],
     headings,
     seoSections: Array.isArray(settings.seo_sections) ? (settings.seo_sections as SeoSection[]) : [],
+    appearance: normalizeAppearance(settings.appearance),
+    configuration,
+    powerOptions: normalizePowerLensOptions(settings.power_options),
   }
 }

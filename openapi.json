@@ -53,9 +53,9 @@
       "get": {
         "tags": ["Catalog"],
         "summary": "Get aggregated storefront home content",
-        "description": "Returns public home banners and headings, site chrome, active catalog products, categories, brands, shades, lens types, and approved reviews.",
+        "description": "Returns the shared storefront home data used by web and mobile clients, including canonical hero banners, normalized appearance and palette settings, ordered/visible homepage sections, hero layout/autoplay, site chrome, active catalog directories/products, and approved reviews.",
         "responses": {
-          "200": { "description": "Storefront home content.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DataResponse" } } } },
+          "200": { "description": "Storefront home content.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StorefrontHomeResponse" } } } },
           "500": { "$ref": "#/components/responses/ServerError" }
         }
       }
@@ -390,7 +390,7 @@
       "delete": { "tags": ["Admin"], "summary": "Delete a storefront testimonial", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "reviewId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Testimonial deleted." } } }
     },
     "/api/admin/content/settings/{key}": {
-      "put": { "tags": ["Admin"], "summary": "Update a validated storefront content setting", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "key", "in": "path", "required": true, "schema": { "type": "string", "enum": ["announcements", "contact", "headings", "seo_sections", "footer", "chatbot"] } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["value"], "properties": { "value": {} } } } } }, "responses": { "200": { "description": "Setting saved." } } }
+      "put": { "tags": ["Admin"], "summary": "Update a validated storefront content setting", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "key", "in": "path", "required": true, "schema": { "type": "string", "enum": ["announcements", "contact", "headings", "seo_sections", "footer", "chatbot", "appearance", "home_configuration"] } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["value"], "properties": { "value": {} } } } } }, "responses": { "200": { "description": "Setting saved." } } }
     },
     "/api/admin/delivery-settings": {
       "get": { "tags": ["Admin"], "summary": "Read delivery fee and free-shipping threshold", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Delivery configuration." } } },
@@ -440,6 +440,73 @@
     },
     "schemas": {
       "DataResponse": { "type": "object", "required": ["data"], "properties": { "data": {} } },
+      "StorefrontHomeResponse": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["content"],
+            "properties": {
+              "content": {
+                "type": "object",
+                "required": ["banners", "headings", "appearance", "configuration"],
+                "properties": {
+                  "banners": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                  "headings": { "type": "object", "additionalProperties": true },
+                  "appearance": { "$ref": "#/components/schemas/AppearanceConfiguration" },
+                  "configuration": { "$ref": "#/components/schemas/HomeConfiguration" }
+                },
+                "additionalProperties": true
+              },
+              "chrome": { "type": "object", "additionalProperties": true },
+              "products": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+              "categories": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+              "brands": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+              "shades": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+              "lensTypes": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+              "reviews": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "AppearanceConfiguration": {
+        "type": "object",
+        "required": ["palette", "button", "textbox", "menu", "navigation"],
+        "properties": {
+          "palette": { "type": "string", "enum": ["sky", "clear", "lagoon", "ocean"] },
+          "button": { "type": "string", "enum": ["pill", "rounded", "square", "outline", "soft"] },
+          "textbox": { "type": "string", "enum": ["rounded", "pill", "underline", "filled", "square"] },
+          "menu": { "type": "string", "enum": ["panel", "compact", "underline", "segmented", "floating"] },
+          "navigation": { "type": "string", "enum": ["classic", "underline", "capsule", "boxed", "minimal"] }
+        },
+        "additionalProperties": false
+      },
+      "HomeConfiguration": {
+        "type": "object",
+        "required": ["sections", "heroAutoplayMs", "heroLayout"],
+        "properties": {
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "enabled", "order", "title", "description"],
+              "properties": {
+                "id": { "type": "string", "enum": ["hero", "bloom", "brands", "shades", "trending", "types", "why-us", "reviews", "contact"] },
+                "enabled": { "type": "boolean" },
+                "order": { "type": "integer", "minimum": 0, "maximum": 1000 },
+                "title": { "type": "string", "maxLength": 200 },
+                "description": { "type": "string", "maxLength": 500 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "heroAutoplayMs": { "type": "integer", "minimum": 3000, "maximum": 15000 },
+          "heroLayout": { "type": "string", "enum": ["full-bleed", "centered", "split", "editorial"] }
+        },
+        "additionalProperties": false
+      },
       "CatalogLiveQueryResponse": { "type": "object", "required": ["url", "query"], "properties": { "url": { "type": "string", "format": "uri", "description": "Public Neon Realtime WebSocket URL." }, "query": { "type": "object", "required": ["capability", "expiresAt", "queryFingerprint"], "properties": { "capability": { "type": "string" }, "expiresAt": { "type": "integer", "format": "int64" }, "queryFingerprint": { "type": "string" } } } } },
       "PowerRangeOption": { "type": "string", "enum": ["0.00-0.50", "0.51-1.00", "1.01-1.50", "1.51-2.00", "2.01-2.50", "2.51-3.00", "3.01-3.50", "3.51-4.00", "4.01-4.50", "4.51-5.00", "5.01-5.50", "5.51-6.00", "6.01-6.50", "6.51-7.00", "7.01-7.50", "7.51-8.00", "8.01-8.50", "8.51-9.00", "9.01-9.50", "9.51-10.00", "10.01-10.50", "10.51-11.00", "11.01-11.50", "11.51-12.00"], "description": "One of the supported 0.50-diopter ranges from 0.00 through 12.00." },
       "ProductsResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "array", "items": { "type": "object", "required": ["availablePowerRanges"], "properties": { "availablePowerRanges": { "type": "array", "items": { "$ref": "#/components/schemas/PowerRangeOption" }, "description": "Power ranges enabled by the store operator for this product. If non-empty, shoppers must select one range for each eye." } }, "additionalProperties": true } }, "pagination": { "type": "object", "properties": { "page": { "type": "integer" }, "limit": { "type": "integer" }, "total": { "type": "integer" }, "totalPages": { "type": "integer" } } }, "timestamp": { "type": "string", "format": "date-time" } } },

@@ -10,6 +10,7 @@ import { useProduct, type Product, type ProductAsset } from '@/lib/hooks/use-sto
 import { getProductImageSources, StorefrontProductImage } from '@/components/storefront/product-image'
 import { StorefrontFallbackImage } from '@/components/storefront/fallback-image'
 import { reportError } from '@/lib/ui/notifications'
+import { powerSurchargeCents, priceWithPowerSurcharge } from '@/lib/power-lens-options'
 
 function formatPrice(value: string, currency: string) {
   const amount = Number(value)
@@ -113,14 +114,17 @@ export function StorefrontProductDetail({
   const imageSources = selectedMedia?.mediaType === 'image'
     ? [...new Set([selectedMedia.blobUrl, ...getProductImageSources(product)].filter((source): source is string => Boolean(source)))]
     : []
-  const price = selectedVariant?.price ?? product.price
+  const basePrice = selectedVariant?.price ?? product.price
   const currency = selectedVariant?.currency ?? product.currency
   const stockQuantity = selectedVariant?.stockQuantity ?? product.stockQuantity
   const availablePowerRanges = product.availablePowerRanges ?? []
+  const availablePowerOptions = product.availablePowerOptions ?? []
   const requiresPowerSelection = availablePowerRanges.length > 0
   const powerSelectionReady = !requiresPowerSelection || (
     availablePowerRanges.includes(leftPowerRange) && availablePowerRanges.includes(rightPowerRange)
   )
+  const price = priceWithPowerSurcharge(basePrice, availablePowerOptions, leftPowerRange, rightPowerRange) ?? basePrice
+  const selectedPowerSurcharge = powerSurchargeCents(availablePowerOptions, leftPowerRange, rightPowerRange)
 
   function changeMedia(index: number) {
     setMediaIndex((index + media.length) % media.length)
@@ -156,7 +160,7 @@ export function StorefrontProductDetail({
                 alt={selectedMedia?.altText || product.name}
                 fdaApproved={product.fdaApproved}
                 className="size-full"
-                imageClassName="size-full object-cover"
+                imageClassName="size-full object-contain"
                 loading="eager"
                 fallback={(
                   <div role="img" aria-label="Abstract illustration; no product photograph is available" className="lens-study relative grid size-full place-items-center">
@@ -187,7 +191,7 @@ export function StorefrontProductDetail({
                   className={`relative size-16 shrink-0 overflow-hidden border-2 focus-visible:outline-2 focus-visible:outline-[#16468a] ${index === mediaIndex ? 'border-[#16468a]' : 'border-transparent'}`}
                 >
                   {asset.mediaType === 'image'
-                    ? <img src={asset.blobUrl ?? ''} alt="" className="size-full object-cover" />
+                    ? <img src={asset.blobUrl ?? ''} alt="" className="size-full object-contain" />
                     : <span className="grid size-full place-items-center bg-[#152a52] font-mono text-xs uppercase text-[#d3ff48]">Video</span>}
                 </button>
               ))}
@@ -233,7 +237,7 @@ export function StorefrontProductDetail({
                       sources={[product.lensShade.imageUrl, product.lensShade.fallbackImageUrl]}
                       alt=""
                       className="size-9 rounded-full border border-[#cfe2eb]"
-                      imageClassName="object-cover"
+                      imageClassName="object-contain"
                     />
                   ) : product.lensShade.hex ? <span className="size-6 rounded-full border border-black/15" style={{ backgroundColor: product.lensShade.hex }} aria-hidden="true" /> : null}
                   {product.lensShade.name}
@@ -245,7 +249,7 @@ export function StorefrontProductDetail({
           {requiresPowerSelection && (
             <fieldset className="mt-7 w-full rounded-2xl border border-[#b8d4e0] bg-[#e8f6fb] p-5">
               <legend className="px-1 text-base font-semibold text-[#15384d]">Choose lens power</legend>
-              <p className="text-sm leading-5 text-[#526b7b]">Choose one available range for each eye. The two eyes can have different powers.</p>
+              <p className="text-sm leading-5 text-[#526b7b]">Choose a power for each eye. Each selected eye adds its listed surcharge to the lens price.</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-semibold text-[#15384d]">
                   Left eye
@@ -257,7 +261,11 @@ export function StorefrontProductDetail({
                     className="mt-1.5 min-h-12 w-full rounded-xl border border-[#b8d4e0] bg-white px-3 py-3 text-base font-normal text-[#15384d] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#087ba5]"
                   >
                     <option value="" disabled>Choose a power range</option>
-                    {availablePowerRanges.map((range) => <option key={range} value={range}>{range} D</option>)}
+                    {availablePowerOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label} D {Number(option.surcharge) === 0 ? '(+Rs 0)' : `(+Rs ${Number(option.surcharge).toFixed(2)})`}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="block text-sm font-semibold text-[#15384d]">
@@ -270,10 +278,17 @@ export function StorefrontProductDetail({
                     className="mt-1.5 min-h-12 w-full rounded-xl border border-[#b8d4e0] bg-white px-3 py-3 text-base font-normal text-[#15384d] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#087ba5]"
                   >
                     <option value="" disabled>Choose a power range</option>
-                    {availablePowerRanges.map((range) => <option key={range} value={range}>{range} D</option>)}
+                    {availablePowerOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label} D {Number(option.surcharge) === 0 ? '(+Rs 0)' : `(+Rs ${Number(option.surcharge).toFixed(2)})`}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>
+              <p className="mt-3 text-sm font-medium tabular-nums text-[#15384d]">
+                Power surcharge: {formatPrice((selectedPowerSurcharge ?? 0) / 100, currency)} total for both eyes
+              </p>
             </fieldset>
           )}
 

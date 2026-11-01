@@ -1,6 +1,7 @@
 'use client'
 
 import useSWR from 'swr'
+import type { PowerLensOption } from '@/lib/power-lens-options'
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { cache: 'no-store' })
@@ -43,6 +44,7 @@ export interface Product {
   powerType?: string | null
   powerRange?: string | null
   availablePowerRanges?: string[]
+  availablePowerOptions?: PowerLensOption[]
   uvProtection?: boolean
   fdaApproved?: boolean
   features?: string[]

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { CSSProperties } from 'react'
 import { ArrowRight, BookOpen, Compass, Eye, Headphones, ShoppingBag, Star, type LucideIcon } from 'lucide-react'
 import { Slider } from '@/components/storefront/home/slider'
 import { SectionProgress } from '@/components/storefront/home/section-progress'
@@ -10,6 +11,7 @@ import { TrendingProducts } from '@/components/storefront/home/trending-products
 import { StoreFooter } from '@/components/storefront/shell/store-footer'
 import { RuntimeErrorNotice } from '@/components/ui/app-notifications'
 import type { BannerContent, HomeContent, SiteChrome } from '@/lib/content-types'
+import { DEFAULT_HOME_CONFIGURATION } from '@/lib/home-configuration'
 import type { CategoryNode } from '@/lib/catalog-types'
 import {
   getCategories,
@@ -127,17 +129,29 @@ async function loadHome(): Promise<HomeData> {
   }
 }
 
-function Hero({ slides }: { slides: BannerContent[] }) {
+function Hero({
+  slides,
+  style,
+  autoplayMs,
+  layout,
+  label,
+}: {
+  slides: BannerContent[]
+  style: CSSProperties
+  autoplayMs: number
+  layout: string
+  label: string
+}) {
   return (
-    <section id="hero" aria-label="Featured lens collections" className="isk-home-section relative h-full min-h-full snap-start snap-always">
+    <section id="hero" aria-label={label} data-hero-layout={layout} style={style} className="isk-home-section relative h-full min-h-full snap-start snap-always">
       {slides.length > 0 ? (
-        <Slider label="Featured lens collections" autoPlayMs={5500} dots arrows editorialControls fullHeight>
+        <Slider label={label} autoPlayMs={autoplayMs} dots arrows editorialControls fullHeight>
           {slides.map((slide, index) => (
             <div key={slide.id} className="relative h-full min-h-full overflow-hidden bg-[#15384d]">
               <Img src={slide.imageUrl} alt={slide.title || 'ISK Lenses collection'} priority={index === 0} className="isk-home-hero-image absolute inset-0 size-full object-cover object-[68%_center]" />
-              <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,rgba(21,56,77,.92)_0%,rgba(21,56,77,.73)_38%,rgba(21,56,77,.16)_76%,rgba(21,56,77,.08)_100%)]" />
-              <div className="relative mx-auto flex h-full min-h-full w-full min-w-0 max-w-[1440px] items-center px-5 pb-28 pt-12 sm:px-10 lg:px-12">
-                <div className={`w-full min-w-0 max-w-[650px] text-white ${index === 0 ? 'isk-home-hero-copy' : ''}`}>
+              <div data-hero-overlay aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,rgba(21,56,77,.92)_0%,rgba(21,56,77,.73)_38%,rgba(21,56,77,.16)_76%,rgba(21,56,77,.08)_100%)]" />
+              <div className={`relative mx-auto flex h-full min-h-full w-full min-w-0 max-w-[1440px] items-center px-5 pb-28 pt-12 sm:px-10 lg:px-12 ${layout === 'centered' ? 'justify-center text-center' : ''}`}>
+                <div data-hero-copy className={`w-full min-w-0 max-w-[650px] text-white ${layout === 'centered' ? 'mx-auto' : ''} ${index === 0 ? 'isk-home-hero-copy' : ''}`}>
                   <h1 className="text-balance text-[clamp(2.6rem,7.6vw,6rem)] font-extrabold leading-[0.94] tracking-[-0.055em]">
                     {slide.title || 'ISK Lenses'}
                   </h1>
@@ -153,7 +167,7 @@ function Hero({ slides }: { slides: BannerContent[] }) {
         </Slider>
       ) : (
         <div className="flex h-full items-center justify-center bg-[#e8f6fb] px-6 text-center">
-          <div>
+          <div className="isk-home-hero-empty-copy">
             <h1 className="text-balance text-4xl font-extrabold tracking-[-0.055em] text-[#15384d] sm:text-6xl">ISK Lenses</h1>
             <p className="mt-4 text-[#526b7b]">No featured collections are available right now.</p>
             <Link href="/shop" className="mt-7 inline-flex min-h-12 items-center rounded-full bg-[#006f9b] px-6 font-semibold text-white">Browse the catalog</Link>
@@ -172,90 +186,26 @@ function productVideo(product: Product | undefined) {
   return product?.assets?.find((asset) => asset.mediaType === 'video')?.blobUrl ?? null
 }
 
-// Downloaded from Unsplash; saved, editable hero banners take precedence over these local defaults.
-const defaultHeroSlides: BannerContent[] = [
-  {
-    id: 'editorial-color-lenses',
-    placement: 'hero',
-    title: 'See color differently.',
-    body: 'Explore the color lens catalog and compare product photos, prices, and details.',
-    imageUrl: '/isk-home/hero-editorial-1.jpg',
-    href: '/shop',
-    sortOrder: 0,
-    isActive: true,
-  },
-  {
-    id: 'editorial-find-your-shade',
-    placement: 'hero',
-    title: 'A shade for your point of view.',
-    body: 'Browse the collection and find the colors that speak to your style.',
-    imageUrl: '/isk-home/hero-editorial-2.jpg',
-    href: '/shop',
-    sortOrder: 1,
-    isActive: true,
-  },
-  {
-    id: 'editorial-make-it-yours',
-    placement: 'hero',
-    title: 'Let your look take the lead.',
-    body: 'Discover the range of lens colors and compare each listing before you choose.',
-    imageUrl: '/isk-home/hero-editorial-3.jpg',
-    href: '/shop',
-    sortOrder: 2,
-    isActive: true,
-  },
-  {
-    id: 'editorial-find-your-color',
-    placement: 'hero',
-    title: 'Find your color.',
-    body: 'Explore the shades available across the lens catalog.',
-    imageUrl: '/isk-home/hero-editorial-4.jpg',
-    href: '/shop',
-    sortOrder: 3,
-    isActive: true,
-  },
-  {
-    id: 'editorial-personal-style',
-    placement: 'hero',
-    title: 'A look that feels like you.',
-    body: 'Browse lens colors and compare available listings.',
-    imageUrl: '/isk-home/hero-editorial-5.jpg',
-    href: '/shop',
-    sortOrder: 4,
-    isActive: true,
-  },
-  {
-    id: 'editorial-new-perspective',
-    placement: 'hero',
-    title: 'A new shade, a new perspective.',
-    body: 'See the colors and product details in our catalog.',
-    imageUrl: '/isk-home/hero-editorial-6.jpg',
-    href: '/shop',
-    sortOrder: 5,
-    isActive: true,
-  },
-  {
-    id: 'editorial-make-color-yours',
-    placement: 'hero',
-    title: 'Make the color yours.',
-    body: 'Explore the lens range by shade and brand.',
-    imageUrl: '/isk-home/hero-editorial-7.jpg',
-    href: '/shop',
-    sortOrder: 6,
-    isActive: true,
-  },
-]
-
 export async function Home({ chrome }: { chrome: SiteChrome }) {
   const { content, products, categories, brands, shades, lensTypes, reviews, loadError } = await loadHome()
   const banners = (placement: BannerContent['placement']) => content?.banners.filter((banner) => banner.placement === placement) ?? []
   const h = content?.headings ?? {}
+  const homeConfiguration = content?.configuration ?? DEFAULT_HOME_CONFIGURATION
+  const configuredSection = (id: string) =>
+    homeConfiguration.sections.find((section) => section.id === id)
+  const sectionStyle = (id: string): CSSProperties => {
+    const section = configuredSection(id)
+    return {
+      order: section?.order ?? 0,
+      display: !section || !section.enabled ? 'none' : undefined,
+    }
+  }
+  const sectionCopy = (id: string) =>
+    configuredSection(id) ?? DEFAULT_HOME_CONFIGURATION.sections.find((section) => section.id === id)
   const linkedBrands = brands.filter((brand) => brand.productCount > 0)
   const featuredBrands = [...brands]
     .sort((left, right) => right.productCount - left.productCount || left.name.localeCompare(right.name))
-  const heroBanners = banners('hero')
-  const configuredHeroSlides = heroBanners.filter((slide) => slide.title.trim() || slide.body?.trim())
-  const heroSlides: BannerContent[] = [...configuredHeroSlides, ...defaultHeroSlides].slice(0, 7)
+  const heroSlides = banners('hero').slice(0, 7)
   const categoryCards = categories
     .filter((category) => category.isActive)
     .map((category) => {
@@ -269,19 +219,25 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
   const contactProduct = products.find((product) => productImage(product))
   const contactImage = productImage(contactProduct)
   return (
-    <main id="isk-home-scroll" tabIndex={0} aria-label="Homepage sections, scroll to explore" className="isk-home snap-y snap-mandatory overflow-x-hidden overflow-y-auto overscroll-y-contain scroll-smooth bg-[#f7fcff] text-[#15384d]">
+    <main id="isk-home-scroll" tabIndex={0} aria-label="Homepage sections, scroll to explore" className="isk-home flex flex-col snap-y snap-mandatory overflow-x-hidden overflow-y-auto overscroll-y-contain scroll-smooth bg-[#f7fcff] text-[#15384d]">
       <HomeScrollMotion />
       <RuntimeErrorNotice message={loadError} />
-      <Hero slides={heroSlides} />
-      <SectionProgress />
+      <Hero
+        slides={heroSlides}
+        style={sectionStyle('hero')}
+        autoplayMs={homeConfiguration.heroAutoplayMs}
+        layout={homeConfiguration.heroLayout}
+        label={sectionCopy('hero')?.title ?? 'Featured lens collections'}
+      />
+      <SectionProgress sections={homeConfiguration.sections} />
 
-      <section id="bloom" aria-labelledby="bloom-heading" className="isk-home-section min-h-full snap-start snap-always bg-[#e8f6fb] py-8 sm:py-10 lg:flex lg:items-center">
+      <section id="bloom" aria-labelledby="bloom-heading" style={sectionStyle('bloom')} className="isk-home-section min-h-full snap-start snap-always bg-[#e8f6fb] py-8 sm:py-10 lg:flex lg:items-center">
         <div className="mx-auto grid w-full max-w-[1440px] items-center gap-8 px-4 sm:px-8 lg:grid-cols-[.85fr_1.4fr] lg:gap-10 lg:px-12">
           <div>
             <h2 id="bloom-heading" className="mt-8 max-w-xl text-5xl font-extrabold leading-[0.94] tracking-[-0.06em] sm:text-6xl">
-              {h.categories ?? 'Browse'}<br /><em className="font-serif font-normal text-[#087ba5]">collections.</em>
+              {sectionCopy('bloom')?.title ?? 'Browse collections'}
             </h2>
-            <p className="mt-5 max-w-lg text-base leading-7 text-[#526b7b]">{h.categoriesIntro ?? 'Shop active product categories from the ISK Lenses catalog.'}</p>
+            <p className="mt-5 max-w-lg text-base leading-7 text-[#526b7b]">{sectionCopy('bloom')?.description ?? 'Shop active product categories from the ISK Lenses catalog.'}</p>
             <div className="mt-7 flex flex-wrap items-center gap-5">
               <Link href="/shop" className="inline-flex min-h-12 items-center gap-3 rounded-full bg-[#006f9b] px-6 text-sm font-bold text-white transition hover:bg-[#087ba5]">
                 Browse the catalog <ArrowRight size={17} aria-hidden="true" />
@@ -317,13 +273,12 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         </div>
       </section>
 
-      <section id="brands" aria-labelledby="brands-heading" className="isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] py-8 sm:py-10 lg:flex lg:items-center">
+      <section id="brands" aria-labelledby="brands-heading" style={sectionStyle('brands')} className="isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] py-8 sm:py-10 lg:flex lg:items-center">
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-12">
           <Heading
             id="brands-heading"
-            first="Shop by"
-            accent="brand"
-            description={featuredBrands.length > 0 ? 'Explore a selection from the full brand directory.' : undefined}
+            first={sectionCopy('brands')?.title ?? 'Shop by brand'}
+            description={sectionCopy('brands')?.description}
             href="/brands"
             hrefLabel="View all brands"
           />
@@ -357,13 +312,12 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         </div>
       </section>
 
-      <section id="shades" aria-labelledby="shades-heading" className="isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] py-8 sm:py-10 lg:flex lg:items-center">
+      <section id="shades" aria-labelledby="shades-heading" style={sectionStyle('shades')} className="isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] py-8 sm:py-10 lg:flex lg:items-center">
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-12">
           <Heading
             id="shades-heading"
-            first="Shop by"
-            accent="shade"
-            description={shadeCards.length > 0 ? 'Browse available lens colors and see which shades have active listings.' : undefined}
+            first={sectionCopy('shades')?.title ?? 'Shop by shade'}
+            description={sectionCopy('shades')?.description}
             href="/shop"
             hrefLabel="Browse all shades"
           />
@@ -397,14 +351,13 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         </div>
       </section>
 
-      <section id="trending" aria-label="Catalog listings" className="isk-home-section min-h-full snap-start snap-always bg-white py-8 sm:py-10 lg:flex lg:items-center">
+      <section id="trending" aria-labelledby="trending-heading" style={sectionStyle('trending')} className="isk-home-section min-h-full snap-start snap-always bg-white py-8 sm:py-10 lg:flex lg:items-center">
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-12">
           <div className="mb-8">
             <Heading
               id="trending-heading"
-              first="Browse"
-              accent="the catalog"
-              description={products.length > 0 ? 'Product details and prices are read from active catalog listings.' : undefined}
+              first={sectionCopy('trending')?.title ?? 'Browse the catalog'}
+              description={sectionCopy('trending')?.description}
               href="/shop"
               hrefLabel="Shop all lenses"
             />
@@ -413,13 +366,13 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         </div>
       </section>
 
-      <section id="types" aria-labelledby="types-heading" className="isk-home-section min-h-full snap-start snap-always bg-[#e8f6fb] py-8 sm:py-10 lg:flex lg:items-center">
+      <section id="types" aria-labelledby="types-heading" style={sectionStyle('types')} className="isk-home-section min-h-full snap-start snap-always bg-[#e8f6fb] py-8 sm:py-10 lg:flex lg:items-center">
         <div className="mx-auto grid w-full max-w-[1440px] gap-10 px-4 sm:px-8 lg:grid-cols-[.8fr_1.3fr] lg:items-center lg:gap-16 lg:px-12">
           <div>
             <h2 id="types-heading" className="mt-5 text-5xl font-extrabold leading-[0.96] tracking-[-0.06em] sm:text-6xl">
-              Shop by<br /><em className="font-serif font-normal text-[#087ba5]">lens type.</em>
+              {sectionCopy('types')?.title ?? 'Shop by lens type'}
             </h2>
-            <p className="mt-5 max-w-md text-lg leading-8 text-[#526b7b]">Browse the catalog by the kind of lens you are looking for, then review each listing for its available details.</p>
+            <p className="mt-5 max-w-md text-lg leading-8 text-[#526b7b]">{sectionCopy('types')?.description}</p>
             <Link href="/faq" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[#15384d] hover:text-[#087ba5]">
               Need help choosing? <ArrowRight size={17} aria-hidden="true" />
             </Link>
@@ -461,14 +414,14 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         </div>
       </section>
 
-      <section id="why-us" aria-labelledby="why-us-heading" className="isk-home-section min-h-full snap-start snap-always bg-[#15384d] py-8 text-white sm:py-10 lg:flex lg:items-center">
+      <section id="why-us" aria-labelledby="why-us-heading" style={sectionStyle('why-us')} className="isk-home-section min-h-full snap-start snap-always bg-[#15384d] py-8 text-white sm:py-10 lg:flex lg:items-center">
         <div className="mx-auto grid w-full max-w-[1440px] gap-10 px-4 sm:px-8 lg:grid-cols-[.8fr_1.3fr] lg:gap-16 lg:px-12">
           <div>
             <h2 id="why-us-heading" className="mt-5 max-w-xl text-5xl font-extrabold leading-[0.96] tracking-[-0.06em] sm:text-6xl">
-              Browse with<br /><em className="font-serif font-normal text-[#b8e8f5]">confidence.</em>
+              {sectionCopy('why-us')?.title ?? 'Browse with confidence'}
             </h2>
             <p className="mt-5 max-w-lg text-lg leading-8 text-white/75">
-              Compare catalog listings and review their product details. Contact lenses are medical devices; follow the guidance of your eye-care professional.
+              {sectionCopy('why-us')?.description}
             </p>
             <Link href="/faq" className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#087ba5] px-6 text-sm font-semibold text-white transition hover:bg-white hover:text-[#15384d]">
               Read lens guidance <ArrowRight size={17} aria-hidden="true" />
@@ -490,13 +443,12 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         </div>
       </section>
 
-      <section id="reviews" aria-labelledby="reviews-heading" className="isk-home-section min-h-full snap-start snap-always overflow-hidden bg-[#e8f6fb] py-8 sm:py-10 lg:flex lg:items-center">
+      <section id="reviews" aria-labelledby="reviews-heading" style={sectionStyle('reviews')} className="isk-home-section min-h-full snap-start snap-always overflow-hidden bg-[#e8f6fb] py-8 sm:py-10 lg:flex lg:items-center">
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-12">
           <Heading
             id="reviews-heading"
-            first={h.reviews ?? 'Product'}
-            accent={h.reviews ? undefined : 'reviews'}
-            description={reviews.length > 0 ? h.reviewsIntro : undefined}
+            first={sectionCopy('reviews')?.title ?? h.reviews ?? 'Product reviews'}
+            description={sectionCopy('reviews')?.description ?? h.reviewsIntro}
           />
           {reviews.length > 0 ? (
             <div className="mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3">
@@ -518,15 +470,15 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         </div>
       </section>
 
-      <section id="contact" aria-labelledby="contact-heading" className="isk-home-contact-section isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] pt-8 sm:pt-10 lg:flex lg:flex-col lg:justify-center">
+      <section id="contact" aria-labelledby="contact-heading" style={sectionStyle('contact')} className="isk-home-contact-section isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] pt-8 sm:pt-10 lg:flex lg:flex-col lg:justify-center">
         <div className="mx-auto flex w-full max-w-[1440px] flex-col px-4 sm:px-8 lg:px-12">
           <div className="isk-home-contact-card relative grid min-h-[390px] flex-1 items-center gap-2 overflow-hidden rounded-[2rem] bg-[#087ba5] md:grid-cols-[1.3fr_1fr]">
             <div className="isk-home-contact-copy relative z-10 p-6 sm:p-9 lg:p-12">
               <h2 id="contact-heading" className="isk-home-contact-heading mt-4 max-w-2xl text-4xl font-extrabold leading-[0.96] tracking-[-0.055em] text-white sm:text-5xl">
-                {h.serviceTitle ?? 'Not sure which shade suits you?'}{!h.serviceTitle && <><br /><em className="font-serif font-normal text-white">Ask our team.</em></>}
+                {sectionCopy('contact')?.title ?? h.serviceTitle ?? 'Questions about a listing or an order?'}
               </h2>
               <p className="isk-home-contact-body mt-4 max-w-xl text-base leading-7 text-white/90">
-                {h.serviceBody ?? 'Contact the ISK Lenses team with questions about the catalog or an order. For lens suitability and fit, consult your eye-care professional.'}
+                {sectionCopy('contact')?.description ?? h.serviceBody}
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link href="/contact-us" className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#15384d] px-6 text-sm font-bold text-white transition hover:bg-white hover:text-[#15384d]">

@@ -9,6 +9,8 @@ import { getDeliveryFeeCents, getFreeShippingThreshold, moneyFromCents, moneyToC
 import { useProducts, type Product } from '@/lib/hooks/use-storefront-data'
 import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { reportError } from '@/lib/ui/notifications'
+import { getCartLinePrice } from '@/lib/hooks/use-storefront-cart'
+import { priceWithPowerSurcharge } from '@/lib/power-lens-options'
 
 type Customer = { email: string }
 
@@ -22,11 +24,12 @@ function formatPrice(value: string | number, currency: string) {
   }
 }
 
-function linePrice(product: Product, variantId: string | undefined) {
+function linePrice(product: Product, variantId: string | undefined, leftPowerRange?: string | null, rightPowerRange?: string | null) {
   const variant = product.variants?.find((item) => item.id === variantId)
+  const basePrice = variant?.price ?? product.price
   return {
     variant,
-    price: variant?.price ?? product.price,
+    price: priceWithPowerSurcharge(basePrice, product.availablePowerOptions, leftPowerRange, rightPowerRange) ?? basePrice,
     currency: variant?.currency ?? product.currency,
   }
 }
@@ -69,10 +72,10 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
 
   useEffect(() => { void readCustomerSession() }, [readCustomerSession])
 
-  const currencies = new Set(lines.map((line) => linePrice(line.product, line.variant?.id).currency))
-  const currency = lines.length ? linePrice(lines[0].product, lines[0].variant?.id).currency : 'PKR'
+  const currencies = new Set(lines.map((line) => getCartLinePrice(line).currency))
+  const currency = lines.length ? getCartLinePrice(lines[0]).currency : 'PKR'
   const subtotalCents = lines.reduce((sum, line) => {
-    const { price } = linePrice(line.product, line.variant?.id)
+    const { price } = getCartLinePrice(line)
     return sum + (moneyToCents(price) ?? 0) * line.quantity
   }, 0)
   const subtotal = subtotalCents / 100
@@ -176,7 +179,7 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
             postalCode: String(form.get('postalCode') ?? ''),
           },
           items: lines.map((line) => {
-            const { price, currency: lineCurrency } = linePrice(line.product, line.variant?.id)
+            const { price, currency: lineCurrency } = linePrice(line.product, line.variant?.id, line.leftPowerRange, line.rightPowerRange)
             return {
               productId: line.product.id,
               variantId: line.variant?.id ?? null,

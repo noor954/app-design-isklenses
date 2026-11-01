@@ -11,6 +11,12 @@ export async function GET() {
         shopper: 'HttpOnly session cookie from POST /api/storefront/session',
         admin: 'HttpOnly session cookie from POST /api/admin/session',
       },
+      sharedStorefrontConfiguration: {
+        read: 'GET /api/storefront/home',
+        updateAppearance: 'PUT /api/admin/content/settings/appearance',
+        updateHomepage: 'PUT /api/admin/content/settings/home_configuration',
+        note: 'The website and mobile storefronts consume the same validated palette, control styles, hero slides, section order/visibility/copy, and hero layout/autoplay.',
+      },
       endpoints: {
         catalog: [
           'GET /api/storefront/home',

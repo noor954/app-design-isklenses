@@ -2,15 +2,14 @@
 
 import Link from 'next/link'
 import { X } from 'lucide-react'
-import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
+import { getCartLinePrice, useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { StorefrontProductImage, getProductImageSources } from '@/components/storefront/product-image'
 import { formatPrice } from '@/lib/store-config'
 
 export function cartTotals(lines: ReturnType<typeof useStorefrontCart>['lines']) {
   const totals: Record<string, number> = {}
   for (const line of lines) {
-    const currency = line.variant?.currency ?? line.product.currency
-    const price = line.variant?.price ?? line.product.price
+    const { currency, price } = getCartLinePrice(line)
     totals[currency] = (totals[currency] ?? 0) + Math.round(Number(price) * 100) * line.quantity
   }
   return Object.entries(totals).map(([currency, cents]) => ({ currency, amount: cents / 100 }))
@@ -38,8 +37,7 @@ export function MiniCart({ open, onClose }: { open: boolean; onClose: () => void
           <>
             <ul className="flex-1 divide-y divide-[#033473]/10 overflow-y-auto px-5">
               {lines.map((line) => {
-                const price = line.variant?.price ?? line.product.price
-                const currency = line.variant?.currency ?? line.product.currency
+                const { price, currency } = getCartLinePrice(line)
                 const max = line.variant?.stockQuantity ?? line.product.stockQuantity
                 return (
                   <li key={line.key} className="flex gap-3 py-4">
@@ -48,7 +46,7 @@ export function MiniCart({ open, onClose }: { open: boolean; onClose: () => void
                       alt={line.product.name}
                       fdaApproved={line.product.fdaApproved}
                       className="size-20 shrink-0 overflow-hidden rounded-lg bg-[#eef3fa]"
-                      imageClassName="size-full object-cover"
+                      imageClassName="size-full object-contain"
                       fallback={<div className="product-placeholder size-full" />}
                     />
                     <div className="min-w-0 flex-1">

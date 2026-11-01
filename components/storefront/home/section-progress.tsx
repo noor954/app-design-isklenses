@@ -1,46 +1,43 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { HomeSectionConfiguration } from '@/lib/home-configuration'
 
-const sections = [
-  ['hero', 'Featured collections'],
-  ['bloom', 'Categories'],
-  ['brands', 'Brands'],
-  ['shades', 'Shades'],
-  ['trending', 'Catalog'],
-  ['types', 'Lens types'],
-  ['why-us', 'About ISK Lenses'],
-  ['reviews', 'Product reviews'],
-  ['contact', 'Contact'],
-] as const
-
-export function SectionProgress() {
+export function SectionProgress({ sections }: { sections: HomeSectionConfiguration[] }) {
   const [active, setActive] = useState(0)
+  const visibleSections = useMemo(
+    () => sections
+      .filter((section) => section.enabled)
+      .sort((left, right) => left.order - right.order),
+    [sections],
+  )
 
   useEffect(() => {
-    const nodes = sections.map(([id]) => document.getElementById(id)).filter((node): node is HTMLElement => Boolean(node))
+    const nodes = visibleSections.map(({ id }) => document.getElementById(id)).filter((node): node is HTMLElement => Boolean(node))
     const observer = new IntersectionObserver((entries) => {
       const visible = entries
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
       if (!visible) return
-      const index = sections.findIndex(([id]) => id === visible.target.id)
+      const index = visibleSections.findIndex(({ id }) => id === visible.target.id)
       if (index >= 0) setActive(index)
     }, { root: document.getElementById('isk-home-scroll'), threshold: [0.2, 0.45, 0.7] })
     nodes.forEach((node) => observer.observe(node))
     return () => observer.disconnect()
-  }, [])
+  }, [visibleSections])
+
+  if (visibleSections.length < 2) return null
 
   return (
     <nav aria-label="Homepage sections" className="fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-end gap-4 md:flex">
       <span className="mb-1 font-mono text-xs tracking-[0.18em] text-[#526b7b]" aria-live="polite">
-        {String(active + 1).padStart(2, '0')} / {String(sections.length).padStart(2, '0')}
+        {String(active + 1).padStart(2, '0')} / {String(visibleSections.length).padStart(2, '0')}
       </span>
-      {sections.map(([id, label], index) => (
+      {visibleSections.map(({ id, title }, index) => (
         <a
           key={id}
           href={`#${id}`}
-          aria-label={`${label}, section ${index + 1} of ${sections.length}`}
+          aria-label={`${title}, section ${index + 1} of ${visibleSections.length}`}
           aria-current={active === index ? 'location' : undefined}
           onClick={(event) => {
             event.preventDefault()

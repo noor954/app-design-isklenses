@@ -23,7 +23,32 @@ class _FakeStoreApi extends StoreApi {
 
   @override
   Future<StoreHomeData> getHomeData() async => const StoreHomeData(
-    banners: [],
+    banners: [
+      StoreBanner(
+        id: 'hero-1',
+        placement: 'hero',
+        title: 'See color differently.',
+        body: null,
+        imageUrl: '',
+        href: '/shop',
+      ),
+      StoreBanner(
+        id: 'hero-2',
+        placement: 'hero',
+        title: 'A shade for your point of view.',
+        body: null,
+        imageUrl: '',
+        href: '/shop',
+      ),
+      StoreBanner(
+        id: 'hero-3',
+        placement: 'hero',
+        title: 'Let your look take the lead.',
+        body: null,
+        imageUrl: '',
+        href: '/shop',
+      ),
+    ],
     products: [],
     categories: [],
     brands: [],
@@ -32,6 +57,15 @@ class _FakeStoreApi extends StoreApi {
     reviews: [],
     chrome: StoreChrome(contact: {}, footer: {}),
     headings: {},
+    appearance: {'palette': 'sky'},
+    origin: 'https://isklenses.com',
+    configuration: {
+      'heroLayout': 'full-bleed',
+      'heroAutoplayMs': 5500,
+      'sections': [
+        {'id': 'hero', 'enabled': true, 'order': 0},
+      ],
+    },
   );
 
   @override
@@ -63,6 +97,27 @@ void main() {
     expect(find.byTooltip('Open your bag'), findsOneWidget);
     expect(find.text('Help'), findsOneWidget);
     expect(find.text('Account'), findsOneWidget);
+  });
+
+  testWidgets('animates configured slides on autoplay and swipe', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      IskLensesApp(api: _FakeStoreApi(), adminApi: _FakeAdminApi()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 / 3'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.text('2 / 3'), findsOneWidget);
+    expect(find.text('A shade for your point of view.'), findsOneWidget);
+    await tester.drag(find.byType(PageView).first, const Offset(-500, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 / 3'), findsOneWidget);
+    expect(find.text('Let your look take the lead.'), findsOneWidget);
   });
 
   testWidgets('opens the separate administrator sign-in', (tester) async {

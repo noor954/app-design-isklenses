@@ -5,7 +5,7 @@ Flutter application for Android and iOS. Shopper and administrator workflows use
 ## Features
 
 - Paginated product browsing and search, with product images and configured lens variants.
-- A visual home discovery feed with hero banners, category/brand/shade shelves, featured and newly added listings, sale pricing, and recorded product ratings when available.
+- A visual home discovery feed driven by the same `/api/storefront/home` hero slides, section visibility/order/copy, autoplay, and hero layout as the website; it also applies the shared palette and control styles while arranging sections for native screens.
 - A guided lens finder that combines live category, shade, brand, and lens-type filters, plus a native shopping guide for comparison, product options, and COD checkout.
 - Dedicated category, brand, information, lens-finder, and shopping-guide pages linked from the home feed, app drawer, and shared footer.
 - Per-eye power-range selection when a product requires it.
@@ -16,6 +16,7 @@ Flutter application for Android and iOS. Shopper and administrator workflows use
 - An administrator module browser for dashboard metrics, products, merchandising, orders, taxonomy, reviews, customers, CRM, storefront content, product-page settings, delivery, chatbot, system users, error logs, and activity.
 - Product create/edit with categories, lens attributes, customer power-range choices, related products, variant CRUD, stock, and uploaded image/video management.
 - Storefront banner/testimonial editing, settings, media uploads, delivery pricing, product-page sections, chatbot configuration, customer updates, CRM follow-up notes, review approval, order status, and owner-only staff/profile controls.
+- Homepage design settings are available through the authenticated Storefront content settings API; the web admin also provides the visual **Home and design** workspace.
 
 The mobile workspace exposes the completed commerce-admin workflows through the shared authenticated REST API. Some web-specific layout and bulk workflows remain optimized for desktop; Project Kanban is project coordination UI and is not included in the commerce app.
 

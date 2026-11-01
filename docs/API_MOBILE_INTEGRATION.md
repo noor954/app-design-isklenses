@@ -19,7 +19,7 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Discovery | `GET /api` | Public | Endpoint groups and OpenAPI link |
 | Discovery | `GET /api/openapi.json` | Public | OpenAPI 3.1 contract for client generation |
 | Catalog | `GET /api/products` | Public | Active product search/filter; pass `page` and optional `limit` for bounded pagination |
-| Catalog | `GET /api/storefront/home` | Public | Aggregated home banners, headings, site chrome, catalog directories, products, and approved reviews |
+| Catalog | `GET /api/storefront/home` | Public | Canonical home banners plus shared palette/control styles, ordered and visible homepage sections, hero layout/autoplay, site chrome, catalog directories/products, and approved reviews |
 | Catalog | `GET /api/products/{slug}` | Public | One active product with variants and media |
 | Catalog | `GET /api/product-categories` | Public | Active category hierarchy and product counts |
 | Catalog | `GET /api/brands` | Public | Active brands and product counts |
@@ -62,7 +62,7 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Admin | `GET /api/admin/content` | Admin cookie | Read storefront banners, testimonials, and editable content settings |
 | Admin | `POST /api/admin/content/banners`; `DELETE /api/admin/content/banners/{bannerId}` | Admin cookie | Create/update or delete a storefront banner |
 | Admin | `POST /api/admin/content/reviews`; `DELETE /api/admin/content/reviews/{reviewId}` | Admin cookie | Create/update or delete a storefront testimonial |
-| Admin | `PUT /api/admin/content/settings/{key}` | Admin cookie | Update an allowlisted, validated storefront setting |
+| Admin | `PUT /api/admin/content/settings/{key}` | Admin cookie | Update an allowlisted storefront setting, including `appearance` and `home_configuration` used by web and native clients |
 | Admin | `PATCH /api/admin/orders/{orderId}` | Admin cookie, admin role | Change order status or confirm cash-on-delivery delivery charges |
 | Admin | `GET /api/admin/orders/stats`, `GET /api/admin/customers/stats` | Admin cookie | Read order/revenue and customer totals |
 | Admin | `PATCH /api/admin/customers/{customerId}` | Admin cookie, admin role | Update customer details and marketing preference |
@@ -81,6 +81,8 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Admin | `POST /api/admin/catalog-sync` | Admin cookie, admin role | Sync selected catalog source data |
 
 These REST handlers call the same permission-checked server operations used by the web admin, so server-side role, inventory, validation, and business-transition rules remain authoritative. JSON admin writes reject cross-origin browser requests; native clients may omit `Origin`. Do not call internal Server Action URLs from a mobile app. Upload endpoints remain multipart and use the explicit file/type/size validation described above. All newly added endpoints and payload details are also published in the OpenAPI contract; where an operation uses the reusable `AdminJsonObject` schema, the named server operation provides the authoritative field validation.
+
+The home API is the canonical cross-platform design contract. Read `data.content.appearance` for the shared `palette`, `button`, `textbox`, `menu`, and `navigation` values. Read `data.content.configuration` for the visible/order-ranked sections plus `heroLayout` and `heroAutoplayMs`. The banner collection at `data.content.banners` is the same active hero set consumed by the website and mobile storefront. Native clients should treat these values as display settings, preserve API order, and ignore unknown enum values by falling back to the documented sky defaults. Admin clients save these through `PUT /api/admin/content/settings/appearance` or `/api/admin/content/settings/home_configuration`; the server validates every write and database migration `0021_home_and_appearance_settings.sql` must be applied before saving the new settings.
 
 The admin API covers the completed commerce workflows. The web-only Project Kanban is project coordination UI rather than store operations and is not included in the customer/mobile commerce API.
 
