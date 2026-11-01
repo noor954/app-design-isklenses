@@ -79,6 +79,40 @@ void main() {
     expect(find.text('Sign in securely'), findsOneWidget);
   });
 
+  testWidgets('opens the lens finder from app navigation', (tester) async {
+    await tester.pumpWidget(
+      IskLensesApp(api: _FakeStoreApi(), adminApi: _FakeAdminApi()),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Find your lenses'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Find your lenses'), findsOneWidget);
+    expect(find.text('Browse all lenses'), findsOneWidget);
+    expect(find.text('How to compare and choose options'), findsOneWidget);
+  });
+
+  testWidgets('shows the guided shopping page from the navigation drawer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      IskLensesApp(api: _FakeStoreApi(), adminApi: _FakeAdminApi()),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('How to shop'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('From browsing to bag.'), findsOneWidget);
+    expect(find.textContaining('Step 1 · Browse the catalog'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    expect(find.text('Find your lenses'), findsWidgets);
+  });
+
   testWidgets('renders the structured product editor', (tester) async {
     await tester.pumpWidget(
       MaterialApp(home: AdminProductEditorScreen(api: _FakeAdminApi())),

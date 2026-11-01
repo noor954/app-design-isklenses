@@ -110,7 +110,22 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen> {
               .toList();
           final featured = products.where((item) => item.isFeatured).toList();
           final arrivals = products.where((item) => item.isNewArrival).toList();
-          final offers = products.where((item) => item.isOnSale).toList();
+          final offers = products.where((item) {
+            final price = double.tryParse(item.price) ?? 0;
+            final previousPrice = double.tryParse(item.compareAtPrice ?? '');
+            return item.isOnSale ||
+                (previousPrice != null && previousPrice > price);
+          }).toList();
+          final topRated =
+              products
+                  .where(
+                    (item) => item.ratingAvg != null && item.ratingCount > 0,
+                  )
+                  .toList()
+                ..sort(
+                  (first, second) =>
+                      second.ratingAvg!.compareTo(first.ratingAvg!),
+                );
 
           return RefreshIndicator(
             onRefresh: _refresh,
@@ -128,6 +143,11 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
                     child: _SearchPanel(onSearch: widget.onBrowse),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _FindYourLookBanner(
+                    onTap: () => widget.onPage('/find-your-look'),
                   ),
                 ),
                 if (categories.isNotEmpty)
@@ -197,6 +217,29 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen> {
                       ),
                     ),
                   ),
+                if (featured.isEmpty && products.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _ProductShelf(
+                      title: 'Explore the collection',
+                      products: products.take(10).toList(),
+                      onProduct: widget.onProduct,
+                      onCompare: widget.onCompare,
+                      onViewAll: () =>
+                          widget.onBrowse(const StoreBrowseFilter()),
+                    ),
+                  ),
+                if (topRated.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _ProductShelf(
+                      title: 'Top-rated listings',
+                      products: topRated.take(10).toList(),
+                      onProduct: widget.onProduct,
+                      onCompare: widget.onCompare,
+                      onViewAll: () => widget.onBrowse(
+                        const StoreBrowseFilter(sort: 'featured'),
+                      ),
+                    ),
+                  ),
                 if (arrivals.isNotEmpty)
                   SliverToBoxAdapter(
                     child: _ProductShelf(
@@ -221,17 +264,33 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen> {
                   ),
                 if (data.lensTypes.isNotEmpty)
                   SliverToBoxAdapter(
-                    child: _LensTypeSection(
-                      items: data.lensTypes,
-                      onTap: (type) => widget.onBrowse(
-                        StoreBrowseFilter(lensTypeId: type.id),
+                    child: _DirectorySection<StoreLensType>(
+                      title: 'Browse by lens type',
+                      subtitle: 'See the options in each listing',
+                      items: data.lensTypes
+                          .where((item) => item.productCount > 0)
+                          .toList(),
+                      itemBuilder: (item) => _ImageDirectoryCard(
+                        title: item.name,
+                        count: item.productCount,
+                        imageUrl: item.imageUrl,
+                        icon: Icons.remove_red_eye_outlined,
+                        onTap: () => widget.onBrowse(
+                          StoreBrowseFilter(lensTypeId: item.id),
+                        ),
                       ),
+                      onViewAll: () => widget.onPage('/find-your-look'),
                     ),
                   ),
                 if (data.reviews.isNotEmpty)
                   SliverToBoxAdapter(
                     child: _ReviewSection(reviews: data.reviews),
                   ),
+                SliverToBoxAdapter(
+                  child: _ShoppingGuideBanner(
+                    onTap: () => widget.onPage('/shopping-guide'),
+                  ),
+                ),
                 SliverToBoxAdapter(
                   child: _GuidanceBanner(onTap: () => widget.onPage('/faq')),
                 ),
@@ -432,6 +491,68 @@ class _SearchPanelState extends State<_SearchPanel> {
       ),
     );
   }
+}
+
+class _FindYourLookBanner extends StatelessWidget {
+  const _FindYourLookBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+    child: Material(
+      color: _navy,
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 14, 18),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(20),
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: const Icon(
+                  Icons.palette_outlined,
+                  color: Color(0xffb8e8f5),
+                  size: 29,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Find your next shade',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Filter the catalog by color, collection, and lens type.',
+                      style: TextStyle(color: Color(0xffe6f4fb), height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _DirectorySection<T> extends StatelessWidget {
@@ -759,6 +880,27 @@ class StoreProductCard extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
+                  if (product.ratingAvg != null && product.ratingCount > 0) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 15,
+                          color: Color(0xffa45d14),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${product.ratingAvg!.toStringAsFixed(1)} · ${product.ratingCount} reviews',
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -777,43 +919,6 @@ class _ProductPlaceholder extends StatelessWidget {
     color: _pale,
     child: Center(
       child: Icon(Icons.remove_red_eye_outlined, size: 42, color: _navy),
-    ),
-  );
-}
-
-class _LensTypeSection extends StatelessWidget {
-  const _LensTypeSection({required this.items, required this.onTap});
-
-  final List<StoreLensType> items;
-  final ValueChanged<StoreLensType> onTap;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 30, 18, 0),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionHeading(title: 'Browse by lens type'),
-        const SizedBox(height: 12),
-        for (final item in items)
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-            leading: CircleAvatar(
-              backgroundColor: _pale,
-              foregroundImage: item.imageUrl == null
-                  ? null
-                  : NetworkImage(item.imageUrl!),
-              child: const Icon(Icons.remove_red_eye_outlined),
-            ),
-            title: Text(
-              item.name,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text('${item.productCount} active listings'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => onTap(item),
-          ),
-      ],
     ),
   );
 }
@@ -936,6 +1041,54 @@ class _GuidanceBanner extends StatelessWidget {
   );
 }
 
+class _ShoppingGuideBanner extends StatelessWidget {
+  const _ShoppingGuideBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(18, 30, 18, 0),
+    child: Material(
+      color: const Color(0xffe8f6fb),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Row(
+            children: [
+              const Icon(Icons.menu_book_outlined, color: _blue, size: 27),
+              const SizedBox(width: 13),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'A clearer way to shop',
+                      style: TextStyle(
+                        color: _navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'See how listings, comparison, and checkout work.',
+                      style: TextStyle(color: _ink, height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded, color: _blue),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class StoreSiteFooter extends StatelessWidget {
   const StoreSiteFooter({required this.data, required this.onPage, super.key});
 
@@ -976,6 +1129,8 @@ class StoreSiteFooter extends StatelessWidget {
             children: [
               for (final (label, route) in const [
                 ('Shop all', '/shop'),
+                ('Find your lenses', '/find-your-look'),
+                ('How to shop', '/shopping-guide'),
                 ('Brands', '/brands'),
                 ('FAQs', '/faq'),
                 ('Contact', '/contact-us'),
@@ -1015,6 +1170,608 @@ class StoreSiteFooter extends StatelessWidget {
       ),
     );
   }
+}
+
+class StoreLensFinderScreen extends StatefulWidget {
+  const StoreLensFinderScreen({
+    required this.api,
+    required this.onBrowse,
+    required this.onPage,
+    super.key,
+  });
+
+  final StoreApi api;
+  final ValueChanged<StoreBrowseFilter> onBrowse;
+  final ValueChanged<String> onPage;
+
+  @override
+  State<StoreLensFinderScreen> createState() => _StoreLensFinderScreenState();
+}
+
+class _StoreLensFinderScreenState extends State<StoreLensFinderScreen> {
+  late Future<StoreHomeData> _data;
+  final _shadeSearch = TextEditingController();
+  String? _category;
+  String? _brand;
+  String? _shadeId;
+  String? _lensTypeId;
+
+  @override
+  void initState() {
+    super.initState();
+    _data = widget.api.getHomeData();
+  }
+
+  @override
+  void dispose() {
+    _shadeSearch.dispose();
+    super.dispose();
+  }
+
+  void _browse() {
+    widget.onBrowse(
+      StoreBrowseFilter(
+        category: _category,
+        brand: _brand,
+        shadeId: _shadeId,
+        lensTypeId: _lensTypeId,
+      ),
+    );
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _paper,
+      appBar: AppBar(title: const Text('Find your lenses')),
+      body: FutureBuilder<StoreHomeData>(
+        future: _data,
+        builder: (context, snapshot) {
+          if (snapshot.hasError && !snapshot.hasData) {
+            return _HomeError(
+              message: snapshot.error.toString(),
+              onRetry: () => setState(() => _data = widget.api.getHomeData()),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator(color: _blue));
+          }
+
+          final data = snapshot.data!;
+          final categories = data.categories
+              .where(
+                (item) =>
+                    item.isActive && item.showInMenu && item.productCount > 0,
+              )
+              .toList();
+          final brands = data.brands
+              .where((item) => item.productCount > 0)
+              .toList();
+          final availableShades = data.shades
+              .where((item) => item.productCount > 0)
+              .toList();
+          final shades = availableShades
+              .where(
+                (item) => item.name.toLowerCase().contains(
+                  _shadeSearch.text.trim().toLowerCase(),
+                ),
+              )
+              .toList();
+          final visibleShades = shades.take(18).toList();
+          final lensTypes = data.lensTypes
+              .where((item) => item.productCount > 0)
+              .toList();
+          final selectedCount = [
+            _category,
+            _brand,
+            _shadeId,
+            _lensTypeId,
+          ].where((value) => value != null).length;
+
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+                children: [
+                  _FinderIntro(selectedCount: selectedCount),
+                  const SizedBox(height: 28),
+                  if (categories.isNotEmpty) ...[
+                    const _FinderHeading(
+                      title: 'Start with a collection',
+                      subtitle: 'Choose a category to narrow the listings.',
+                    ),
+                    const SizedBox(height: 12),
+                    _FinderChoiceGroup(
+                      items: categories
+                          .map((item) => (item.slug, item.name, null))
+                          .toList(),
+                      selected: _category,
+                      onSelected: (value) => setState(
+                        () => _category = _category == value ? null : value,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  if (availableShades.isNotEmpty) ...[
+                    const _FinderHeading(
+                      title: 'Choose a shade',
+                      subtitle:
+                          'Search the available shade names or browse the edit.',
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _shadeSearch,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Search shades',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: _shadeSearch.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'Clear shade search',
+                                onPressed: () {
+                                  _shadeSearch.clear();
+                                  setState(() {});
+                                },
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 11),
+                    _FinderChoiceGroup(
+                      items: visibleShades
+                          .map(
+                            (item) => (
+                              item.id,
+                              '${item.name} · ${item.productCount}',
+                              _colorFromHex(item.hex) ?? _pale,
+                            ),
+                          )
+                          .toList(),
+                      selected: _shadeId,
+                      onSelected: (value) => setState(
+                        () => _shadeId = _shadeId == value ? null : value,
+                      ),
+                    ),
+                    if (shades.length > visibleShades.length)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 7),
+                        child: Text(
+                          'Showing 18 matches. Refine your search to see other shades.',
+                          style: TextStyle(color: _ink.withAlpha(190)),
+                        ),
+                      ),
+                    if (shades.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          'No shades match that search. Try another name.',
+                          style: TextStyle(color: _ink),
+                        ),
+                      ),
+                  ],
+                  const SizedBox(height: 24),
+                  if (lensTypes.isNotEmpty) ...[
+                    const _FinderHeading(
+                      title: 'Choose a lens type',
+                      subtitle: 'Only types with active listings are shown.',
+                    ),
+                    const SizedBox(height: 12),
+                    _FinderChoiceGroup(
+                      items: lensTypes
+                          .map(
+                            (item) => (
+                              item.id,
+                              '${item.name} · ${item.productCount}',
+                              null,
+                            ),
+                          )
+                          .toList(),
+                      selected: _lensTypeId,
+                      onSelected: (value) => setState(
+                        () => _lensTypeId = _lensTypeId == value ? null : value,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  if (brands.isNotEmpty) ...[
+                    const _FinderHeading(
+                      title: 'Or browse a brand',
+                      subtitle: 'Choose from brands linked to active listings.',
+                    ),
+                    const SizedBox(height: 12),
+                    _FinderChoiceGroup(
+                      items: brands
+                          .map(
+                            (item) => (
+                              item.slug,
+                              '${item.name} · ${item.productCount}',
+                              null,
+                            ),
+                          )
+                          .toList(),
+                      selected: _brand,
+                      onSelected: (value) => setState(
+                        () => _brand = _brand == value ? null : value,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  TextButton.icon(
+                    onPressed: () => widget.onPage('/shopping-guide'),
+                    icon: const Icon(Icons.menu_book_outlined),
+                    label: const Text('How to compare and choose options'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+        child: Row(
+          children: [
+            if (_category != null ||
+                _brand != null ||
+                _shadeId != null ||
+                _lensTypeId != null)
+              TextButton(
+                onPressed: () => setState(() {
+                  _category = null;
+                  _brand = null;
+                  _shadeId = null;
+                  _lensTypeId = null;
+                }),
+                child: const Text('Clear'),
+              ),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _browse,
+                icon: const Icon(Icons.search_rounded),
+                label: Text(
+                  _category == null &&
+                          _brand == null &&
+                          _shadeId == null &&
+                          _lensTypeId == null
+                      ? 'Browse all lenses'
+                      : 'See matching lenses',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FinderIntro extends StatelessWidget {
+  const _FinderIntro({required this.selectedCount});
+
+  final int selectedCount;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: _navy,
+      borderRadius: BorderRadius.circular(24),
+    ),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.remove_red_eye_outlined,
+          color: Color(0xffb8e8f5),
+          size: 42,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Browse by what catches your eye.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  height: 1.15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                selectedCount == 0
+                    ? 'Mix and match filters, then see the matching active listings.'
+                    : '$selectedCount ${selectedCount == 1 ? 'filter' : 'filters'} selected. Add another or see matching lenses.',
+                style: const TextStyle(color: Color(0xffe6f4fb), height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _FinderHeading extends StatelessWidget {
+  const _FinderHeading({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(
+          color: _navy,
+          fontSize: 19,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      const SizedBox(height: 3),
+      Text(subtitle, style: const TextStyle(color: _ink, height: 1.4)),
+    ],
+  );
+}
+
+class _FinderChoiceGroup extends StatelessWidget {
+  const _FinderChoiceGroup({
+    required this.items,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<(String, String, Color?)> items;
+  final String? selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 9,
+    runSpacing: 8,
+    children: [
+      for (final (id, label, swatch) in items)
+        ChoiceChip(
+          avatar: swatch == null
+              ? null
+              : CircleAvatar(
+                  backgroundColor: swatch,
+                  child: swatch.computeLuminance() < 0.34
+                      ? const Icon(Icons.check, size: 13, color: Colors.white)
+                      : null,
+                ),
+          label: Text(label),
+          selected: selected == id,
+          onSelected: (_) => onSelected(id),
+        ),
+    ],
+  );
+}
+
+class StoreShoppingGuideScreen extends StatefulWidget {
+  const StoreShoppingGuideScreen({
+    required this.api,
+    required this.onPage,
+    super.key,
+  });
+
+  final StoreApi api;
+  final ValueChanged<String> onPage;
+
+  @override
+  State<StoreShoppingGuideScreen> createState() =>
+      _StoreShoppingGuideScreenState();
+}
+
+class _StoreShoppingGuideScreenState extends State<StoreShoppingGuideScreen> {
+  late Future<StoreHomeData> _data;
+
+  void _openPage(String path) {
+    Navigator.of(context).pop();
+    widget.onPage(path);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _data = widget.api.getHomeData();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _paper,
+    appBar: AppBar(title: const Text('How to shop')),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 780),
+        child: FutureBuilder<StoreHomeData>(
+          future: _data,
+          builder: (context, snapshot) {
+            if (snapshot.hasError && !snapshot.hasData) {
+              return _HomeError(
+                message: snapshot.error.toString(),
+                onRetry: () => setState(() => _data = widget.api.getHomeData()),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(color: _blue),
+              );
+            }
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: _navy,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.shopping_bag_outlined,
+                        color: Color(0xffb8e8f5),
+                        size: 34,
+                      ),
+                      SizedBox(height: 14),
+                      Text(
+                        'From browsing to bag.',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'A quick guide to the product details, comparison, and checkout available in the app.',
+                        style: TextStyle(
+                          color: Color(0xffe6f4fb),
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 25),
+                for (final (index, step) in _shoppingSteps.indexed)
+                  _ShoppingStep(
+                    number: index + 1,
+                    icon: step.$1,
+                    title: step.$2,
+                    description: step.$3,
+                    isLast: index == _shoppingSteps.length - 1,
+                  ),
+                const SizedBox(height: 22),
+                const Text(
+                  'Product specifications and selection options vary by listing. For lens fit and suitability, consult your eye-care professional.',
+                  style: TextStyle(color: _ink, height: 1.5),
+                ),
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  onPressed: () => _openPage('/find-your-look'),
+                  icon: const Icon(Icons.palette_outlined),
+                  label: const Text('Find your lenses'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _openPage('/shop'),
+                  icon: const Icon(Icons.storefront_outlined),
+                  label: const Text('Browse the full catalog'),
+                ),
+                StoreSiteFooter(data: snapshot.data!, onPage: _openPage),
+              ],
+            );
+          },
+        ),
+      ),
+    ),
+  );
+}
+
+const _shoppingSteps = <(IconData, String, String)>[
+  (
+    Icons.search_rounded,
+    'Browse the catalog',
+    'Search products or filter by a listed category, brand, shade, or lens type.',
+  ),
+  (
+    Icons.fact_check_outlined,
+    'Review the listing',
+    'Check the current price, availability, recorded specifications, and any options shown on that product.',
+  ),
+  (
+    Icons.compare_arrows_rounded,
+    'Compare details',
+    'Add up to three products to compare their listed details side by side.',
+  ),
+  (
+    Icons.tune_rounded,
+    'Choose available options',
+    'If the listing offers variants or power ranges, select the options shown before adding it to your bag.',
+  ),
+  (
+    Icons.local_shipping_outlined,
+    'Review checkout',
+    'Enter delivery details, check the configured delivery fee, and place a cash-on-delivery order. The server verifies current price and stock.',
+  ),
+];
+
+class _ShoppingStep extends StatelessWidget {
+  const _ShoppingStep({
+    required this.number,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.isLast,
+  });
+
+  final int number;
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) => IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 54,
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 23,
+                backgroundColor: _pale,
+                child: Icon(icon, color: _blue),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 1,
+                    color: _rule,
+                    margin: const EdgeInsets.symmetric(vertical: 5),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 13),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 21, top: 3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Step $number · $title',
+                  style: const TextStyle(
+                    color: _navy,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  description,
+                  style: const TextStyle(color: _ink, height: 1.45),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class StoreDirectoryScreen extends StatefulWidget {

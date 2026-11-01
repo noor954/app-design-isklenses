@@ -5,6 +5,9 @@ Flutter application for Android and iOS. Shopper and administrator workflows use
 ## Features
 
 - Paginated product browsing and search, with product images and configured lens variants.
+- A visual home discovery feed with hero banners, category/brand/shade shelves, featured and newly added listings, sale pricing, and recorded product ratings when available.
+- A guided lens finder that combines live category, shade, brand, and lens-type filters, plus a native shopping guide for comparison, product options, and COD checkout.
+- Dedicated category, brand, information, lens-finder, and shopping-guide pages linked from the home feed, app drawer, and shared footer.
 - Per-eye power-range selection when a product requires it.
 - Local shopping bag and cash-on-delivery checkout. The server independently validates prices, inventory, delivery fees, and the checkout idempotency key.
 - Shopper registration/sign-in with the existing HttpOnly session cookie stored in platform secure storage, plus customer order summaries.

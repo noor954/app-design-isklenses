@@ -41,6 +41,8 @@ class _IskLensesAppState extends State<IskLensesApp> {
   var _tab = 0;
   StoreBrowseFilter _browseFilter = const StoreBrowseFilter();
 
+  BuildContext get _navigatorContext => _scaffoldKey.currentContext ?? context;
+
   @override
   void initState() {
     super.initState();
@@ -93,7 +95,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
   }
 
   void _openCart() {
-    Navigator.of(context).push<void>(
+    Navigator.of(_navigatorContext).push<void>(
       MaterialPageRoute(
         builder: (_) => CartScreen(
           api: _api,
@@ -107,7 +109,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
   }
 
   Future<void> _openProduct(StoreProduct product) async {
-    await Navigator.of(context).push<void>(
+    await Navigator.of(_navigatorContext).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => StoreProductDetailsScreen(
           api: _api,
@@ -123,19 +125,19 @@ class _IskLensesAppState extends State<IskLensesApp> {
     final existing = _comparison.indexWhere((item) => item.id == product.id);
     if (existing >= 0) {
       setState(() => _comparison.removeAt(existing));
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(_navigatorContext).showSnackBar(
         SnackBar(content: Text('${product.name} removed from comparison')),
       );
       return;
     }
     if (_comparison.length >= 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(_navigatorContext).showSnackBar(
         const SnackBar(content: Text('Compare up to three products at once.')),
       );
       return;
     }
     setState(() => _comparison.add(product));
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(_navigatorContext).showSnackBar(
       SnackBar(content: Text('${product.name} added to comparison')),
     );
   }
@@ -168,7 +170,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
       _api.getProduct(slug).then(_openProduct).catchError((Object error) {
         if (mounted) {
           ScaffoldMessenger.of(
-            context,
+            _navigatorContext,
           ).showSnackBar(SnackBar(content: Text(error.toString())));
         }
       });
@@ -180,18 +182,35 @@ class _IskLensesAppState extends State<IskLensesApp> {
       _browse(const StoreBrowseFilter());
     } else if (path == '/cart') {
       _openCart();
+    } else if (path == '/find-your-look') {
+      Navigator.of(_navigatorContext).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => StoreLensFinderScreen(
+            api: _api,
+            onBrowse: _browse,
+            onPage: _openStorePage,
+          ),
+        ),
+      );
+    } else if (path == '/shopping-guide') {
+      Navigator.of(_navigatorContext).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              StoreShoppingGuideScreen(api: _api, onPage: _openStorePage),
+        ),
+      );
     } else if (path == '/my-account') {
       setState(() => _tab = 4);
     } else if (path == '/compare') {
       setState(() => _tab = 2);
     } else if (path == '/admin') {
-      Navigator.of(context).push<void>(
+      Navigator.of(_navigatorContext).push<void>(
         MaterialPageRoute(builder: (_) => AdminWorkspaceScreen(api: _adminApi)),
       );
     } else if (path == '/brands' ||
         path == '/product-category' ||
         path == '/blogs') {
-      Navigator.of(context).push<void>(
+      Navigator.of(_navigatorContext).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => StoreDirectoryScreen(
             api: _api,
@@ -270,6 +289,16 @@ class _IskLensesAppState extends State<IskLensesApp> {
             '/product-category',
           ),
           _drawerItem(Icons.sell_outlined, 'Brands', '/brands'),
+          _drawerItem(
+            Icons.palette_outlined,
+            'Find your lenses',
+            '/find-your-look',
+          ),
+          _drawerItem(
+            Icons.menu_book_outlined,
+            'How to shop',
+            '/shopping-guide',
+          ),
           ListTile(
             leading: const Icon(Icons.compare_arrows_rounded),
             title: const Text('Compare lenses'),
