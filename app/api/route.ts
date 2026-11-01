@@ -13,6 +13,7 @@ export async function GET() {
       },
       endpoints: {
         catalog: [
+          'GET /api/storefront/home',
           'GET /api/products',
           'GET /api/products/{slug}',
           'GET /api/product-categories',

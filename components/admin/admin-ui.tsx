@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 
-export const inputClass = 'w-full rounded-lg border border-[#1c1c1a]/15 bg-white px-3 py-2.5 text-sm text-[#1c1c1a] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#1c1c1a]'
-export const primaryButton = 'inline-flex items-center justify-center gap-2 rounded-full bg-[#1c1c1a] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#353531] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1c1c1a] disabled:cursor-wait disabled:opacity-60'
-export const secondaryButton = 'rounded-full border border-[#1c1c1a]/15 bg-white px-4 py-2.5 text-sm hover:bg-[#f2f1ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1c1c1a] disabled:opacity-60'
+export const inputClass = 'w-full rounded-xl border border-[#b8d4e0] bg-white px-3 py-2.5 text-sm text-[#15384d] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#087ba5] disabled:cursor-not-allowed disabled:opacity-60'
+export const primaryButton = 'inline-flex items-center justify-center gap-2 rounded-full bg-[#006f9b] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#005b80] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ba5] disabled:cursor-wait disabled:opacity-60'
+export const secondaryButton = 'inline-flex items-center justify-center gap-2 rounded-full border border-[#b8d4e0] bg-white px-4 py-2.5 text-sm font-medium text-[#15384d] transition-colors hover:bg-[#e8f6fb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ba5] disabled:cursor-not-allowed disabled:opacity-60'
 
 export function Field({ label, children, required = false }: { label: string; children: ReactNode; required?: boolean }) {
   return <label className="block text-xs font-medium text-[#55544e]">{label}{required && <span aria-hidden="true" className="ml-1 text-red-600">*</span>}<div className="mt-1.5">{children}</div></label>

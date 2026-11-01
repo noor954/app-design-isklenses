@@ -19,6 +19,7 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Discovery | `GET /api` | Public | Endpoint groups and OpenAPI link |
 | Discovery | `GET /api/openapi.json` | Public | OpenAPI 3.1 contract for client generation |
 | Catalog | `GET /api/products` | Public | Active product search/filter; pass `page` and optional `limit` for bounded pagination |
+| Catalog | `GET /api/storefront/home` | Public | Aggregated home banners, headings, site chrome, catalog directories, products, and approved reviews |
 | Catalog | `GET /api/products/{slug}` | Public | One active product with variants and media |
 | Catalog | `GET /api/product-categories` | Public | Active category hierarchy and product counts |
 | Catalog | `GET /api/brands` | Public | Active brands and product counts |
@@ -149,7 +150,7 @@ The UUIDs in the JSON are illustrative: replace `productId` with an actual UUID 
 ## API behavior and operational notes
 
 - JSON success responses generally use `{ "data": ... }`; errors use `{ "error": "..." }`. Checkout returns `orderNumber` and `reused`. The paginated product response includes `{ data, pagination: { page, limit, total, totalPages }, timestamp }`.
-- `GET /api/products` retains the legacy unbounded response when called without `page`; mobile clients should always pass `page` and may pass `limit` (1–100, default 24). Filters are `category`, `brand`, and `q`.
+- `GET /api/products` retains the legacy unbounded response when called without `page`; mobile clients should always pass `page` and may pass `limit` (1–100, default 24). Filters are `category`, `brand`, `shadeId`, `lensTypeId`, and `q`; supported sort orders are `newest`, `price_asc`, `price_desc`, `name_asc`, and `featured`.
 - Public catalog and media responses are cacheable. Account, order, and admin responses are `no-store`; honor HTTP cache headers rather than persisting stale inventory or prices.
 - Expect `400` validation errors, `401` unauthenticated/invalid credentials, `403` forbidden/origin rejection, `404` missing resources, `409` checkout conflicts, `413` oversized bodies, `415` unsupported content types, `429` rate limits, and `5xx` service failures. Retry transient failures with bounded backoff; for checkout always reuse its idempotency key.
 - Current public throttling is best-effort per process, not distributed. Configure edge-level rate limits before broad production traffic.

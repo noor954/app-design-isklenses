@@ -37,11 +37,25 @@
           { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 24 } },
           { "name": "category", "in": "query", "schema": { "type": "string", "maxLength": 100 } },
           { "name": "brand", "in": "query", "schema": { "type": "string", "maxLength": 100 } },
+          { "name": "shadeId", "in": "query", "schema": { "type": "string", "maxLength": 100 } },
+          { "name": "lensTypeId", "in": "query", "schema": { "type": "string", "maxLength": 100 } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["newest", "price_asc", "price_desc", "name_asc", "featured"], "default": "newest" } },
           { "name": "q", "in": "query", "schema": { "type": "string", "maxLength": 100 } }
         ],
         "responses": {
           "200": { "description": "Product data; paginated requests also include total and page metadata.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductsResponse" } } } },
           "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/storefront/home": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "Get aggregated storefront home content",
+        "description": "Returns public home banners and headings, site chrome, active catalog products, categories, brands, shades, lens types, and approved reviews.",
+        "responses": {
+          "200": { "description": "Storefront home content.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DataResponse" } } } },
           "500": { "$ref": "#/components/responses/ServerError" }
         }
       }

@@ -11,8 +11,28 @@ class _FakeStoreApi extends StoreApi {
   Future<ShopperSession?> getSession() async => null;
 
   @override
-  Future<ProductPage> getProducts({int page = 1, String query = ''}) async =>
-      ProductPage(products: const [], page: page, totalPages: 1);
+  Future<ProductPage> getProducts({
+    int page = 1,
+    String query = '',
+    String? category,
+    String? brand,
+    String? shadeId,
+    String? lensTypeId,
+    String sort = 'newest',
+  }) async => ProductPage(products: const [], page: page, totalPages: 1);
+
+  @override
+  Future<StoreHomeData> getHomeData() async => const StoreHomeData(
+    banners: [],
+    products: [],
+    categories: [],
+    brands: [],
+    shades: [],
+    lensTypes: [],
+    reviews: [],
+    chrome: StoreChrome(contact: {}, footer: {}),
+    headings: {},
+  );
 
   @override
   Future<List<DeliveryRule>> getDeliveryRules() async => const [];
@@ -40,7 +60,7 @@ void main() {
 
     expect(find.text('ISK Lenses'), findsOneWidget);
     expect(find.text('Shop'), findsOneWidget);
-    expect(find.text('Bag'), findsOneWidget);
+    expect(find.byTooltip('Open your bag'), findsOneWidget);
     expect(find.text('Help'), findsOneWidget);
     expect(find.text('Account'), findsOneWidget);
   });

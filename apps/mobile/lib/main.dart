@@ -5,10 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'admin_product_editor.dart';
+import 'isk_controls.dart';
 import 'store_api.dart';
+import 'storefront_screens.dart';
 
 const _navy = Color(0xff033473);
 const _paleBlue = Color(0xffeef4fc);
+const _controlBlue = Color(0xff006f9b);
+const _controlLine = Color(0xffb8d4e0);
+const _controlFill = Color(0xffe8f6fb);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,9 +33,13 @@ class IskLensesApp extends StatefulWidget {
 class _IskLensesAppState extends State<IskLensesApp> {
   late final StoreApi _api;
   late final AdminApi _adminApi;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _catalogKey = GlobalKey<_CatalogScreenState>();
   final List<CartLine> _cart = [];
+  final List<StoreProduct> _comparison = [];
   ShopperSession? _session;
   var _tab = 0;
+  StoreBrowseFilter _browseFilter = const StoreBrowseFilter();
 
   @override
   void initState() {
@@ -76,6 +85,249 @@ class _IskLensesAppState extends State<IskLensesApp> {
 
   void _clearCart() => setState(_cart.clear);
 
+  void _browse(StoreBrowseFilter filter) {
+    setState(() {
+      _browseFilter = filter;
+      _tab = 1;
+    });
+  }
+
+  void _openCart() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => CartScreen(
+          api: _api,
+          cart: _cart,
+          onChange: _updateCart,
+          onCheckoutComplete: _clearCart,
+          customerEmail: _session?.email,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openProduct(StoreProduct product) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => StoreProductDetailsScreen(
+          api: _api,
+          product: product,
+          onAdd: _addToCart,
+          onPage: _openStorePage,
+        ),
+      ),
+    );
+  }
+
+  void _compareProduct(StoreProduct product) {
+    final existing = _comparison.indexWhere((item) => item.id == product.id);
+    if (existing >= 0) {
+      setState(() => _comparison.removeAt(existing));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${product.name} removed from comparison')),
+      );
+      return;
+    }
+    if (_comparison.length >= 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Compare up to three products at once.')),
+      );
+      return;
+    }
+    setState(() => _comparison.add(product));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${product.name} added to comparison')),
+    );
+  }
+
+  void _openStorePage(String path) {
+    _scaffoldKey.currentState?.closeDrawer();
+    final uri = Uri.tryParse(path);
+    if (uri != null && (uri.path == '/shop' || uri.path == '/products')) {
+      _browse(
+        StoreBrowseFilter(
+          query: uri.queryParameters['q'] ?? '',
+          brand: uri.queryParameters['brand'],
+        ),
+      );
+      return;
+    }
+    if (uri != null && uri.path.startsWith('/product-category/')) {
+      final category = uri.path
+          .substring('/product-category/'.length)
+          .split('/')
+          .where((part) => part.isNotEmpty)
+          .lastOrNull;
+      if (category != null) {
+        _browse(StoreBrowseFilter(category: category));
+      }
+      return;
+    }
+    if (uri != null && uri.path.startsWith('/product/')) {
+      final slug = uri.path.substring('/product/'.length);
+      _api.getProduct(slug).then(_openProduct).catchError((Object error) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(error.toString())));
+        }
+      });
+      return;
+    }
+    if (path == '/') {
+      setState(() => _tab = 0);
+    } else if (path == '/shop' || path == '/products') {
+      _browse(const StoreBrowseFilter());
+    } else if (path == '/cart') {
+      _openCart();
+    } else if (path == '/my-account') {
+      setState(() => _tab = 4);
+    } else if (path == '/compare') {
+      setState(() => _tab = 2);
+    } else if (path == '/admin') {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (_) => AdminWorkspaceScreen(api: _adminApi)),
+      );
+    } else if (path == '/brands' ||
+        path == '/product-category' ||
+        path == '/blogs') {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => StoreDirectoryScreen(
+            api: _api,
+            path: path,
+            onBrowse: _browse,
+            onProduct: _openProduct,
+            onCompare: _compareProduct,
+          ),
+        ),
+      );
+    } else {
+      openStoreInformation(context, api: _api, path: path);
+    }
+  }
+
+  Widget _tabContent() => IndexedStack(
+    index: _tab,
+    children: [
+      StorefrontHomeScreen(
+        api: _api,
+        onBrowse: _browse,
+        onProduct: _openProduct,
+        onCompare: _compareProduct,
+        onPage: _openStorePage,
+      ),
+      CatalogScreen(
+        key: _catalogKey,
+        api: _api,
+        onAdd: _addToCart,
+        onProduct: _openProduct,
+        onCompare: _compareProduct,
+        filter: _browseFilter,
+        onPage: _openStorePage,
+      ),
+      StoreComparisonScreen(
+        api: _api,
+        products: _comparison,
+        onRemove: (product) => setState(
+          () => _comparison.removeWhere((item) => item.id == product.id),
+        ),
+        onAdd: _openProduct,
+        onProduct: _openProduct,
+        onPage: _openStorePage,
+      ),
+      AssistantScreen(api: _api),
+      AccountScreen(
+        api: _api,
+        adminApi: _adminApi,
+        session: _session,
+        onSessionChanged: (value) => setState(() => _session = value),
+      ),
+    ],
+  );
+
+  Widget _pageDrawer() => Drawer(
+    child: SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 18),
+            child: Text(
+              'ISK Lenses',
+              style: TextStyle(
+                color: _navy,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          _drawerItem(Icons.home_outlined, 'Home', '/'),
+          _drawerItem(Icons.storefront_outlined, 'Shop all', '/shop'),
+          _drawerItem(
+            Icons.category_outlined,
+            'Categories',
+            '/product-category',
+          ),
+          _drawerItem(Icons.sell_outlined, 'Brands', '/brands'),
+          ListTile(
+            leading: const Icon(Icons.compare_arrows_rounded),
+            title: const Text('Compare lenses'),
+            onTap: () {
+              _scaffoldKey.currentState?.closeDrawer();
+              setState(() => _tab = 2);
+            },
+          ),
+          const Divider(height: 24),
+          _drawerItem(Icons.article_outlined, 'Blogs', '/blogs'),
+          _drawerItem(
+            Icons.help_outline_rounded,
+            'Frequently asked questions',
+            '/faq',
+          ),
+          _drawerItem(
+            Icons.contact_support_outlined,
+            'Contact us',
+            '/contact-us',
+          ),
+          _drawerItem(
+            Icons.local_shipping_outlined,
+            'Shipping & returns',
+            '/shipping-returns',
+          ),
+          _drawerItem(
+            Icons.privacy_tip_outlined,
+            'Privacy policy',
+            '/privacy-policy',
+          ),
+          _drawerItem(
+            Icons.description_outlined,
+            'Terms & conditions',
+            '/terms-conditions',
+          ),
+          const Divider(height: 24),
+          _drawerItem(Icons.shopping_bag_outlined, 'Your bag', '/cart'),
+          _drawerItem(
+            Icons.person_outline_rounded,
+            'My account',
+            '/my-account',
+          ),
+          _drawerItem(
+            Icons.admin_panel_settings_outlined,
+            'Admin workspace',
+            '/admin',
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _drawerItem(IconData icon, String label, String path) => ListTile(
+    leading: Icon(icon),
+    title: Text(label),
+    onTap: () => _openStorePage(path),
+  );
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -83,9 +335,10 @@ class _IskLensesAppState extends State<IskLensesApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        canvasColor: Colors.white,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: _navy,
-          primary: _navy,
+          seedColor: _controlBlue,
+          primary: _controlBlue,
           surface: Colors.white,
         ),
         scaffoldBackgroundColor: const Color(0xfff8faff),
@@ -99,77 +352,273 @@ class _IskLensesAppState extends State<IskLensesApp> {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 15,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _controlLine),
+          ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xffd9e3f2)),
+            borderSide: const BorderSide(color: _controlLine),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _controlBlue, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xffb4233e)),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xffb4233e), width: 2),
+          ),
+        ),
+        dropdownMenuTheme: DropdownMenuThemeData(
+          textStyle: const TextStyle(color: Color(0xff15384d)),
+          menuStyle: MenuStyle(
+            backgroundColor: const WidgetStatePropertyAll(Colors.white),
+            elevation: const WidgetStatePropertyAll(8),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: _controlLine),
+              ),
+            ),
+          ),
+        ),
+        checkboxTheme: CheckboxThemeData(
+          fillColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? _controlBlue
+                : Colors.white,
+          ),
+          side: const BorderSide(color: _controlLine, width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        ),
+        radioTheme: RadioThemeData(
+          fillColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? _controlBlue
+                : const Color(0xff7893a2),
+          ),
+        ),
+        switchTheme: SwitchThemeData(
+          thumbColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? Colors.white
+                : const Color(0xfff7fcff),
+          ),
+          trackColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? _controlBlue
+                : _controlFill,
+          ),
+          trackOutlineColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? _controlBlue
+                : _controlLine,
+          ),
+        ),
+        chipTheme: ChipThemeData(
+          backgroundColor: Colors.white,
+          selectedColor: _controlFill,
+          checkmarkColor: _controlBlue,
+          labelStyle: const TextStyle(color: Color(0xff15384d)),
+          side: const BorderSide(color: _controlLine),
+          showCheckmark: true,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        popupMenuTheme: PopupMenuThemeData(
+          color: Colors.white,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: _controlLine),
+          ),
+        ),
+        listTileTheme: const ListTileThemeData(
+          iconColor: _controlBlue,
+          textColor: Color(0xff15384d),
+        ),
+        expansionTileTheme: const ExpansionTileThemeData(
+          collapsedBackgroundColor: _controlFill,
+          backgroundColor: _controlFill,
+          collapsedShape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(14)),
+            side: BorderSide(color: _controlLine),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(14)),
+            side: BorderSide(color: _controlLine),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: _controlBlue,
+            foregroundColor: Colors.white,
+            shape: const StadiumBorder(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _controlBlue,
+            side: const BorderSide(color: _controlLine),
+            shape: const StadiumBorder(),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           ),
         ),
       ),
-      home: Scaffold(
-        body: IndexedStack(
-          index: _tab,
-          children: [
-            CatalogScreen(api: _api, onAdd: _addToCart),
-            CartScreen(
-              api: _api,
-              cart: _cart,
-              onChange: _updateCart,
-              onCheckoutComplete: _clearCart,
-              customerEmail: _session?.email,
+      home: Builder(
+        builder: (context) {
+          final wide = MediaQuery.sizeOf(context).width >= 900;
+          final destinations = [
+            const NavigationRailDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label: Text('Home'),
             ),
-            AssistantScreen(api: _api),
-            AccountScreen(
-              api: _api,
-              adminApi: _adminApi,
-              session: _session,
-              onSessionChanged: (value) => setState(() => _session = value),
-            ),
-          ],
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _tab,
-          onDestinationSelected: (value) => setState(() => _tab = value),
-          destinations: [
-            const NavigationDestination(
+            const NavigationRailDestination(
               icon: Icon(Icons.storefront_outlined),
               selectedIcon: Icon(Icons.storefront),
-              label: 'Shop',
+              label: Text('Shop'),
             ),
-            NavigationDestination(
+            NavigationRailDestination(
               icon: Badge(
-                isLabelVisible: _cart.isNotEmpty,
-                label: Text(
-                  '${_cart.fold<int>(0, (total, item) => total + item.quantity)}',
-                ),
-                child: const Icon(Icons.shopping_bag_outlined),
+                isLabelVisible: _comparison.isNotEmpty,
+                label: Text('${_comparison.length}'),
+                child: const Icon(Icons.compare_arrows_rounded),
               ),
-              selectedIcon: const Icon(Icons.shopping_bag),
-              label: 'Bag',
+              selectedIcon: const Icon(Icons.compare_arrows_rounded),
+              label: const Text('Compare'),
             ),
-            const NavigationDestination(
+            const NavigationRailDestination(
               icon: Icon(Icons.chat_bubble_outline),
               selectedIcon: Icon(Icons.chat_bubble),
-              label: 'Help',
+              label: Text('Help'),
             ),
-            NavigationDestination(
+            NavigationRailDestination(
               icon: Icon(
                 _session == null ? Icons.person_outline : Icons.person,
               ),
-              label: 'Account',
+              selectedIcon: const Icon(Icons.person),
+              label: const Text('Account'),
             ),
-          ],
-        ),
+          ];
+          return Scaffold(
+            key: _scaffoldKey,
+            drawer: _pageDrawer(),
+            appBar: AppBar(
+              title: Text(
+                _tab == 0
+                    ? 'ISK Lenses'
+                    : ['Home', 'Shop', 'Compare', 'Help', 'Account'][_tab],
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              actions: [
+                IconButton(
+                  onPressed: _openCart,
+                  tooltip: 'Open your bag',
+                  icon: Badge(
+                    isLabelVisible: _cart.isNotEmpty,
+                    label: Text(
+                      '${_cart.fold<int>(0, (total, item) => total + item.quantity)}',
+                    ),
+                    child: const Icon(Icons.shopping_bag_outlined),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            body: wide
+                ? Row(
+                    children: [
+                      NavigationRail(
+                        selectedIndex: _tab,
+                        onDestinationSelected: (value) =>
+                            setState(() => _tab = value),
+                        extended: MediaQuery.sizeOf(context).width >= 1200,
+                        labelType: MediaQuery.sizeOf(context).width >= 1200
+                            ? null
+                            : NavigationRailLabelType.all,
+                        destinations: destinations,
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: _tabContent()),
+                    ],
+                  )
+                : _tabContent(),
+            bottomNavigationBar: wide
+                ? null
+                : NavigationBar(
+                    selectedIndex: _tab,
+                    onDestinationSelected: (value) =>
+                        setState(() => _tab = value),
+                    destinations: [
+                      const NavigationDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home_rounded),
+                        label: 'Home',
+                      ),
+                      const NavigationDestination(
+                        icon: Icon(Icons.storefront_outlined),
+                        selectedIcon: Icon(Icons.storefront),
+                        label: 'Shop',
+                      ),
+                      NavigationDestination(
+                        icon: Badge(
+                          isLabelVisible: _comparison.isNotEmpty,
+                          label: Text('${_comparison.length}'),
+                          child: const Icon(Icons.compare_arrows_rounded),
+                        ),
+                        selectedIcon: const Icon(Icons.compare_arrows_rounded),
+                        label: 'Compare',
+                      ),
+                      const NavigationDestination(
+                        icon: Icon(Icons.chat_bubble_outline),
+                        selectedIcon: Icon(Icons.chat_bubble),
+                        label: 'Help',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(
+                          _session == null
+                              ? Icons.person_outline
+                              : Icons.person,
+                        ),
+                        label: 'Account',
+                      ),
+                    ],
+                  ),
+          );
+        },
       ),
     );
   }
 }
 
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({required this.api, required this.onAdd, super.key});
+  const CatalogScreen({
+    required this.api,
+    required this.onAdd,
+    required this.onProduct,
+    required this.onCompare,
+    required this.filter,
+    required this.onPage,
+    super.key,
+  });
 
   final StoreApi api;
   final ValueChanged<CartLine> onAdd;
+  final ValueChanged<StoreProduct> onProduct;
+  final ValueChanged<StoreProduct> onCompare;
+  final StoreBrowseFilter filter;
+  final ValueChanged<String> onPage;
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -179,6 +628,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
   final List<StoreProduct> _products = [];
+  late Future<StoreHomeData> _footerData;
   Timer? _searchDebounce;
   String? _error;
   var _page = 1;
@@ -186,12 +636,28 @@ class _CatalogScreenState extends State<CatalogScreen> {
   var _loading = false;
   var _requestToken = 0;
   var _query = '';
+  String? _category;
+  String? _brand;
+  String? _shadeId;
+  String? _lensTypeId;
+  String _sort = 'newest';
 
   @override
   void initState() {
     super.initState();
+    _footerData = widget.api.getHomeData();
+    _applyFilterValues(widget.filter);
     _scrollController.addListener(_onScroll);
     _load(reset: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant CatalogScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.filter != oldWidget.filter) {
+      _applyFilterValues(widget.filter);
+      _load(reset: true);
+    }
   }
 
   @override
@@ -228,6 +694,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
       final result = await widget.api.getProducts(
         page: reset ? 1 : _page + 1,
         query: _query,
+        category: _category,
+        brand: _brand,
+        shadeId: _shadeId,
+        lensTypeId: _lensTypeId,
+        sort: _sort,
       );
       if (!mounted || requestToken != _requestToken) return;
       setState(() {
@@ -254,37 +725,69 @@ class _CatalogScreenState extends State<CatalogScreen> {
     });
   }
 
-  Future<void> _showProduct(StoreProduct product) async {
-    final line = await showModalBottomSheet<CartLine>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => ProductSheet(product: product),
-    );
-    if (line == null || !mounted) return;
-    widget.onAdd(line);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${product.name} added to your bag')),
-    );
+  void _applyFilterValues(StoreBrowseFilter filter) {
+    _query = filter.query;
+    _category = filter.category;
+    _brand = filter.brand;
+    _shadeId = filter.shadeId;
+    _lensTypeId = filter.lensTypeId;
+    _sort = filter.sort;
+    _searchController.text = filter.query;
+  }
+
+  void applyFilter(StoreBrowseFilter filter) {
+    _searchDebounce?.cancel();
+    _applyFilterValues(filter);
+    _load(reset: true);
+  }
+
+  Future<void> _openFilters() async {
+    try {
+      final home = await _footerData;
+      if (!mounted) return;
+      final selected = await showModalBottomSheet<StoreBrowseFilter>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (context) => _CatalogFilterSheet(
+          data: home,
+          initial: StoreBrowseFilter(
+            query: _query,
+            category: _category,
+            brand: _brand,
+            shadeId: _shadeId,
+            lensTypeId: _lensTypeId,
+            sort: _sort,
+          ),
+        ),
+      );
+      if (selected == null || !mounted) return;
+      applyFilter(selected);
+    } on StoreApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final columns = MediaQuery.sizeOf(context).width > 650 ? 3 : 2;
+    final width = MediaQuery.sizeOf(context).width;
+    final columns = width >= 1100
+        ? 4
+        : width >= 700
+        ? 3
+        : 2;
+    final activeFilters = [
+      if (_category != null) 'Category',
+      if (_brand != null) 'Brand',
+      if (_shadeId != null) 'Shade',
+      if (_lensTypeId != null) 'Lens type',
+    ];
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'ISK Lenses',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh catalog',
-            onPressed: () => _load(reset: true),
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
+      backgroundColor: const Color(0xfff8faff),
       body: RefreshIndicator(
         onRefresh: () => _load(reset: true),
         child: CustomScrollView(
@@ -296,37 +799,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [_navy, Color(0xff1a67b8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'See the world your way',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            'Explore contact lenses picked for your style.',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     TextField(
                       controller: _searchController,
                       onChanged: _onSearchChanged,
@@ -336,7 +808,70 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         prefixIcon: Icon(Icons.search),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _openFilters,
+                          icon: const Icon(Icons.tune_rounded),
+                          label: Text(
+                            activeFilters.isEmpty
+                                ? 'Filter'
+                                : 'Filter (${activeFilters.length})',
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          initialValue: _sort,
+                          onSelected: (value) => applyFilter(
+                            StoreBrowseFilter(
+                              query: _query,
+                              category: _category,
+                              brand: _brand,
+                              shadeId: _shadeId,
+                              lensTypeId: _lensTypeId,
+                              sort: value,
+                            ),
+                          ),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'newest',
+                              child: Text('Newest'),
+                            ),
+                            PopupMenuItem(
+                              value: 'featured',
+                              child: Text('Featured'),
+                            ),
+                            PopupMenuItem(
+                              value: 'price_asc',
+                              child: Text('Price: low to high'),
+                            ),
+                            PopupMenuItem(
+                              value: 'price_desc',
+                              child: Text('Price: high to low'),
+                            ),
+                            PopupMenuItem(
+                              value: 'name_asc',
+                              child: Text('Name: A to Z'),
+                            ),
+                          ],
+                          child: OutlinedButton.icon(
+                            onPressed: null,
+                            icon: const Icon(Icons.sort_rounded),
+                            label: const Text('Sort'),
+                          ),
+                        ),
+                        if (activeFilters.isNotEmpty)
+                          TextButton(
+                            onPressed: () => applyFilter(
+                              StoreBrowseFilter(query: _query, sort: _sort),
+                            ),
+                            child: const Text('Clear filters'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     Text(
                       _query.isEmpty ? 'Shop contact lenses' : 'Search results',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -344,6 +879,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         color: _navy,
                       ),
                     ),
+                    if (activeFilters.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          activeFilters.join(' · '),
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -375,11 +918,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     crossAxisCount: columns,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    mainAxisExtent: 270,
+                    mainAxisExtent: width >= 700 ? 330 : 306,
                   ),
                   itemBuilder: (context, index) => _ProductCard(
                     product: _products[index],
-                    onTap: () => _showProduct(_products[index]),
+                    onTap: () => widget.onProduct(_products[index]),
+                    onCompare: () => widget.onCompare(_products[index]),
                   ),
                 ),
               ),
@@ -395,7 +939,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   child: _ErrorPanel(message: _error!, onRetry: () => _load()),
                 ),
             ],
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            SliverToBoxAdapter(
+              child: FutureBuilder<StoreHomeData>(
+                future: _footerData,
+                builder: (context, snapshot) => snapshot.hasData
+                    ? StoreSiteFooter(
+                        data: snapshot.data!,
+                        onPage: widget.onPage,
+                      )
+                    : const SizedBox(height: 20),
+              ),
+            ),
           ],
         ),
       ),
@@ -404,88 +958,181 @@ class _CatalogScreenState extends State<CatalogScreen> {
 }
 
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product, required this.onTap});
+  const _ProductCard({
+    required this.product,
+    required this.onTap,
+    required this.onCompare,
+  });
 
   final StoreProduct product;
   final VoidCallback onTap;
+  final VoidCallback onCompare;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 1,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                color: _paleBlue,
-                child: product.imageUrl == null
-                    ? const Center(
-                        child: Icon(
-                          Icons.visibility_outlined,
-                          size: 44,
-                          color: _navy,
-                        ),
-                      )
-                    : Image.network(
-                        product.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(
-                            Icons.visibility_outlined,
-                            size: 44,
-                            color: _navy,
-                          ),
-                        ),
-                      ),
+    return StoreProductCard(
+      product: product,
+      onTap: onTap,
+      onCompare: onCompare,
+    );
+  }
+}
+
+class _CatalogFilterSheet extends StatefulWidget {
+  const _CatalogFilterSheet({required this.data, required this.initial});
+
+  final StoreHomeData data;
+  final StoreBrowseFilter initial;
+
+  @override
+  State<_CatalogFilterSheet> createState() => _CatalogFilterSheetState();
+}
+
+class _CatalogFilterSheetState extends State<_CatalogFilterSheet> {
+  late String? _category = widget.initial.category;
+  late String? _brand = widget.initial.brand;
+  late String? _shadeId = widget.initial.shadeId;
+  late String? _lensTypeId = widget.initial.lensTypeId;
+  late String _sort = widget.initial.sort;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      20,
+      10,
+      20,
+      MediaQuery.viewInsetsOf(context).bottom + 20,
+    ),
+    child: SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _money(product.price, product.currency),
-                    style: const TextStyle(
-                      color: _navy,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonal(
-                      onPressed: onTap,
-                      style: FilledButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      child: Text(
-                        product.stockQuantity > 0
-                            ? 'Choose options'
-                            : 'View details',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Filter and sort',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: _navy,
+              fontWeight: FontWeight.w900,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          _filterDropdown(
+            label: 'Category',
+            value: _category,
+            options: widget.data.categories
+                .where((item) => item.isActive && item.productCount > 0)
+                .map((item) => (item.slug, item.name))
+                .toList(),
+            onChanged: (value) => setState(() => _category = value),
+          ),
+          const SizedBox(height: 12),
+          _filterDropdown(
+            label: 'Brand',
+            value: _brand,
+            options: widget.data.brands
+                .where((item) => item.productCount > 0)
+                .map((item) => (item.slug, item.name))
+                .toList(),
+            onChanged: (value) => setState(() => _brand = value),
+          ),
+          const SizedBox(height: 12),
+          _filterDropdown(
+            label: 'Shade',
+            value: _shadeId,
+            options: widget.data.shades
+                .where((item) => item.productCount > 0)
+                .map((item) => (item.id, item.name))
+                .toList(),
+            onChanged: (value) => setState(() => _shadeId = value),
+          ),
+          const SizedBox(height: 12),
+          _filterDropdown(
+            label: 'Lens type',
+            value: _lensTypeId,
+            options: widget.data.lensTypes
+                .where((item) => item.productCount > 0)
+                .map((item) => (item.id, item.name))
+                .toList(),
+            onChanged: (value) => setState(() => _lensTypeId = value),
+          ),
+          const SizedBox(height: 12),
+          _filterDropdown(
+            label: 'Sort by',
+            value: _sort,
+            options: const [
+              ('newest', 'Newest'),
+              ('featured', 'Featured'),
+              ('price_asc', 'Price: low to high'),
+              ('price_desc', 'Price: high to low'),
+              ('name_asc', 'Name: A to Z'),
+            ],
+            onChanged: (value) => setState(() => _sort = value ?? 'newest'),
+            allowEmpty: false,
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => setState(() {
+                  _category = null;
+                  _brand = null;
+                  _shadeId = null;
+                  _lensTypeId = null;
+                  _sort = 'newest';
+                }),
+                child: const Text('Clear all'),
+              ),
+              const Spacer(),
+              FilledButton(
+                onPressed: () => Navigator.pop(
+                  context,
+                  StoreBrowseFilter(
+                    query: widget.initial.query,
+                    category: _category,
+                    brand: _brand,
+                    shadeId: _shadeId,
+                    lensTypeId: _lensTypeId,
+                    sort: _sort,
+                  ),
+                ),
+                child: const Text('Show products'),
+              ),
+            ],
+          ),
+        ],
       ),
+    ),
+  );
+
+  Widget _filterDropdown({
+    required String label,
+    required String? value,
+    required List<(String, String)> options,
+    required ValueChanged<String?> onChanged,
+    bool allowEmpty = true,
+  }) {
+    final exists = options.any((item) => item.$1 == value);
+    return DropdownButtonFormField<String>(
+      initialValue: exists ? value : null,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        if (allowEmpty)
+          const DropdownMenuItem<String>(value: null, child: Text('Any')),
+        for (final (option, title) in options)
+          DropdownMenuItem(value: option, child: Text(title)),
+      ],
+      onChanged: onChanged,
     );
   }
 }
@@ -551,8 +1198,8 @@ class _ProductSheetState extends State<ProductSheet> {
             ),
             if (product.variants.isNotEmpty) ...[
               const SizedBox(height: 18),
-              DropdownButtonFormField<String>(
-                initialValue: _variant?.id,
+              IskDropdownField<String>(
+                value: _variant?.id,
                 decoration: const InputDecoration(
                   labelText: 'Lens option',
                   hintText: 'Choose an option',
@@ -663,8 +1310,8 @@ class _PowerDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
+    return IskDropdownField<String>(
+      value: value,
       decoration: InputDecoration(
         labelText: label,
         hintText: 'Select power range',
@@ -1172,7 +1819,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Store assistant')),
       body: Column(
         children: [
           Expanded(
@@ -1342,7 +1988,6 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget build(BuildContext context) {
     final session = widget.session;
     return Scaffold(
-      appBar: AppBar(title: const Text('Your account')),
       body: session == null
           ? ListView(
               padding: const EdgeInsets.all(20),
@@ -2095,8 +2740,8 @@ class _AdminWorkspaceScreenState extends State<AdminWorkspaceScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: field == 'role'
-                      ? DropdownButtonFormField<String>(
-                          initialValue: 'staff',
+                      ? IskDropdownField<String>(
+                          value: 'staff',
                           decoration: const InputDecoration(labelText: 'Role'),
                           items: const [
                             DropdownMenuItem(
@@ -2200,8 +2845,8 @@ class _AdminWorkspaceScreenState extends State<AdminWorkspaceScreen> {
                   'Add product review',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                DropdownButtonFormField<String>(
-                  initialValue: productId,
+                IskDropdownField<String>(
+                  value: productId,
                   decoration: const InputDecoration(labelText: 'Product'),
                   items: products
                       .map(
@@ -2231,8 +2876,8 @@ class _AdminWorkspaceScreenState extends State<AdminWorkspaceScreen> {
                   maxLines: 6,
                   decoration: const InputDecoration(labelText: 'Review'),
                 ),
-                DropdownButtonFormField<int>(
-                  initialValue: rating,
+                IskDropdownField<int>(
+                  value: rating,
                   decoration: const InputDecoration(labelText: 'Rating'),
                   items: [1, 2, 3, 4, 5]
                       .map(
@@ -2496,8 +3141,8 @@ class _AdminWorkspaceScreenState extends State<AdminWorkspaceScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 10),
                     child: field == 'placement'
-                        ? DropdownButtonFormField<String>(
-                            initialValue:
+                        ? IskDropdownField<String>(
+                            value:
                                 bannerPlacements.contains(
                                   controllers[field]!.text,
                                 )
@@ -3102,8 +3747,8 @@ class _AdminWorkspaceScreenState extends State<AdminWorkspaceScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _module,
+                            child: IskDropdownField<String>(
+                              value: _module,
                               decoration: const InputDecoration(
                                 labelText: 'Admin area',
                               ),

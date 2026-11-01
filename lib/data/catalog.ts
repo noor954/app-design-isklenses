@@ -227,7 +227,15 @@ async function enrich<T extends { id: string; categoryId: string | null; lensSha
   }))
 }
 
-async function buildCatalogConditions(categorySlug: string | null, query: string | null, brandSlug: string | null) {
+type CatalogSort = 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'featured'
+
+async function buildCatalogConditions(
+  categorySlug: string | null,
+  query: string | null,
+  brandSlug: string | null,
+  lensShadeId: string | null = null,
+  lensTypeId: string | null = null,
+) {
   const conditions = [eq(storeProducts.status, 'active')]
   if (categorySlug) {
     const all = await getCategories()
@@ -248,6 +256,8 @@ async function buildCatalogConditions(categorySlug: string | null, query: string
     )!)
   }
   if (brandSlug) conditions.push(eq(storeBrands.slug, brandSlug), eq(storeBrands.isActive, true))
+  if (lensShadeId) conditions.push(eq(storeProducts.lensShadeId, lensShadeId))
+  if (lensTypeId) conditions.push(eq(storeProducts.lensTypeId, lensTypeId))
   return conditions
 }
 
@@ -269,13 +279,29 @@ async function loadCatalog(categorySlug: string | null, query: string | null, br
   return enrich(rows)
 }
 
-async function loadCatalogPage(categorySlug: string | null, query: string | null, brandSlug: string | null, page: number, pageSize: number) {
-  const conditions = await buildCatalogConditions(categorySlug, query, brandSlug)
+async function loadCatalogPage(
+  categorySlug: string | null,
+  query: string | null,
+  brandSlug: string | null,
+  page: number,
+  pageSize: number,
+  lensShadeId: string | null,
+  lensTypeId: string | null,
+  sort: CatalogSort,
+) {
+  const conditions = await buildCatalogConditions(categorySlug, query, brandSlug, lensShadeId, lensTypeId)
   if (!conditions) return { data: [], total: 0, page, pageSize, totalPages: 0 }
 
+  const orderBy = {
+    newest: [desc(storeProducts.createdAt), asc(storeProducts.name)],
+    price_asc: [asc(storeProducts.price), asc(storeProducts.name)],
+    price_desc: [desc(storeProducts.price), asc(storeProducts.name)],
+    name_asc: [asc(storeProducts.name)],
+    featured: [desc(storeProducts.isFeatured), desc(storeProducts.createdAt)],
+  }[sort]
   const [rows, countRows] = await Promise.all([
     catalogQuery(conditions)
-      .orderBy(desc(storeProducts.createdAt))
+      .orderBy(...orderBy)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db
@@ -303,12 +329,15 @@ export function getCatalogPage(
   brand: string | null,
   page: number,
   pageSize: number,
+  lensShadeId: string | null = null,
+  lensTypeId: string | null = null,
+  sort: CatalogSort = 'newest',
 ) {
   return cached(
     CATALOG_NAMESPACE,
-    `products-page:image-fallback-v1:${category ?? ''}:${(query ?? '').toLowerCase()}:${brand ?? ''}:${page}:${pageSize}`,
+    `products-page:image-fallback-v1:${category ?? ''}:${(query ?? '').toLowerCase()}:${brand ?? ''}:${lensShadeId ?? ''}:${lensTypeId ?? ''}:${sort}:${page}:${pageSize}`,
     60,
-    () => loadCatalogPage(category, query, brand, page, pageSize),
+    () => loadCatalogPage(category, query, brand, page, pageSize, lensShadeId, lensTypeId, sort),
   )
 }
 

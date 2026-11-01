@@ -34,13 +34,16 @@ export function categoryHref(category: Pick<ProductCategory, 'path'>) {
 export function categoryTree(categories: ProductCategory[]) {
   const children = new Map<string, ProductCategory[]>()
   for (const category of categories) {
-    if (!category.showInMenu) continue
+    if (!category.isActive || !category.showInMenu) continue
     const key = category.parentId ?? 'root'
-    children.set(key, [...(children.get(key) ?? []), category])
+    children.set(key, [...(children.get(key) ?? []), { ...category, name: titleCase(category.name) }])
   }
   return children
 }
 
 export function titleCase(value: string) {
-  return value.toLocaleLowerCase().replace(/(^|\s)\S/g, (letter) => letter.toLocaleUpperCase())
+  return value.trim().toLocaleLowerCase().replace(
+    /(^|[^\p{L}\p{M}'’])(\p{L})/gu,
+    (_match, separator: string, letter: string) => `${separator}${letter.toLocaleUpperCase()}`,
+  )
 }

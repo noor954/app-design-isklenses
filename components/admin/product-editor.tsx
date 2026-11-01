@@ -6,6 +6,7 @@ import { LoaderCircle, Plus, X } from 'lucide-react'
 import { createProduct, getAdminCategories, setProductRelations, updateProduct } from '@/app/actions/catalog-admin'
 import { getAdminBrands, getAdminLensShades, getAdminLensTypes } from '@/app/actions/catalog-taxonomy'
 import { Alert, Field, flattenCategories, inputClass, primaryButton, secondaryButton, type AdminCategory } from '@/components/admin/admin-ui'
+import { MultiSelectField } from '@/components/admin/multi-select-field'
 import { useAdminProducts, type AdminProduct } from '@/lib/hooks/use-admin-data'
 import { notify, reportError } from '@/lib/ui/notifications'
 import { POWER_RANGE_OPTIONS } from '@/lib/power-ranges'
@@ -32,6 +33,7 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
   const [specs, setSpecs] = useState<SpecRow[]>(product?.specs ?? [])
   const [related, setRelated] = useState<string[]>(product?.relatedProductIds ?? [])
   const [relatedQuery, setRelatedQuery] = useState('')
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState(product?.categoryIds ?? (product?.categoryId ? [product.categoryId] : []))
   const [diameterMm, setDiameterMm] = useState(product?.diameterMm ?? '')
   const [baseCurve, setBaseCurve] = useState(product?.baseCurve ?? '')
   const [waterContent, setWaterContent] = useState(product?.waterContent ?? '')
@@ -124,12 +126,23 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
         <p className="text-xs leading-5 text-[#526b7b] sm:col-span-2">Name, catalog placement, and availability.</p>
         <Field label="Name" required><input name="name" required maxLength={200} defaultValue={product?.name} className={inputClass} /></Field>
         <Field label="Slug (blank = from name)"><input name="slug" maxLength={120} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={product?.slug} className={inputClass} /></Field>
-        <Field label="Categories">
-          <select name="categoryIds" multiple aria-describedby="product-category-help" defaultValue={product?.categoryIds ?? (product?.categoryId ? [product.categoryId] : [])} className={`${inputClass} min-h-32`}>
-            {categories.map((row) => <option key={row.id} value={row.id}>{'\u2003'.repeat(row.depth)}{row.name}</option>)}
-          </select>
-          <span id="product-category-help" className="mt-1 block text-xs text-[#526b7b]">Optional. Select multiple categories, or leave empty until you are ready to assign them.</span>
-        </Field>
+        <div className="block text-xs font-medium text-[#526b7b]">
+          Categories
+          <MultiSelectField
+            name="categoryIds"
+            label="Product categories"
+            placeholder="Choose categories"
+            options={categories.map((row) => ({ value: row.id, label: `${'\u2003'.repeat(row.depth)}${row.name}` }))}
+            selected={selectedCategoryIds}
+            onChange={(value, checked) => {
+              const selected = new Set(selectedCategoryIds)
+              if (checked) selected.add(value)
+              else selected.delete(value)
+              setSelectedCategoryIds([...selected])
+            }}
+          />
+          <span id="product-category-help" className="mt-1 block text-xs text-[#526b7b]">Optional. Choose one or more categories, or leave empty until you are ready to assign them.</span>
+        </div>
         <Field label="Brand">
           <select name="brandId" defaultValue={product?.brandId ?? ''} className={inputClass}>
             <option value="">No brand</option>

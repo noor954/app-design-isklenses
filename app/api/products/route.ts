@@ -9,11 +9,19 @@ export async function GET(request: NextRequest) {
     const category = url.searchParams.get('category')
     const rawBrand = url.searchParams.get('brand')?.trim()
     const rawQuery = url.searchParams.get('q')?.trim()
+    const rawShadeId = url.searchParams.get('shadeId')?.trim()
+    const rawLensTypeId = url.searchParams.get('lensTypeId')?.trim()
+    const rawSort = url.searchParams.get('sort')?.trim() || 'newest'
     const rawPage = url.searchParams.get('page')
     const rawLimit = url.searchParams.get('limit')
     if (category && category.length > 100) return NextResponse.json({ error: 'Category filter is too long.' }, { status: 400 })
     if (rawBrand && rawBrand.length > 100) return NextResponse.json({ error: 'Brand filter is too long.' }, { status: 400 })
     if (rawQuery && rawQuery.length > 100) return NextResponse.json({ error: 'Search query is too long.' }, { status: 400 })
+    if (rawShadeId && rawShadeId.length > 100) return NextResponse.json({ error: 'Shade filter is too long.' }, { status: 400 })
+    if (rawLensTypeId && rawLensTypeId.length > 100) return NextResponse.json({ error: 'Lens type filter is too long.' }, { status: 400 })
+    if (!['newest', 'price_asc', 'price_desc', 'name_asc', 'featured'].includes(rawSort)) {
+      return NextResponse.json({ error: 'Choose a supported sort order.' }, { status: 400 })
+    }
     if ((rawPage !== null && !/^[1-9]\d*$/.test(rawPage)) || (rawLimit !== null && !/^[1-9]\d*$/.test(rawLimit))) {
       return NextResponse.json({ error: 'Page and limit must be positive integers.' }, { status: 400 })
     }
@@ -29,7 +37,16 @@ export async function GET(request: NextRequest) {
     const query = rawQuery
 
     if (page !== null) {
-      const result = await getCatalogPage(category || null, query || null, rawBrand || null, page, limit ?? 24)
+      const result = await getCatalogPage(
+        category || null,
+        query || null,
+        rawBrand || null,
+        page,
+        limit ?? 24,
+        rawShadeId || null,
+        rawLensTypeId || null,
+        rawSort as 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'featured',
+      )
       return NextResponse.json(
         {
           data: result.data,

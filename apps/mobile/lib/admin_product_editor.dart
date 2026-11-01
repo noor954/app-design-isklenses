@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'isk_controls.dart';
 import 'store_api.dart';
 
 const _adminBlue = Color(0xff006f9b);
@@ -335,31 +336,51 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
                     ),
                   ]),
                   _section('Catalog placement', [
-                    const Text('Categories'),
-                    const SizedBox(height: 4),
                     if (_categories.isEmpty)
                       const Text('No categories are available.')
                     else
-                      ..._categories.map((category) {
-                        final id = category['id']?.toString() ?? '';
-                        return CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          title: Text(
-                            category['name']?.toString() ?? 'Category',
+                      ExpansionTile(
+                        leading: const Icon(Icons.category_outlined),
+                        title: const Text('Categories'),
+                        subtitle: Text(
+                          _categoryIds.isEmpty
+                              ? 'Choose one or more categories'
+                              : '${_categoryIds.length} selected',
+                        ),
+                        childrenPadding: const EdgeInsets.fromLTRB(
+                          12,
+                          0,
+                          12,
+                          12,
+                        ),
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: _categories
+                                .map((category) {
+                                  final id = category['id']?.toString() ?? '';
+                                  return FilterChip(
+                                    label: Text(
+                                      category['name']?.toString() ??
+                                          'Category',
+                                    ),
+                                    selected: _categoryIds.contains(id),
+                                    onSelected: id.isEmpty
+                                        ? null
+                                        : (selected) => setState(() {
+                                            if (selected) {
+                                              _categoryIds.add(id);
+                                            } else {
+                                              _categoryIds.remove(id);
+                                            }
+                                          }),
+                                  );
+                                })
+                                .toList(growable: false),
                           ),
-                          value: _categoryIds.contains(id),
-                          onChanged: id.isEmpty
-                              ? null
-                              : (selected) => setState(() {
-                                  if (selected == true) {
-                                    _categoryIds.add(id);
-                                  } else {
-                                    _categoryIds.remove(id);
-                                  }
-                                }),
-                        );
-                      }),
+                        ],
+                      ),
                     _recordDropdown('Brand', _brands, _brandId, (value) {
                       setState(() => _brandId = value);
                     }),
@@ -561,8 +582,8 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
     final selected = options.contains(value) ? value : null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: DropdownButtonFormField<String>(
-        initialValue: selected,
+      child: IskDropdownField<String>(
+        value: selected,
         validator: (value) =>
             value == null ? 'Select $label before saving.' : null,
         decoration: InputDecoration(labelText: label),
@@ -583,8 +604,8 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
     required ValueChanged<T?> onChanged,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
-    child: DropdownButtonFormField<T>(
-      initialValue: value,
+    child: IskDropdownField<T>(
+      value: value,
       decoration: InputDecoration(labelText: label),
       items: values
           .map(
@@ -612,8 +633,8 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
     final selected = options.any((item) => item.$1 == value) ? value : null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: DropdownButtonFormField<String?>(
-        initialValue: selected,
+      child: IskDropdownField<String?>(
+        value: selected,
         decoration: InputDecoration(labelText: label),
         items: [
           const DropdownMenuItem<String?>(value: null, child: Text('None')),

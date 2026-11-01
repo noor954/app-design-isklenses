@@ -7,6 +7,7 @@ import { buildCategoryPaths, DEFAULT_PRODUCT_PAGE, descendantIds, SECTION_SOURCE
 import { db } from '@/lib/db'
 import { isPowerRangeOption, POWER_RANGE_OPTIONS } from '@/lib/power-ranges'
 import { deleteMedia, mediaPathFromOwnedUrl } from '@/lib/server/media-storage.mjs'
+import { titleCase } from '@/lib/store-config'
 import {
   storeActivityEvents,
   storeBrands,
@@ -68,7 +69,7 @@ export type CategoryInput = {
 }
 
 function parseCategory(input: CategoryInput) {
-  const name = text(input.name, 120, 'Name', true)!
+  const name = titleCase(text(input.name, 120, 'Name', true)!)
   const slug = typeof input.slug === 'string' && input.slug.trim() ? input.slug.trim().toLowerCase() : slugify(name)
   if (!slugPattern.test(slug) || slug.length > 80) throw new Error('Slug may use lowercase letters, numbers and hyphens only.')
   const imageUrl = text(input.imageUrl, 1000, 'Image URL')
@@ -100,6 +101,7 @@ export async function getAdminCategories() {
   const own = new Map(counts.map((row) => [row.id, row.n]))
   return buildCategoryPaths(rows).map((row) => ({
     ...row,
+    name: titleCase(row.name),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     productCount: own.get(row.id) ?? 0,

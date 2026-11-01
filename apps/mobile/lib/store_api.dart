@@ -11,6 +11,15 @@ const _adminSessionCookieName = 'isk-lenses-admin-session';
 const _adminSessionCookieStorageKey = 'admin-session-cookie';
 const _uuid = Uuid();
 
+Map<String, dynamic> _asMap(Object? value) =>
+    value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+
+List<Map<String, dynamic>> _asList(Object? value) => value is List
+    ? value.whereType<Map>().map(Map<String, dynamic>.from).toList()
+    : <Map<String, dynamic>>[];
+
+int _asInt(Object? value) => value is num ? value.toInt() : 0;
+
 class StoreApiException implements Exception {
   const StoreApiException(this.message, {this.statusCode});
 
@@ -73,10 +82,7 @@ class StoreApi {
         'Use an HTTP site origin without a path.',
       );
     }
-    return uri
-        .replace(path: '', query: '', fragment: '')
-        .toString()
-        .replaceFirst(RegExp(r'/$'), '');
+    return uri.origin;
   }
 
   Future<void> _storeSessionCookie(Headers headers) async {
@@ -101,15 +107,17 @@ class StoreApi {
     Map<String, dynamic>? query,
   }) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        path,
-        queryParameters: query,
-      );
+      final response = await _dio.get<Object?>(path, queryParameters: query);
       final body = response.data;
-      if (body == null) {
-        throw const StoreApiException('The store returned an empty response.');
+      if (body is! Map) {
+        throw StoreApiException(
+          body == null
+              ? 'The store returned an empty response.'
+              : 'The store returned an invalid response.',
+          statusCode: response.statusCode,
+        );
       }
-      return body;
+      return Map<String, dynamic>.from(body);
     } on DioException catch (error) {
       throw _toApiException(error);
     }
@@ -148,13 +156,26 @@ class StoreApi {
     return StoreApiException(message, statusCode: error.response?.statusCode);
   }
 
-  Future<ProductPage> getProducts({int page = 1, String query = ''}) async {
+  Future<ProductPage> getProducts({
+    int page = 1,
+    String query = '',
+    String? category,
+    String? brand,
+    String? shadeId,
+    String? lensTypeId,
+    String sort = 'newest',
+  }) async {
     final body = await _getObject(
       '/api/products',
       query: {
         'page': page,
         'limit': 24,
         if (query.trim().isNotEmpty) 'q': query.trim(),
+        if (category != null) 'category': category,
+        if (brand != null) 'brand': brand,
+        if (shadeId != null) 'shadeId': shadeId,
+        if (lensTypeId != null) 'lensTypeId': lensTypeId,
+        'sort': sort,
       },
     );
     final values = body['data'];
@@ -175,6 +196,72 @@ class StoreApi {
           .toList(growable: false),
       page: page,
       totalPages: totalPages,
+    );
+  }
+
+  Future<StoreHomeData> getHomeData() async {
+    try {
+      final body = await _getObject('/api/storefront/home');
+      final data = body['data'];
+      if (data is! Map) {
+        throw const StoreApiException(
+          'The storefront home response is invalid.',
+        );
+      }
+      return StoreHomeData.fromJson(
+        Map<String, dynamic>.from(data),
+        Uri.parse(_dio.options.baseUrl),
+      );
+    } on StoreApiException catch (error) {
+      if (error.statusCode != 404) rethrow;
+      return _getHomeDataFromPublicCatalog();
+    }
+  }
+
+  Future<StoreHomeData> _getHomeDataFromPublicCatalog() async {
+    final responses = await Future.wait([
+      _getObject('/api/product-categories'),
+      _getObject('/api/brands'),
+      _getObject('/api/lens-shades'),
+      _getObject('/api/lens-types'),
+      getProducts(),
+    ]);
+    final origin = Uri.parse(_dio.options.baseUrl);
+    final categories = _asList((responses[0] as Map<String, dynamic>)['data'])
+        .map((item) => StoreCategory.fromJson(item, origin))
+        .toList(growable: false);
+    final brands = _asList(
+      (responses[1] as Map<String, dynamic>)['data'],
+    ).map((item) => StoreBrand.fromJson(item, origin)).toList(growable: false);
+    final shades = _asList(
+      (responses[2] as Map<String, dynamic>)['data'],
+    ).map((item) => StoreShade.fromJson(item, origin)).toList(growable: false);
+    final lensTypes = _asList((responses[3] as Map<String, dynamic>)['data'])
+        .map((item) => StoreLensType.fromJson(item, origin))
+        .toList(growable: false);
+    final products = (responses[4] as ProductPage).products;
+    return StoreHomeData(
+      banners: const [],
+      products: products,
+      categories: categories,
+      brands: brands,
+      shades: shades,
+      lensTypes: lensTypes,
+      reviews: const [],
+      chrome: const StoreChrome(contact: {}, footer: {}),
+      headings: const {},
+    );
+  }
+
+  Future<StoreProduct> getProduct(String slug) async {
+    final body = await _getObject('/api/products/${Uri.encodeComponent(slug)}');
+    final value = body['data'];
+    if (value is! Map) {
+      throw const StoreApiException('The product response is invalid.');
+    }
+    return StoreProduct.fromJson(
+      Map<String, dynamic>.from(value),
+      Uri.parse(_dio.options.baseUrl),
     );
   }
 
@@ -495,6 +582,252 @@ class ProductPage {
   final int totalPages;
 }
 
+class StoreHomeData {
+  const StoreHomeData({
+    required this.banners,
+    required this.products,
+    required this.categories,
+    required this.brands,
+    required this.shades,
+    required this.lensTypes,
+    required this.reviews,
+    required this.chrome,
+    required this.headings,
+  });
+
+  final List<StoreBanner> banners;
+  final List<StoreProduct> products;
+  final List<StoreCategory> categories;
+  final List<StoreBrand> brands;
+  final List<StoreShade> shades;
+  final List<StoreLensType> lensTypes;
+  final List<StoreReview> reviews;
+  final StoreChrome chrome;
+  final Map<String, dynamic> headings;
+
+  factory StoreHomeData.fromJson(Map<String, dynamic> value, Uri origin) {
+    final content = _asMap(value['content']);
+    return StoreHomeData(
+      banners: _asList(content['banners'])
+          .map((item) => StoreBanner.fromJson(item, origin))
+          .toList(growable: false),
+      products: _asList(value['products'])
+          .map((item) => StoreProduct.fromJson(item, origin))
+          .toList(growable: false),
+      categories: _asList(value['categories'])
+          .map((item) => StoreCategory.fromJson(item, origin))
+          .toList(growable: false),
+      brands: _asList(value['brands'])
+          .map((item) => StoreBrand.fromJson(item, origin))
+          .toList(growable: false),
+      shades: _asList(value['shades'])
+          .map((item) => StoreShade.fromJson(item, origin))
+          .toList(growable: false),
+      lensTypes: _asList(value['lensTypes'])
+          .map((item) => StoreLensType.fromJson(item, origin))
+          .toList(growable: false),
+      reviews: _asList(
+        value['reviews'],
+      ).map(StoreReview.fromJson).toList(growable: false),
+      chrome: StoreChrome.fromJson(_asMap(value['chrome'])),
+      headings: _asMap(content['headings']),
+    );
+  }
+}
+
+class StoreBanner {
+  const StoreBanner({
+    required this.id,
+    required this.placement,
+    required this.title,
+    required this.body,
+    required this.imageUrl,
+    required this.href,
+  });
+
+  final String id;
+  final String placement;
+  final String title;
+  final String? body;
+  final String imageUrl;
+  final String? href;
+
+  factory StoreBanner.fromJson(Map value, Uri origin) => StoreBanner(
+    id: value['id']?.toString() ?? '',
+    placement: value['placement']?.toString() ?? 'hero',
+    title: value['title']?.toString() ?? '',
+    body: value['body']?.toString(),
+    imageUrl:
+        StoreProduct.mediaUrl(value['imageUrl']?.toString(), origin) ?? '',
+    href: value['href']?.toString(),
+  );
+}
+
+class StoreCategory {
+  const StoreCategory({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.path,
+    required this.imageUrl,
+    required this.productCount,
+    required this.isActive,
+    required this.showInMenu,
+  });
+
+  final String id;
+  final String name;
+  final String slug;
+  final String path;
+  final String? imageUrl;
+  final int productCount;
+  final bool isActive;
+  final bool showInMenu;
+
+  factory StoreCategory.fromJson(Map value, Uri origin) => StoreCategory(
+    id: value['id']?.toString() ?? '',
+    name: value['name']?.toString() ?? '',
+    slug: value['slug']?.toString() ?? '',
+    path: value['path']?.toString() ?? value['slug']?.toString() ?? '',
+    imageUrl: StoreProduct.mediaUrl(
+      value['imageUrl']?.toString() ?? value['fallbackImageUrl']?.toString(),
+      origin,
+    ),
+    productCount: _asInt(value['productCount']),
+    isActive: value['isActive'] != false,
+    showInMenu: value['showInMenu'] != false,
+  );
+}
+
+class StoreBrand {
+  const StoreBrand({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.imageUrl,
+    required this.productCount,
+  });
+
+  final String id;
+  final String name;
+  final String slug;
+  final String? imageUrl;
+  final int productCount;
+
+  factory StoreBrand.fromJson(Map value, Uri origin) => StoreBrand(
+    id: value['id']?.toString() ?? '',
+    name: value['name']?.toString() ?? '',
+    slug: value['slug']?.toString() ?? '',
+    imageUrl: StoreProduct.mediaUrl(
+      value['logoUrl']?.toString() ?? value['fallbackImageUrl']?.toString(),
+      origin,
+    ),
+    productCount: _asInt(value['productCount']),
+  );
+}
+
+class StoreShade {
+  const StoreShade({
+    required this.id,
+    required this.name,
+    required this.hex,
+    required this.imageUrl,
+    required this.productCount,
+  });
+
+  final String id;
+  final String name;
+  final String? hex;
+  final String? imageUrl;
+  final int productCount;
+
+  factory StoreShade.fromJson(Map value, Uri origin) => StoreShade(
+    id: value['id']?.toString() ?? '',
+    name: value['name']?.toString() ?? '',
+    hex: value['hex']?.toString(),
+    imageUrl: StoreProduct.mediaUrl(
+      value['imageUrl']?.toString() ?? value['fallbackImageUrl']?.toString(),
+      origin,
+    ),
+    productCount: _asInt(value['productCount']),
+  );
+}
+
+class StoreLensType {
+  const StoreLensType({
+    required this.id,
+    required this.name,
+    required this.imageUrl,
+    required this.productCount,
+  });
+
+  final String id;
+  final String name;
+  final String? imageUrl;
+  final int productCount;
+
+  factory StoreLensType.fromJson(Map value, Uri origin) => StoreLensType(
+    id: value['id']?.toString() ?? '',
+    name: value['name']?.toString() ?? '',
+    imageUrl: StoreProduct.mediaUrl(
+      value['fallbackImageUrl']?.toString(),
+      origin,
+    ),
+    productCount: _asInt(value['productCount']),
+  );
+}
+
+class StoreReview {
+  const StoreReview({
+    required this.author,
+    required this.title,
+    required this.body,
+    required this.rating,
+  });
+
+  final String author;
+  final String? title;
+  final String body;
+  final int rating;
+
+  factory StoreReview.fromJson(Map value) => StoreReview(
+    author: value['author']?.toString() ?? 'Customer',
+    title: value['title']?.toString(),
+    body: value['body']?.toString() ?? '',
+    rating: _asInt(value['rating']),
+  );
+}
+
+class StoreChrome {
+  const StoreChrome({required this.contact, required this.footer});
+
+  final Map<String, dynamic> contact;
+  final Map<String, dynamic> footer;
+
+  factory StoreChrome.fromJson(Map value) => StoreChrome(
+    contact: _asMap(value['contact']),
+    footer: _asMap(value['footer']),
+  );
+}
+
+class StoreBrowseFilter {
+  const StoreBrowseFilter({
+    this.query = '',
+    this.category,
+    this.brand,
+    this.shadeId,
+    this.lensTypeId,
+    this.sort = 'newest',
+  });
+
+  final String query;
+  final String? category;
+  final String? brand;
+  final String? shadeId;
+  final String? lensTypeId;
+  final String sort;
+}
+
 class StoreProduct {
   const StoreProduct({
     required this.id,
@@ -504,8 +837,29 @@ class StoreProduct {
     required this.currency,
     required this.stockQuantity,
     required this.imageUrl,
+    required this.images,
     required this.availablePowerRanges,
     required this.variants,
+    required this.description,
+    required this.brand,
+    required this.category,
+    required this.shade,
+    required this.lensType,
+    required this.compareAtPrice,
+    required this.diameterMm,
+    required this.baseCurve,
+    required this.waterContent,
+    required this.material,
+    required this.wearDuration,
+    required this.packContents,
+    required this.powerRange,
+    required this.features,
+    required this.specs,
+    required this.isFeatured,
+    required this.isNewArrival,
+    required this.isOnSale,
+    required this.ratingAvg,
+    required this.ratingCount,
   });
 
   final String id;
@@ -515,12 +869,51 @@ class StoreProduct {
   final String currency;
   final int stockQuantity;
   final String? imageUrl;
+  final List<String> images;
   final List<String> availablePowerRanges;
   final List<ProductVariant> variants;
+  final String? description;
+  final String? brand;
+  final String? category;
+  final Map<String, dynamic>? shade;
+  final Map<String, dynamic>? lensType;
+  final String? compareAtPrice;
+  final String? diameterMm;
+  final String? baseCurve;
+  final String? waterContent;
+  final String? material;
+  final String? wearDuration;
+  final String? packContents;
+  final String? powerRange;
+  final List<String> features;
+  final List<Map<String, dynamic>> specs;
+  final bool isFeatured;
+  final bool isNewArrival;
+  final bool isOnSale;
+  final double? ratingAvg;
+  final int ratingCount;
 
   factory StoreProduct.fromJson(Map value, Uri apiOrigin) {
     final ranges = value['availablePowerRanges'];
     final variants = value['variants'];
+    final assets = _asList(value['assets']);
+    final imageUrls = assets
+        .where((asset) => asset['mediaType'] != 'video')
+        .map(
+          (asset) =>
+              StoreProduct.mediaUrl(asset['blobUrl']?.toString(), apiOrigin),
+        )
+        .whereType<String>()
+        .toList(growable: false);
+    final hero = StoreProduct.mediaUrl(
+      value['heroImageUrl']?.toString(),
+      apiOrigin,
+    );
+    final shade = value['lensShade'];
+    final lensType = value['lensType'];
+    final specs = _asList(value['specs']);
+    final features = value['features'];
+    final avgRating = value['ratingAvg'];
     return StoreProduct(
       id: value['id']?.toString() ?? '',
       name: value['name']?.toString() ?? 'Contact lenses',
@@ -530,7 +923,11 @@ class StoreProduct {
       stockQuantity: value['stockQuantity'] is num
           ? (value['stockQuantity'] as num).toInt()
           : 0,
-      imageUrl: _mediaUrl(value['heroImageUrl']?.toString(), apiOrigin),
+      imageUrl: hero ?? (imageUrls.isEmpty ? null : imageUrls.first),
+      images: [
+        if (hero != null) hero,
+        ...imageUrls.where((image) => image != hero),
+      ],
       availablePowerRanges: ranges is List
           ? ranges.whereType<String>().toList(growable: false)
           : const [],
@@ -540,10 +937,32 @@ class StoreProduct {
                 .map(ProductVariant.fromJson)
                 .toList(growable: false)
           : const [],
+      description: value['description']?.toString(),
+      brand: value['brand']?.toString(),
+      category: value['category']?.toString(),
+      shade: shade is Map ? Map<String, dynamic>.from(shade) : null,
+      lensType: lensType is Map ? Map<String, dynamic>.from(lensType) : null,
+      compareAtPrice: value['compareAtPrice']?.toString(),
+      diameterMm: value['diameterMm']?.toString(),
+      baseCurve: value['baseCurve']?.toString(),
+      waterContent: value['waterContent']?.toString(),
+      material: value['material']?.toString(),
+      wearDuration: value['wearDuration']?.toString(),
+      packContents: value['packContents']?.toString(),
+      powerRange: value['powerRange']?.toString(),
+      features: features is List
+          ? features.map((item) => item.toString()).toList(growable: false)
+          : const [],
+      specs: specs.map((item) => Map<String, dynamic>.from(item)).toList(),
+      isFeatured: value['isFeatured'] == true,
+      isNewArrival: value['isNewArrival'] == true,
+      isOnSale: value['isOnSale'] == true,
+      ratingAvg: avgRating is num ? avgRating.toDouble() : null,
+      ratingCount: _asInt(value['ratingCount']),
     );
   }
 
-  static String? _mediaUrl(String? value, Uri apiOrigin) {
+  static String? mediaUrl(String? value, Uri apiOrigin) {
     if (value == null || value.isEmpty) return null;
     final uri = Uri.tryParse(value);
     if (uri == null) return null;
