@@ -1,13 +1,12 @@
 import {
   getCategories,
-  getHomeCatalog,
   getStorefrontBrands,
   getStorefrontLensTypes,
   getStorefrontShades,
 } from '@/lib/data/catalog'
 import { categoryHref } from '@/lib/store-config'
 
-export const HOME_SECTION_PAGE_SIZE = 10
+export const HOME_SECTION_PAGE_SIZE = 15
 export const HOME_SECTION_KEYS = ['categories', 'brands', 'shades', 'lens-types'] as const
 export type HomeSectionKey = (typeof HOME_SECTION_KEYS)[number]
 
@@ -119,19 +118,5 @@ export async function getHomeSectionPage(
     pageSize,
     total: filtered.length,
     hasMore: !normalizedQuery && start + items.length < filtered.length,
-  }
-}
-
-export async function getHomeProductsPage(page = 1) {
-  const products = await getHomeCatalog()
-  const safePage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1
-  const start = (safePage - 1) * HOME_SECTION_PAGE_SIZE
-  const items = products.slice(start, start + HOME_SECTION_PAGE_SIZE)
-  return {
-    items,
-    page: safePage,
-    pageSize: HOME_SECTION_PAGE_SIZE,
-    total: products.length,
-    hasMore: start + items.length < products.length,
   }
 }

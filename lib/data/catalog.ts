@@ -392,6 +392,47 @@ export function getHomeCatalog() {
   return cached(CATALOG_NAMESPACE, 'home-products:image-fallback-v1', 300, loadHomeCatalog)
 }
 
+export const HOME_PRODUCT_TABS = ['catalog', 'featured', 'new', 'reduced'] as const
+export type HomeProductTab = (typeof HOME_PRODUCT_TABS)[number]
+export const HOME_PRODUCT_PAGE_SIZE = 15
+
+async function loadHomeProductsPage(tab: HomeProductTab, page: number) {
+  const conditions = [eq(storeProducts.status, 'active')]
+  if (tab === 'featured') conditions.push(eq(storeProducts.isFeatured, true))
+  if (tab === 'new') conditions.push(eq(storeProducts.isNewArrival, true))
+  if (tab === 'reduced') conditions.push(eq(storeProducts.isOnSale, true))
+  const where = and(...conditions)
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select(productColumns)
+      .from(storeProducts)
+      .leftJoin(storeCategories, eq(storeCategories.id, storeProducts.categoryId))
+      .where(where)
+      .orderBy(desc(storeProducts.isFeatured), desc(storeProducts.isNewArrival), desc(storeProducts.isOnSale), desc(storeProducts.createdAt), asc(storeProducts.id))
+      .limit(HOME_PRODUCT_PAGE_SIZE)
+      .offset((page - 1) * HOME_PRODUCT_PAGE_SIZE),
+    db.select({ total: sql<number>`count(*)::int` }).from(storeProducts).where(where),
+  ])
+  const products = (await enrich(rows)).map((product) => ({
+    ...product,
+    createdAt: typeof product.createdAt === 'string' ? product.createdAt : product.createdAt.toISOString(),
+    updatedAt: typeof product.updatedAt === 'string' ? product.updatedAt : product.updatedAt.toISOString(),
+  }))
+  return {
+    tab,
+    items: products,
+    page,
+    pageSize: HOME_PRODUCT_PAGE_SIZE,
+    total,
+    hasMore: (page - 1) * HOME_PRODUCT_PAGE_SIZE + products.length < total,
+  }
+}
+
+export function getHomeProductsPage(tab: HomeProductTab, page = 1) {
+  const safePage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1
+  return cached(CATALOG_NAMESPACE, `home-products-page:v1:${tab}:${safePage}`, 300, () => loadHomeProductsPage(tab, safePage))
+}
+
 async function loadStorefrontBrands() {
   const brandsQuery = db
     .select({

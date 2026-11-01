@@ -12,12 +12,6 @@ export const HOME_SECTION_DEFAULTS = [
     description: 'Shop active product categories from the catalog.',
   },
   {
-    id: 'brands',
-    label: 'Brands',
-    title: 'Shop by brand',
-    description: 'Explore a selection from the full brand directory.',
-  },
-  {
     id: 'shades',
     label: 'Lens shades',
     title: 'Shop by shade',
@@ -34,6 +28,12 @@ export const HOME_SECTION_DEFAULTS = [
     label: 'Lens types',
     title: 'Shop by lens type',
     description: 'Browse the lens types linked to active listings.',
+  },
+  {
+    id: 'brands',
+    label: 'Brands',
+    title: 'Shop by brand',
+    description: 'Explore a selection from the full brand directory.',
   },
   {
     id: 'why-us',

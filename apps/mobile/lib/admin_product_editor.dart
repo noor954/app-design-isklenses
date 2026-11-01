@@ -464,7 +464,8 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
                           .map((option) {
                             final range = option['value']?.toString() ?? '';
                             final label = option['label']?.toString() ?? range;
-                            final surcharge = option['surcharge']?.toString() ?? '0';
+                            final surcharge =
+                                option['surcharge']?.toString() ?? '0';
                             final selected = _powerSelection.contains(range);
                             return FilterChip(
                               label: Text('$label · Rs $surcharge / eye'),

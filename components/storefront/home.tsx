@@ -5,7 +5,6 @@ import { Slider } from '@/components/storefront/home/slider'
 import { SectionProgress } from '@/components/storefront/home/section-progress'
 import { HomeScrollMotion } from '@/components/storefront/home/scroll-motion'
 import { PagedSectionCarousel } from '@/components/storefront/home/paged-section-carousel'
-import { pickCarouselVariant } from '@/lib/carousel-variants'
 import { getHomeSectionPage } from '@/lib/data/home-sections'
 import { GalleryCard } from '@/components/storefront/home/gallery-card'
 import { StorefrontFallbackImage } from '@/components/storefront/fallback-image'
@@ -18,6 +17,7 @@ import type { CategoryNode } from '@/lib/catalog-types'
 import {
   getCategories,
   getHomeCatalog,
+  getHomeProductsPage,
   getStorefrontBrands,
   getStorefrontLensTypes,
   getStorefrontReviews,
@@ -218,12 +218,13 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
     shade,
     product: products.find((product) => product.lensShadeId === shade.id),
   }))
-  const [categoriesPage, brandsPage, shadesPage] = await Promise.all([
+  const [categoriesPage, brandsPage, shadesPage, catalogPage] = await Promise.all([
     getHomeSectionPage('categories'),
     getHomeSectionPage('brands'),
     getHomeSectionPage('shades'),
+    getHomeProductsPage('catalog', 1),
   ])
-  const carouselVariants = { categories: pickCarouselVariant(), brands: pickCarouselVariant(), shades: pickCarouselVariant() }
+  const carouselVariants = { categories: 'coverflow', brands: 'fade-slide', shades: 'infinite-loop' } as const
   const contactProduct = products.find((product) => productImage(product))
   const contactImage = productImage(contactProduct)
   return (
@@ -294,7 +295,7 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
               hrefLabel="Shop all lenses"
             />
           </div>
-          <TrendingProducts products={products} />
+          <TrendingProducts initialProducts={catalogPage.items as unknown as Product[]} initialHasMore={catalogPage.hasMore} />
         </div>
       </section>
 

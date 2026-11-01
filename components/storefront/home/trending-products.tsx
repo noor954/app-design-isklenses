@@ -1,27 +1,78 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, ShoppingBag, Star } from 'lucide-react'
+import { SharedCarousel } from '@/components/ui/shared-carousel'
+import type { CarouselVariant } from '@/lib/carousel-variants'
 import { StorefrontProductImage, getProductImageSources } from '@/components/storefront/product-image'
 import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import type { Product } from '@/lib/hooks/use-storefront-data'
 import { formatPrice, isAvailable, lowestPrice } from '@/lib/store-config'
 
 type Filter = 'catalog' | 'featured' | 'new' | 'reduced'
+type TabState = { items: Product[]; page: number; hasMore: boolean; loaded: boolean }
 
-export function TrendingProducts({ products }: { products: Product[] }) {
+const TAB_VARIANTS: Record<Filter, CarouselVariant> = {
+  catalog: 'smooth-slide',
+  featured: 'coverflow',
+  new: 'fade-slide',
+  reduced: 'infinite-loop',
+}
+
+const EMPTY_TAB: TabState = { items: [], page: 0, hasMore: true, loaded: false }
+
+export function TrendingProducts({ initialProducts, initialHasMore }: { initialProducts: Product[]; initialHasMore: boolean }) {
   const [filter, setFilter] = useState<Filter>('catalog')
-  const filtered = useMemo(() => {
-    if (filter === 'featured') return products.filter((product) => product.isFeatured)
-    if (filter === 'reduced') return products.filter((product) => product.isOnSale)
-    if (filter === 'new') return products.filter((product) => product.isNewArrival)
-    return products
-  }, [filter, products])
+  const [tabs, setTabs] = useState<Record<Filter, TabState>>({
+    catalog: { items: initialProducts, page: 1, hasMore: initialHasMore, loaded: true },
+    featured: EMPTY_TAB,
+    new: EMPTY_TAB,
+    reduced: EMPTY_TAB,
+  })
+  const loading = useRef<Set<Filter>>(new Set())
+
+  const loadPage = useCallback(async (tab: Filter) => {
+    if (loading.current.has(tab)) return
+    loading.current.add(tab)
+    try {
+      const current = tabsRef.current[tab]
+      const response = await fetch(`/api/storefront/home/products?tab=${tab}&page=${current.page + 1}`)
+      if (!response.ok) throw new Error('Request failed')
+      const { data } = (await response.json()) as { data: { items: Product[]; hasMore: boolean } }
+      setTabs((state) => {
+        const known = new Set(state[tab].items.map((item) => item.id))
+        return {
+          ...state,
+          [tab]: {
+            items: [...state[tab].items, ...data.items.filter((item) => !known.has(item.id))],
+            page: state[tab].page + 1,
+            hasMore: data.hasMore,
+            loaded: true,
+          },
+        }
+      })
+    } catch {
+      setTabs((state) => ({ ...state, [tab]: { ...state[tab], hasMore: false, loaded: true } }))
+    } finally {
+      loading.current.delete(tab)
+    }
+  }, [])
+
+  const tabsRef = useRef(tabs)
+  useEffect(() => {
+    tabsRef.current = tabs
+  }, [tabs])
+
+  useEffect(() => {
+    if (!tabs[filter].loaded) void loadPage(filter)
+  }, [filter, tabs, loadPage])
+
+  const active = tabs[filter]
 
   return (
     <div>
-      <div className="mb-7 flex flex-wrap gap-2 border-b border-[#cfe2eb]" role="tablist" aria-label="Filter products">
+      <div className="mb-4 flex flex-wrap gap-2 border-b border-[#cfe2eb]" role="tablist" aria-label="Filter products">
         {([
           ['catalog', 'Catalog'],
           ['featured', 'Featured'],
@@ -42,23 +93,32 @@ export function TrendingProducts({ products }: { products: Product[] }) {
         ))}
       </div>
 
-      {products.length > 0 ? (
-        filtered.length > 0 ? (
-          <ul role="tabpanel" className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-6">
-            {filtered.slice(0, 4).map((product) => <CatalogProduct key={product.id} product={product} />)}
-          </ul>
-        ) : (
-          <div role="tabpanel" className="border-t border-[#cfe2eb] py-12 text-center">
-            <p className="text-lg font-semibold text-[#15384d]">No matching listings in this view.</p>
-            <button type="button" onClick={() => setFilter('catalog')} className="mt-3 text-sm font-semibold text-[#006f9b] hover:underline">Browse the full catalog</button>
-          </div>
-        )
-      ) : (
+      {active.items.length > 0 ? (
+        <div role="tabpanel">
+          <SharedCarousel
+            key={filter}
+            items={active.items}
+            variant={TAB_VARIANTS[filter]}
+            label={`${filter} products`}
+            getKey={(product) => product.id}
+            hasMore={active.hasMore}
+            onNeedMore={() => void loadPage(filter)}
+            renderItem={(product) => <CatalogProduct product={product} />}
+          />
+        </div>
+      ) : !active.loaded || active.hasMore ? (
+        <div role="tabpanel" aria-busy="true" className="border-t border-[#cfe2eb] py-12 text-center text-sm text-[#526b7b]">Loading listings…</div>
+      ) : filter === 'catalog' ? (
         <div role="tabpanel" className="border-t border-[#cfe2eb] py-12 text-center">
           <p className="text-lg font-semibold text-[#15384d]">No active products are available right now.</p>
           <Link href="/shop" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#006f9b] hover:underline">
             Browse the catalog <ArrowRight size={15} aria-hidden="true" />
           </Link>
+        </div>
+      ) : (
+        <div role="tabpanel" className="border-t border-[#cfe2eb] py-12 text-center">
+          <p className="text-lg font-semibold text-[#15384d]">No matching listings in this view.</p>
+          <button type="button" onClick={() => setFilter('catalog')} className="mt-3 text-sm font-semibold text-[#006f9b] hover:underline">Browse the full catalog</button>
         </div>
       )}
     </div>
@@ -73,7 +133,7 @@ function CatalogProduct({ product }: { product: Product }) {
   const href = `/product/${product.slug}`
 
   return (
-    <li className="group min-w-0">
+    <div className="group min-w-0">
       <Link href={href} aria-label={`View ${product.name}`} className="isk-trending-image relative block overflow-hidden rounded-2xl bg-[#e8f6fb]">
         <StorefrontProductImage
           sources={getProductImageSources(product)}
@@ -112,6 +172,6 @@ function CatalogProduct({ product }: { product: Product }) {
           )}
         </div>
       </div>
-    </li>
+    </div>
   )
 }
