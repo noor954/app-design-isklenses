@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server'
 import { AdminAuthError } from '@/lib/auth/admin'
 import { logApplicationError } from '@/lib/errors/log-error'
+import { AdminRequestError } from '@/lib/http/admin-request-error'
 
 export async function adminApiError(error: unknown) {
+  if (error instanceof AdminRequestError) {
+    return NextResponse.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'no-store' } })
+  }
   if (error instanceof AdminAuthError) {
     return NextResponse.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'no-store' } })
+  }
+  if (error instanceof Error && error.constructor === Error && !('code' in error)) {
+    return NextResponse.json(
+      { error: error.message || 'The admin request is invalid.' },
+      { status: 400, headers: { 'Cache-Control': 'no-store' } },
+    )
   }
   console.error('[admin-api] Request failed', error instanceof Error ? error.name : 'UnknownError')
   try {

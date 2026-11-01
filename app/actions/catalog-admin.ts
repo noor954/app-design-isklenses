@@ -515,8 +515,30 @@ export async function addProductsToCategory(ids: string[], categoryId: string) {
 export async function getAdminProduct(id: string) {
   await requireAdminSession('staff')
   uuid(id, 'Product')
-  const [row] = await db.select().from(storeProducts).where(eq(storeProducts.id, id)).limit(1)
-  return row ?? null
+  const [[row], categories, assets, relatedProducts] = await Promise.all([
+    db.select().from(storeProducts).where(eq(storeProducts.id, id)).limit(1),
+    db.select({ categoryId: storeProductCategories.categoryId })
+      .from(storeProductCategories)
+      .where(eq(storeProductCategories.productId, id)),
+    db.select().from(storeProductAssets)
+      .where(eq(storeProductAssets.productId, id))
+      .orderBy(asc(storeProductAssets.sortOrder)),
+    db.select({ relatedProductId: storeProductRelations.relatedProductId })
+      .from(storeProductRelations)
+      .where(eq(storeProductRelations.productId, id))
+      .orderBy(asc(storeProductRelations.sortOrder)),
+  ])
+  return row
+    ? {
+        ...row,
+        categoryIds: categories.map(({ categoryId }) => categoryId),
+        assets: assets.map((asset) => ({
+          ...asset,
+          createdAt: asset.createdAt.toISOString(),
+        })),
+        relatedProductIds: relatedProducts.map(({ relatedProductId }) => relatedProductId),
+      }
+    : null
 }
 
 export async function createProduct(input: AdminProductInput) {

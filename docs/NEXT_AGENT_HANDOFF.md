@@ -1,6 +1,6 @@
 # Next Agent Handoff
 
-_Last updated: 2026-10-11_
+_Last updated: 2026-11-01_
 
 This document is the operational handoff for continuing the ecommerce storefront + admin CRM project. It intentionally records environment-variable **names and sources**, never secret values.
 
@@ -10,7 +10,7 @@ This document is the operational handoff for continuing the ecommerce storefront
 - Package manager: `pnpm@12.3.4`.
 - Primary database: Neon Postgres.
 - File storage: Neon `store_media_objects`, served through the cacheable same-origin `/api/media/[...path]` route.
-- AI integration: Vercel AI Gateway is connected, but no AI feature is currently required by the storefront/admin data layer.
+- AI integration: the chatbot optionally uses a stateless Mastra agent through Vercel AI Gateway when `AI_GATEWAY_API_KEY` is configured; without it, the deterministic FAQ/catalog assistant remains active.
 - Deployment target: Vercel. The project is already linked in `.vercel/`.
 - Database migration history: `db/migrations/`.
 - Drizzle schema mirror: `lib/db/schema.ts`.
@@ -19,6 +19,8 @@ This document is the operational handoff for continuing the ecommerce storefront
 - Read endpoints: public catalog under `app/api/products/`; authenticated admin data under `app/api/admin/`.
 - Client refresh hooks: `lib/hooks/use-storefront-data.ts`, `lib/hooks/use-admin-data.ts`.
 - **Permanent API parity rule:** every website behavior or data change must be reflected in the corresponding API and mobile integration contract in the same change, so Flutter/FlutterFlow and other clients can access the same behavior. See `AGENTS.md` and `docs/architect/AGENT_INSTRUCTIONS.md`; document any explicit exception.
+- **Cross-platform direction:** retain Next.js as the web and API backend; the Flutter shopper app lives in `apps/mobile` and consumes the existing API/OpenAPI contract. TanStack DB and a sealed public-catalog Neon Realtime path are implemented; the optional Mastra chatbot reads the same current FAQ/catalog facts on every turn. See `docs/architect/ARCHITECTURE_OVERVIEW.md` for security boundaries. Do not introduce TanStack Start as a parallel backend or replace application-owned auth without an explicitly reviewed migration.
+- **Integration readiness:** the current local environment was checked without displaying values; it has `DATABASE_URL` and `NEON_AUTH_BASE_URL`, but no `NEON_REALTIME_URL`, `NEON_REALTIME_SECRET`, or `AI_GATEWAY_API_KEY`. Neon Realtime is configured in `neon.ts` but must be provisioned for the intended branch and supplied with runtime variables before the live query connects. The Mastra model path activates only when the server-side gateway key is configured; the current deterministic chatbot remains available without it. Use Node.js 22.13+ for local and deployed runtime. Do not invent credentials or connect clients directly to Postgres.
 - Sync notes: `docs/DATABASE_SYNC.md`.
 - GitHub Actions: no workflow files are currently tracked in `.github/workflows/`.
 - GitHub operation identity: project agents must verify and use `@qaiserfccc` for GitHub mutations; see `AGENTS.md`.
@@ -34,7 +36,7 @@ Verified through the project integration inventory:
 
 1. **Neon** — connected and supplies the Postgres connection variables below.
 2. **Neon** — supplies the database connection used for both application data and media objects. Vercel Blob is no longer used by the runtime.
-3. **Vercel AI Gateway** — connected and available for future AI features.
+3. **Vercel AI Gateway** — connected; optional Mastra chatbot responses use it when the server key is configured.
 
 Do not replace Neon with another database unless explicitly requested. Do not add a second database driver or use `@neondatabase/serverless`; this project uses `pg` + Drizzle.
 
@@ -86,6 +88,12 @@ The active Neon project identifier observed during schema work is `polished-dust
 
 - `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL` is present in the project environment inventory, but Supabase is not the active database/auth integration. Do not introduce Supabase code unless the architecture is explicitly changed.
 
+### Optional chatbot integration
+
+| Variable | Source | Usage |
+|---|---|---|
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway | Enables stateless Mastra responses on `/api/chatbot`; without it, deterministic FAQ/catalog answers remain active. Server-side only. |
+
 ### Not currently configured by this project
 
 - `BETTER_AUTH_SECRET` is not present in the available environment inventory. Do not add Better Auth imports or auth routes until this secret is supplied and the Better Auth setup is intentionally approved.
@@ -111,18 +119,20 @@ The current schema includes products, product assets, source product categories,
 - Public catalog/detail responses include active lens options, supported uploaded media, and source-category IDs. Product photography is exposed only through same-origin `/api/media/...` URLs; source image URLs are not returned for storefront display. Other import provenance is admin-only.
 - The public WooCommerce Store API importer is authenticated and stages all pages of 50 records before atomically replacing the product catalog. It retains structured fields, extracted table specifications, pricing, categories, availability, and image/video URL references; it excludes descriptive copy and does not download/rehost media. After an import, `node --env-file=.env.local scripts/rehost-source-product-images.mjs` copies approved ISK upload images into the database media library; it is bounded, retries transient failures, and is safe to rerun. The source snapshot contained no video links. Each new import creates drafts with zero stock. The current catalog was separately published at the operator's direction; verify listing details and source media rights before relying on or adding claims.
 - After a successful admin mutation, call the relevant SWR `mutate()`/refresh function for immediate UI consistency.
-- Current UI synchronization is polling/revalidation, not database WebSockets. Treat “realtime” as sync-ready periodic refresh unless a future agent adds an approved realtime transport.
+- Current UI synchronization uses SWR polling/revalidation as fallback. The web catalog now also uses a server-sealed, aggregate-only Neon Realtime query through TanStack DB when the service is provisioned. Flutter shopper workflows use the REST API and explicit refresh; the Flutter admin workspace has a separate secure session and common management actions, but specialized admin editors still need mobile parity work.
 - Admin access is a database-backed owner/admin/staff system with scrypt-hashed passwords and revocable signed sessions; it is not SSO.
-- The storefront bag is in-page state only. Customer/order creation and order-history reads are intentionally unavailable until payment, checkout, and customer-access controls are configured.
+- The storefront bag is in-page state only. COD order creation and signed-in customer order-history reads are available through the existing REST API; online payment is not implemented. Verify delivery settings and target-database migrations before enabling checkout in another environment.
+- Completed admin commerce operations are exposed through authenticated REST routes documented in `openapi.json` and `docs/API_MOBILE_INTEGRATION.md`; routes reuse the existing permission-checked server operations rather than duplicating database writes. Project Kanban remains project coordination UI and is not part of the commerce API.
 
 ## Deployment reference
 
 - Vercel project is already linked locally via `.vercel/`.
 - Use the Vercel project UI for normal preview/production publishing.
-- If CLI deployment is explicitly needed, run commands from `/vercel/share/v0-project` with the project’s authenticated Vercel CLI context; use `pnpm` for package commands.
+- The local code session is the linked repository checkout; use its authenticated Vercel CLI context only after reviewing the diff, verifying required environment configuration, and ensuring the intended work is ready to publish.
 - Do not deploy from or commit the `.env` files.
 - Before deployment, verify Neon is configured for the target environment and apply all numbered database migrations.
 - After deployment, verify `/`, `/api/products`, `/api/media/...`, and `/api/admin/metrics` in the deployed environment and inspect runtime logs if a database error appears.
+- The latest name-only Vercel environment inventory includes the existing database, admin-session/recovery, media, and Meta variables in their configured environments. `AI_GATEWAY_API_KEY`, `NEON_REALTIME_URL`, and `NEON_REALTIME_SECRET` are not configured in Production, Preview, or Development; these integrations remain optional and retain fallback behavior. The new admin REST endpoints require no additional environment variables. No Vercel variable values were read or changed, and this worktree's admin API/mobile changes have not been deployed.
 
 ## Validation checklist
 

@@ -1,5 +1,6 @@
 import { and, desc, eq, ilike, or } from 'drizzle-orm'
 import { storefrontFaqs } from '@/lib/data/storefront-faq'
+import { answerWithMastra } from '@/lib/data/mastra-chatbot'
 import { db } from '@/lib/db'
 import { storeCategories, storeProducts, storeSettings } from '@/lib/db/schema'
 
@@ -161,6 +162,20 @@ export async function answerChatbotMessage(message: string): Promise<ChatbotAnsw
     .filter((match) => match.score >= 0.4)
     .sort((left, right) => right.score - left.score)
     .slice(0, 3)
+
+  const aiAnswer = await answerWithMastra(message, knowledge)
+  if (aiAnswer) {
+    const links = bestProducts
+      .filter(({ score }) => score >= 0.2)
+      .map(({ product }) => ({ label: product.name, href: product.url }))
+    if (!links.length && bestFaq && bestFaq.score >= 0.2) {
+      links.push({ label: 'Read the FAQ', href: bestFaq.faq.source })
+    }
+    if (!links.length) {
+      links.push({ label: 'Browse products', href: '/shop' }, { label: 'Contact the store', href: '/contact-us' })
+    }
+    return { answer: aiAnswer, links }
+  }
 
   if (bestProducts.length && bestProducts[0].score >= 0.4 && bestProducts[0].score > (bestFaq?.score ?? 0)) {
     return {

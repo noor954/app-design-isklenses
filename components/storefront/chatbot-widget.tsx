@@ -131,7 +131,7 @@ export function ChatbotWidget() {
               <Send size={17} aria-hidden="true" />
             </button>
           </form>
-          <p className="px-4 pb-3 text-xs leading-4 text-[#526b7b]">Uses public store information only. No order lookups or eye-health advice.</p>
+          <p className="px-4 pb-3 text-xs leading-4 text-[#526b7b]">Uses public store information only. Some replies may use an AI service; don’t share personal, order, payment, or health details.</p>
         </section>
       )}
       <button

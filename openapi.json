@@ -93,6 +93,18 @@
         "responses": { "200": { "description": "Delivery subtotal bands and fees.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DataResponse" } } } } }
       }
     },
+    "/api/realtime/catalog": {
+      "get": {
+        "tags": ["Integrations"],
+        "summary": "Obtain a short-lived sealed public-catalog live query",
+        "description": "Returns the public Neon Realtime URL and a short-lived capability for the aggregate active-catalog version query. This endpoint exposes no customer or administrative data. Responses are private and non-cacheable. Returns 503 until Neon Realtime is configured.",
+        "responses": {
+          "200": { "description": "Public live-query capability.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogLiveQueryResponse" } } } },
+          "503": { "description": "Neon Realtime is not configured." },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
     "/api/products/{slug}/reviews": {
       "get": {
         "tags": ["Catalog"],
@@ -153,7 +165,7 @@
       "post": {
         "tags": ["Integrations"],
         "summary": "Ask the public store assistant",
-        "description": "Answers only from published catalog listings and public FAQs. Does not access orders or customer accounts, and redirects medical or lens-fitting questions to an eye-care professional. Rate limited to 20 requests per IP per 10 minutes.",
+        "description": "Grounds answers in current published catalog listings and public FAQs. When configured, a stateless server-side Mastra agent uses Vercel AI Gateway; otherwise deterministic matching is used. Does not access orders or customer accounts, and redirects medical or lens-fitting questions to an eye-care professional. Rate limited to 20 requests per IP per 10 minutes.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChatbotQuestion" } } } },
         "responses": {
           "200": { "description": "Grounded store answer and optional storefront links.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChatbotAnswerResponse" } } } },
@@ -245,17 +257,141 @@
       "post": { "tags": ["Admin"], "summary": "Reset password with recovery key", "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["email", "recoveryKey", "newPassword"], "properties": { "email": { "type": "string", "format": "email" }, "recoveryKey": { "type": "string" }, "newPassword": { "type": "string" } } } } } }, "responses": { "200": { "description": "Password reset." }, "401": { "$ref": "#/components/responses/Unauthorized" }, "503": { "description": "Recovery is not enabled." } } }
     },
     "/api/admin/metrics": { "get": { "tags": ["Admin"], "summary": "Read dashboard metrics", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Order and revenue metrics." }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
-    "/api/admin/products": { "get": { "tags": ["Admin"], "summary": "List admin products with media and variants", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Product management records." }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/admin/products": {
+      "get": { "tags": ["Admin"], "summary": "List admin products with media and variants", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Product management records." }, "401": { "$ref": "#/components/responses/Unauthorized" } } },
+      "post": { "tags": ["Admin"], "summary": "Create a product", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "Product created." }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } } }
+    },
+    "/api/admin/products/{productId}": {
+      "get": { "tags": ["Admin"], "summary": "Read an admin product", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }], "responses": { "200": { "description": "Product record." }, "404": { "$ref": "#/components/responses/NotFound" } } },
+      "put": { "tags": ["Admin"], "summary": "Replace editable product fields", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Product updated." }, "400": { "$ref": "#/components/responses/BadRequest" } } },
+      "delete": { "tags": ["Admin"], "summary": "Delete a product and its assets", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }], "responses": { "200": { "description": "Product deleted." }, "401": { "$ref": "#/components/responses/Unauthorized" } } }
+    },
+    "/api/admin/products/{productId}/stock": {
+      "patch": { "tags": ["Admin"], "summary": "Update product stock when variants are not active", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["quantity"], "properties": { "quantity": { "type": "integer", "minimum": 0 } } }, "example": { "quantity": 50 } } } }, "responses": { "200": { "description": "Stock updated." }, "400": { "$ref": "#/components/responses/BadRequest" } } }
+    },
+    "/api/admin/products/{productId}/relations": {
+      "put": { "tags": ["Admin"], "summary": "Replace related-product IDs", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["relatedIds"], "properties": { "relatedIds": { "type": "array", "maxItems": 24, "items": { "type": "string", "format": "uuid" } } } } } } }, "responses": { "200": { "description": "Relations replaced." }, "400": { "$ref": "#/components/responses/BadRequest" } } }
+    },
+    "/api/admin/products/{productId}/variants": {
+      "get": { "tags": ["Admin"], "summary": "List product variants", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }], "responses": { "200": { "description": "Variant records." } } },
+      "post": { "tags": ["Admin"], "summary": "Create a product variant", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "Variant created." }, "400": { "$ref": "#/components/responses/BadRequest" } } }
+    },
+    "/api/admin/products/{productId}/variants/{variantId}": {
+      "put": { "tags": ["Admin"], "summary": "Update a product variant", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }, { "name": "variantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Variant updated." } } },
+      "delete": { "tags": ["Admin"], "summary": "Archive a product variant", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/ProductId" }, { "name": "variantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Variant archived." } } }
+    },
+    "/api/admin/products/merchandising": {
+      "get": { "tags": ["Admin"], "summary": "List product merchandising state and effective prices", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Products with featured, new-arrival, and sale flags." } } },
+      "patch": { "tags": ["Admin"], "summary": "Set featured, new-arrival, or sale state for products", "security": [{ "adminCookie": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["ids", "kind", "selected"], "properties": { "ids": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "type": "string", "format": "uuid" } }, "kind": { "type": "string", "enum": ["featured", "new_arrival", "on_sale"] }, "selected": { "type": "boolean" } } } } } }, "responses": { "200": { "description": "Merchandising state updated." } } }
+    },
+    "/api/admin/products/categories": {
+      "post": { "tags": ["Admin"], "summary": "Add products to a category", "security": [{ "adminCookie": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["ids", "categoryId"], "properties": { "ids": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "type": "string", "format": "uuid" } }, "categoryId": { "type": "string", "format": "uuid" } } } } } }, "responses": { "200": { "description": "Products assigned." } } }
+    },
+    "/api/admin/categories": {
+      "get": { "tags": ["Admin"], "summary": "List categories for admin management", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Category hierarchy with product counts." } } },
+      "post": { "tags": ["Admin"], "summary": "Create a category", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "Category created." } } },
+      "patch": { "tags": ["Admin"], "summary": "Bulk update category active/menu visibility", "security": [{ "adminCookie": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["ids"], "properties": { "ids": { "type": "array", "minItems": 1, "maxItems": 1000, "items": { "type": "string", "format": "uuid" } }, "isActive": { "type": "boolean" }, "showInMenu": { "type": "boolean" } } } } } }, "responses": { "200": { "description": "Category visibility updated." } } }
+    },
+    "/api/admin/categories/{categoryId}": {
+      "put": { "tags": ["Admin"], "summary": "Update a category", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "categoryId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Category updated." } } },
+      "delete": { "tags": ["Admin"], "summary": "Delete a category without children or products", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "categoryId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Category deleted." } } }
+    },
+    "/api/admin/categories/{categoryId}/move": {
+      "post": { "tags": ["Admin"], "summary": "Move a category up or down among siblings", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "categoryId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["direction"], "properties": { "direction": { "type": "string", "enum": ["up", "down"] } } } } } }, "responses": { "200": { "description": "Category moved." } } }
+    },
+    "/api/admin/brands": {
+      "get": { "tags": ["Admin"], "summary": "List brands", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Brand records." } } },
+      "post": { "tags": ["Admin"], "summary": "Create a brand", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "Brand created." } } }
+    },
+    "/api/admin/brands/{brandId}": {
+      "put": { "tags": ["Admin"], "summary": "Update a brand", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "brandId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Brand updated." } } },
+      "delete": { "tags": ["Admin"], "summary": "Delete a brand and clear product references", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "brandId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Brand deleted." } } }
+    },
+    "/api/admin/lens-shades": {
+      "get": { "tags": ["Admin"], "summary": "List lens shades", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Lens shade records." } } },
+      "post": { "tags": ["Admin"], "summary": "Create a lens shade", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "Lens shade created." } } }
+    },
+    "/api/admin/lens-shades/{shadeId}": {
+      "put": { "tags": ["Admin"], "summary": "Update a lens shade", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "shadeId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Lens shade updated." } } },
+      "delete": { "tags": ["Admin"], "summary": "Delete a lens shade", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "shadeId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Lens shade deleted." } } }
+    },
+    "/api/admin/lens-types": {
+      "get": { "tags": ["Admin"], "summary": "List lens types", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Lens type records." } } },
+      "post": { "tags": ["Admin"], "summary": "Create a lens type", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "Lens type created." } } }
+    },
+    "/api/admin/lens-types/{lensTypeId}": {
+      "put": { "tags": ["Admin"], "summary": "Update a lens type", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "lensTypeId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Lens type updated." } } },
+      "delete": { "tags": ["Admin"], "summary": "Delete a lens type", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "lensTypeId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Lens type deleted." } } }
+    },
+    "/api/admin/reviews": {
+      "get": { "tags": ["Admin"], "summary": "List product reviews including approval status", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Review records with product names." } } },
+      "post": { "tags": ["Admin"], "summary": "Create a product review", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "Review created." } } }
+    },
+    "/api/admin/reviews/{reviewId}": {
+      "patch": { "tags": ["Admin"], "summary": "Approve or reject a product review", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "reviewId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["approved"], "properties": { "approved": { "type": "boolean" } } } } } }, "responses": { "200": { "description": "Review approval changed." } } },
+      "delete": { "tags": ["Admin"], "summary": "Delete a product review", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "reviewId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Review deleted." } } }
+    },
+    "/api/admin/product-page-settings": {
+      "get": { "tags": ["Admin"], "summary": "Read product-page section and review settings", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Product-page settings." } } },
+      "put": { "tags": ["Admin"], "summary": "Save product-page section and review settings", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Settings saved." } } }
+    },
     "/api/admin/orders": {
       "get": { "tags": ["Admin"], "summary": "List orders", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/Offset" }, { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["pending", "paid", "processing", "shipped", "delivered", "cancelled", "refunded"] } }], "responses": { "200": { "description": "Page of up to 50 orders." }, "401": { "$ref": "#/components/responses/Unauthorized" } } }
+    },
+    "/api/admin/orders/{orderId}": {
+      "patch": { "tags": ["Admin"], "summary": "Update order status or confirm delivery fee", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "orderId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Order updated, including inventory reservation effects." }, "400": { "$ref": "#/components/responses/BadRequest" } } }
+    },
+    "/api/admin/orders/stats": {
+      "get": { "tags": ["Admin"], "summary": "Read order and revenue statistics", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Order counts, revenue by currency, and status totals." } } }
     },
     "/api/admin/customers": {
       "get": { "tags": ["Admin"], "summary": "Search and list customers", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/Offset" }, { "$ref": "#/components/parameters/Search" }], "responses": { "200": { "description": "Page of up to 50 customers." }, "401": { "$ref": "#/components/responses/Unauthorized" } } }
     },
+    "/api/admin/customers/{customerId}": {
+      "patch": { "tags": ["Admin"], "summary": "Update customer profile and marketing preference", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "customerId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Customer updated." } } }
+    },
+    "/api/admin/customers/stats": {
+      "get": { "tags": ["Admin"], "summary": "Read customer count", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Total registered customers." } } }
+    },
     "/api/admin/crm": {
-      "get": { "tags": ["Admin"], "summary": "Search and list CRM leads", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/Offset" }, { "$ref": "#/components/parameters/Search" }, { "name": "status", "in": "query", "schema": { "type": "string", "maxLength": 32 } }], "responses": { "200": { "description": "Page of up to 50 CRM leads." }, "401": { "$ref": "#/components/responses/Unauthorized" } } }
+      "get": { "tags": ["Admin"], "summary": "Search and list CRM leads", "security": [{ "adminCookie": [] }], "parameters": [{ "$ref": "#/components/parameters/Offset" }, { "$ref": "#/components/parameters/Search" }, { "name": "status", "in": "query", "schema": { "type": "string", "maxLength": 32 } }], "responses": { "200": { "description": "Page of up to 50 CRM leads." }, "401": { "$ref": "#/components/responses/Unauthorized" } } },
+      "post": { "tags": ["Admin"], "summary": "Create a manual CRM lead", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "Lead created." } } }
+    },
+    "/api/admin/crm/{leadId}": {
+      "patch": { "tags": ["Admin"], "summary": "Update lead status, notes, or follow-up date", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "leadId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Lead updated." } } }
     },
     "/api/admin/activity": { "get": { "tags": ["Admin"], "summary": "List recent activity", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Recent audit activity." }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/admin/error-logs": { "get": { "tags": ["Admin"], "summary": "List recent application error logs", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Up to 200 recent error logs." } } } },
+    "/api/admin/content": { "get": { "tags": ["Admin"], "summary": "Read storefront banners, reviews, and editable settings", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Storefront content management data." } } } },
+    "/api/admin/content/banners": {
+      "post": { "tags": ["Admin"], "summary": "Create or update a storefront banner", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Banner updated." }, "201": { "description": "Banner created." } } }
+    },
+    "/api/admin/content/banners/{bannerId}": {
+      "delete": { "tags": ["Admin"], "summary": "Delete a storefront banner and clean up its owned media", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "bannerId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Banner deleted." } } }
+    },
+    "/api/admin/content/reviews": {
+      "post": { "tags": ["Admin"], "summary": "Create or update a storefront testimonial", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Testimonial updated." }, "201": { "description": "Testimonial created." } } }
+    },
+    "/api/admin/content/reviews/{reviewId}": {
+      "delete": { "tags": ["Admin"], "summary": "Delete a storefront testimonial", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "reviewId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Testimonial deleted." } } }
+    },
+    "/api/admin/content/settings/{key}": {
+      "put": { "tags": ["Admin"], "summary": "Update a validated storefront content setting", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "key", "in": "path", "required": true, "schema": { "type": "string", "enum": ["announcements", "contact", "headings", "seo_sections", "footer", "chatbot"] } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["value"], "properties": { "value": {} } } } } }, "responses": { "200": { "description": "Setting saved." } } }
+    },
+    "/api/admin/delivery-settings": {
+      "get": { "tags": ["Admin"], "summary": "Read delivery fee and free-shipping threshold", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "Delivery configuration." } } },
+      "put": { "tags": ["Admin"], "summary": "Update delivery pricing", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Delivery settings saved." } } }
+    },
+    "/api/admin/system-users": {
+      "get": { "tags": ["Admin"], "summary": "List admin user accounts", "security": [{ "adminCookie": [] }], "responses": { "200": { "description": "System user records; role visibility is restricted by server policy." } } },
+      "post": { "tags": ["Admin"], "summary": "Create an admin user", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "201": { "description": "User created." }, "403": { "$ref": "#/components/responses/Forbidden" } } }
+    },
+    "/api/admin/system-users/{userId}": {
+      "patch": { "tags": ["Admin"], "summary": "Change user active status or reset password", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "User updated." }, "403": { "$ref": "#/components/responses/Forbidden" } } }
+    },
+    "/api/admin/profile": {
+      "put": { "tags": ["Admin"], "summary": "Update the signed-in admin email or password", "security": [{ "adminCookie": [] }], "requestBody": { "$ref": "#/components/requestBodies/AdminJsonObject" }, "responses": { "200": { "description": "Credentials updated; existing session policy applies." } } }
+    },
     "/api/admin/assets/{assetId}": {
       "patch": { "tags": ["Admin"], "summary": "Move a product asset in its gallery", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "assetId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["direction"], "properties": { "direction": { "type": "string", "enum": ["up", "down"] } } } } } }, "responses": { "200": { "description": "Updated asset." }, "401": { "$ref": "#/components/responses/Unauthorized" } } },
       "delete": { "tags": ["Admin"], "summary": "Delete a product asset", "security": [{ "adminCookie": [] }], "parameters": [{ "name": "assetId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Asset removed." }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } } }
@@ -277,11 +413,20 @@
     },
     "parameters": {
       "Slug": { "name": "slug", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" } },
+      "ProductId": { "name": "productId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
       "Offset": { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } },
       "Search": { "name": "q", "in": "query", "schema": { "type": "string", "maxLength": 100 } }
     },
+    "requestBodies": {
+      "AdminJsonObject": {
+        "required": true,
+        "description": "JSON object validated by the named admin operation; server-side field, role, and business-rule validation remains authoritative.",
+        "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+      }
+    },
     "schemas": {
       "DataResponse": { "type": "object", "required": ["data"], "properties": { "data": {} } },
+      "CatalogLiveQueryResponse": { "type": "object", "required": ["url", "query"], "properties": { "url": { "type": "string", "format": "uri", "description": "Public Neon Realtime WebSocket URL." }, "query": { "type": "object", "required": ["capability", "expiresAt", "queryFingerprint"], "properties": { "capability": { "type": "string" }, "expiresAt": { "type": "integer", "format": "int64" }, "queryFingerprint": { "type": "string" } } } } },
       "PowerRangeOption": { "type": "string", "enum": ["0.00-0.50", "0.51-1.00", "1.01-1.50", "1.51-2.00", "2.01-2.50", "2.51-3.00", "3.01-3.50", "3.51-4.00", "4.01-4.50", "4.51-5.00", "5.01-5.50", "5.51-6.00", "6.01-6.50", "6.51-7.00", "7.01-7.50", "7.51-8.00", "8.01-8.50", "8.51-9.00", "9.01-9.50", "9.51-10.00", "10.01-10.50", "10.51-11.00", "11.01-11.50", "11.51-12.00"], "description": "One of the supported 0.50-diopter ranges from 0.00 through 12.00." },
       "ProductsResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "array", "items": { "type": "object", "required": ["availablePowerRanges"], "properties": { "availablePowerRanges": { "type": "array", "items": { "$ref": "#/components/schemas/PowerRangeOption" }, "description": "Power ranges enabled by the store operator for this product. If non-empty, shoppers must select one range for each eye." } }, "additionalProperties": true } }, "pagination": { "type": "object", "properties": { "page": { "type": "integer" }, "limit": { "type": "integer" }, "total": { "type": "integer" }, "totalPages": { "type": "integer" } } }, "timestamp": { "type": "string", "format": "date-time" } } },
       "ShopperSessionInput": { "oneOf": [

@@ -1,6 +1,6 @@
 # Chatbot knowledge source
 
-`GET /api/chatbot/knowledge` provides a public, read-only grounding source for a future storefront assistant. It returns the same FAQ content shown on `/faq`, plus a bounded set of active product matches when called with a search term:
+`GET /api/chatbot/knowledge` provides a public, read-only grounding source for the storefront assistant. It returns the same FAQ content shown on `/faq`, plus a bounded set of active product matches when called with a search term:
 
 ```text
 GET /api/chatbot/knowledge?q=blue
@@ -8,7 +8,7 @@ GET /api/chatbot/knowledge?q=blue
 
 The response contains FAQ answers, selected public product facts and URLs, and behavioral guidance. It excludes customer/order data, unpublished products, source-import payloads, and internal admin data. Product facts are read from Neon at request time; cache lifetime is 60 seconds. Keep answers grounded in the returned facts, and do not have the assistant provide lens-fitting or eye-health advice.
 
-This prepares a retrieval-augmented chatbot; it does not train a model or store chat transcripts. Connect the endpoint to a future assistant server through the configured AI provider, and keep model credentials and any customer/order tools server-side.
+`POST /api/chatbot` retrieves current public FAQ/catalog facts from Neon for each question. If the server-only `AI_GATEWAY_API_KEY` is configured, Mastra uses the `vercel/google/gemini-2.5-flash` model to draft a grounded answer; otherwise the existing deterministic response is used. The agent has no tools, customer/order access, persistent memory, or write permissions. ISK does not store chat transcripts; requests sent through the AI Gateway are subject to the gateway/model provider's own processing and retention policies. Keep model credentials server-side.
 
 ## InstantDB MCP boundary
 

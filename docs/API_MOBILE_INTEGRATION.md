@@ -2,7 +2,15 @@
 
 The site publishes its machine-readable contract at **`https://<site-origin>/api/openapi.json`** and a compact endpoint directory at **`https://<site-origin>/api`**. The OpenAPI document is also checked in at [`../openapi.json`](../openapi.json). The current contract is **1.0.0**. Existing `/api/...` paths remain the v1 paths for compatibility; no `/api/v1/...` URL aliases exist yet. Breaking changes should be introduced under a new URL prefix rather than silently changing the existing contract.
 
-The API is usable from Flutter Android, iOS, Windows, other native clients, and server integrations. Native apps do not use browser CORS. POST/DELETE/PATCH requests without `Origin` are accepted for native/server clients; browser cross-origin writes remain rejected. Do not send an `Origin` header that claims to be the website unless the request is actually from that origin. **Flutter Web** is not enabled for cross-origin credentialed calls; host it same-origin or add a separately reviewed, explicit CORS allowlist before enabling it.
+The API is usable from Flutter Android, iOS, Windows, other native clients, and server integrations. Native apps do not use browser CORS. POST/PUT/PATCH/DELETE requests without `Origin` are accepted for native/server clients; browser cross-origin writes remain rejected. Do not send an `Origin` header that claims to be the website unless the request is actually from that origin. **Flutter Web** is not enabled for cross-origin credentialed calls; host it same-origin or add a separately reviewed, explicit CORS allowlist before enabling it.
+
+## Cross-platform architecture status
+
+Next.js remains the full-stack web application and trusted owner of business rules, database access, and REST endpoints. The Flutter Android/iOS client in [`../apps/mobile`](../apps/mobile) consumes this shared API for shopper and commerce-admin workflows. Admin sessions are separate from shopper sessions and stored in platform secure storage; server authorization remains authoritative. TanStack DB and a server-sealed Neon Realtime catalog-version query are implemented for the web catalog; the Realtime service must be provisioned and its server variables configured before live subscriptions can connect. The chatbot uses Mastra with Vercel AI Gateway when the server-side `AI_GATEWAY_API_KEY` is configured, and otherwise retains its deterministic FAQ/catalog response. Every answer is grounded against current public database facts; ISK does not store conversation history. Third-party AI processing and retention policies may apply. The architecture and external prerequisites are tracked in [`architect/ARCHITECTURE_OVERVIEW.md`](architect/ARCHITECTURE_OVERVIEW.md).
+
+Do not treat adding TanStack Start beside Next.js as a mobile API strategy. TanStack Start is a separate full-stack framework option; the current API contract remains the common boundary. Realtime must not expose database access or bypass the signed-cookie auth model. The web catalog falls back to its API-backed SWR behavior if the Realtime endpoint is unavailable; native clients use the documented REST endpoints and refresh responses as needed. The current Mastra chatbot is server-side, stateless, and read-only; future background agents must use the same permission-checked application operations for business writes.
+
+The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed public aggregate query and Realtime URL. The capability is a bearer credential: do not log it or store it persistently. Only configure approved origins in [`../neon.ts`](../neon.ts); do not expose `NEON_REALTIME_SECRET`.
 
 ## Endpoint directory
 
@@ -34,6 +42,34 @@ The API is usable from Flutter Android, iOS, Windows, other native clients, and 
 | Admin | `POST /api/admin/password-reset` | Recovery key | Reset an admin password when recovery is enabled |
 | Admin | `GET /api/admin/metrics` | Admin cookie | Dashboard metrics |
 | Admin | `GET /api/admin/products` | Admin cookie | Admin product rows, media, and variants |
+| Admin | `POST /api/admin/products` | Admin cookie, admin role | Create a product with validated lens fields, category assignments, and power ranges |
+| Admin | `GET, PUT, DELETE /api/admin/products/{productId}` | Admin cookie | Read, replace editable product fields, or delete a product |
+| Admin | `PATCH /api/admin/products/{productId}/stock` | Admin cookie, admin role | Update stock for products without active variants |
+| Admin | `GET, POST /api/admin/products/{productId}/variants` | Admin cookie | List and create product variants |
+| Admin | `PUT, DELETE /api/admin/products/{productId}/variants/{variantId}` | Admin cookie, admin role | Update or archive a product variant |
+| Admin | `PUT /api/admin/products/{productId}/relations` | Admin cookie, admin role | Replace related products |
+| Admin | `GET, PATCH /api/admin/products/merchandising` | Admin cookie | Read merchandising state and bulk-enable featured, new-arrival, or on-sale placement |
+| Admin | `POST /api/admin/products/categories` | Admin cookie, admin role | Add selected products to a category |
+| Admin | `GET, POST, PATCH /api/admin/categories` | Admin cookie | List, create, and bulk-update active/menu visibility |
+| Admin | `PUT, DELETE /api/admin/categories/{categoryId}` | Admin cookie, admin role | Update or delete a category |
+| Admin | `POST /api/admin/categories/{categoryId}/move` | Admin cookie, admin role | Move a category among siblings |
+| Admin | `GET, POST /api/admin/brands` and `PUT, DELETE /api/admin/brands/{brandId}` | Admin cookie | Manage brands |
+| Admin | `GET, POST /api/admin/lens-shades` and `PUT, DELETE /api/admin/lens-shades/{shadeId}` | Admin cookie | Manage lens shades |
+| Admin | `GET, POST /api/admin/lens-types` and `PUT, DELETE /api/admin/lens-types/{lensTypeId}` | Admin cookie | Manage lens types |
+| Admin | `GET, POST /api/admin/reviews` and `PATCH, DELETE /api/admin/reviews/{reviewId}` | Admin cookie | Create, approve/reject, and delete product reviews |
+| Admin | `GET, PUT /api/admin/product-page-settings` | Admin cookie | Read and save product-page sections and review settings |
+| Admin | `GET /api/admin/content` | Admin cookie | Read storefront banners, testimonials, and editable content settings |
+| Admin | `POST /api/admin/content/banners`; `DELETE /api/admin/content/banners/{bannerId}` | Admin cookie | Create/update or delete a storefront banner |
+| Admin | `POST /api/admin/content/reviews`; `DELETE /api/admin/content/reviews/{reviewId}` | Admin cookie | Create/update or delete a storefront testimonial |
+| Admin | `PUT /api/admin/content/settings/{key}` | Admin cookie | Update an allowlisted, validated storefront setting |
+| Admin | `PATCH /api/admin/orders/{orderId}` | Admin cookie, admin role | Change order status or confirm cash-on-delivery delivery charges |
+| Admin | `GET /api/admin/orders/stats`, `GET /api/admin/customers/stats` | Admin cookie | Read order/revenue and customer totals |
+| Admin | `PATCH /api/admin/customers/{customerId}` | Admin cookie, admin role | Update customer details and marketing preference |
+| Admin | `POST /api/admin/crm`; `PATCH /api/admin/crm/{leadId}` | Admin cookie, admin role | Create or update CRM leads |
+| Admin | `GET, PUT /api/admin/delivery-settings` | Admin cookie | Read and update delivery pricing |
+| Admin | `GET, POST /api/admin/system-users`; `PATCH /api/admin/system-users/{userId}` | Admin cookie; role-dependent | Manage staff accounts and reset passwords |
+| Admin | `PUT /api/admin/profile` | Admin cookie | Update signed-in administrator credentials |
+| Admin | `GET /api/admin/error-logs` | Admin cookie | Read recent application error logs |
 | Admin | `GET /api/admin/orders?offset=0&status=pending` | Admin cookie | Up to 50 orders per page |
 | Admin | `GET /api/admin/customers?offset=0&q=...` | Admin cookie | Up to 50 matching customers per page |
 | Admin | `GET /api/admin/crm?offset=0&q=...&status=...` | Admin cookie | Up to 50 CRM leads per page |
@@ -43,9 +79,13 @@ The API is usable from Flutter Android, iOS, Windows, other native clients, and 
 | Admin | `POST /api/admin/content/upload` | Admin cookie | Upload content image (4 MB maximum) |
 | Admin | `POST /api/admin/catalog-sync` | Admin cookie, admin role | Sync selected catalog source data |
 
-Admin product/order/customer mutations and other controls currently run through authenticated Next.js Server Actions used by the website, not a complete public REST CRUD API. Do not call internal Server Action URLs from a mobile app. Add explicit REST handlers with role checks and request/response validation before building a mobile admin client.
+These REST handlers call the same permission-checked server operations used by the web admin, so server-side role, inventory, validation, and business-transition rules remain authoritative. JSON admin writes reject cross-origin browser requests; native clients may omit `Origin`. Do not call internal Server Action URLs from a mobile app. Upload endpoints remain multipart and use the explicit file/type/size validation described above. All newly added endpoints and payload details are also published in the OpenAPI contract; where an operation uses the reusable `AdminJsonObject` schema, the named server operation provides the authoritative field validation.
+
+The admin API covers the completed commerce workflows. The web-only Project Kanban is project coordination UI rather than store operations and is not included in the customer/mobile commerce API.
 
 ## Flutter / FlutterFlow / Windows setup
+
+The Flutter Android/iOS storefront and commerce-admin client is in `apps/mobile`. See its README for local setup, API-origin configuration, build commands, admin module coverage, and the current release-readiness boundary.
 
 1. Use the deployed site origin as the base URL, for example `https://shop.example.com`; all API paths above are relative to that origin.
 2. Open `/api/openapi.json` in an OpenAPI client generator or use it as the reference when configuring FlutterFlow API Calls. Set `Accept: application/json` and `Content-Type: application/json` on JSON writes.
@@ -114,7 +154,7 @@ The UUIDs in the JSON are illustrative: replace `productId` with an actual UUID 
 - Expect `400` validation errors, `401` unauthenticated/invalid credentials, `403` forbidden/origin rejection, `404` missing resources, `409` checkout conflicts, `413` oversized bodies, `415` unsupported content types, `429` rate limits, and `5xx` service failures. Retry transient failures with bounded backoff; for checkout always reuse its idempotency key.
 - Current public throttling is best-effort per process, not distributed. Configure edge-level rate limits before broad production traffic.
 - The Meta webhook is server-to-server only and verifies `X-Hub-Signature-256`; it is not a mobile client endpoint.
-- The store assistant is deterministic and grounded in public FAQ/catalog data. `POST /api/chatbot` accepts `{ "message": "..." }` (1–200 characters) and is rate limited to 20 requests per IP per 10 minutes. It cannot access orders or accounts and must not be used for lens fitting or eye-health advice. `GET /api/chatbot/knowledge` preserves lens specification fields in product matches. Admin changes use `PUT /api/chatbot/settings` with the admin cookie. Migration `0019_chatbot_settings.sql` is applied to the configured database; apply it to other target databases before saving chatbot settings there.
+- The store assistant is grounded in the current public FAQ/catalog data. `POST /api/chatbot` accepts `{ "message": "..." }` (1–200 characters) and is rate limited to 20 requests per IP per 10 minutes. With `AI_GATEWAY_API_KEY`, the server runs the response through the `vercel/google/gemini-2.5-flash` Mastra agent; without it, the deterministic response remains available. The agent has no tools, account/order access, persistent memory, or write permissions; it cannot provide lens fitting or eye-health advice. `GET /api/chatbot/knowledge` preserves lens specification fields in product matches. Admin changes use `PUT /api/chatbot/settings` with the admin cookie. Migration `0019_chatbot_settings.sql` is applied to the configured database; apply it to other target databases before saving chatbot settings there.
 
 ## FastAPI quick-service starter
 

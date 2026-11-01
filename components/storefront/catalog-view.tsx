@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { SlidersHorizontal } from 'lucide-react'
 import { ProductCard, ProductGridSkeleton } from '@/components/storefront/product-card'
+import { CatalogRealtimeSync } from '@/components/storefront/catalog-realtime-sync'
 import { Pagination } from '@/components/ui/pagination'
 import { descendantIds } from '@/lib/catalog-types'
 import type { StorefrontBrand } from '@/lib/data/catalog'
@@ -104,6 +105,7 @@ export function CatalogView({ categoryPath, brands }: { categoryPath?: string; b
 
   return (
     <main className="mx-auto max-w-[1320px] px-4 pb-16 pt-8 sm:px-6 lg:pt-12">
+      <CatalogRealtimeSync />
       <nav aria-label="Breadcrumb" className="text-xs text-[#4a5568]">
         <Link href="/" className="hover:underline">Home</Link> / <Link href="/shop" className="hover:underline">Shop</Link>
         {ancestors.map((item) => <span key={item.id}> / <Link href={categoryHref(item)} className="hover:underline">{titleCase(item.name)}</Link></span>)}
