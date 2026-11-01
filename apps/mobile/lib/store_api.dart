@@ -203,6 +203,28 @@ class StoreApi {
     );
   }
 
+  Future<({List<StoreProduct> items, bool hasMore})> getHomeProducts(
+    String tab,
+    int page,
+  ) async {
+    final body = await _getObject(
+      '/api/storefront/home/products',
+      query: {'tab': tab, 'page': page},
+    );
+    final data = body['data'];
+    if (data is! Map || data['items'] is! List) {
+      throw const StoreApiException('The home products response is invalid.');
+    }
+    final base = Uri.parse(_dio.options.baseUrl);
+    return (
+      items: (data['items'] as List)
+          .whereType<Map>()
+          .map((value) => StoreProduct.fromJson(value, base))
+          .toList(growable: false),
+      hasMore: data['hasMore'] == true,
+    );
+  }
+
   Future<StoreHomeData> getHomeData() async {
     final body = await _getObject('/api/storefront/home');
     final data = body['data'];
@@ -1017,16 +1039,13 @@ class CartLine {
       for (final option in product.availablePowerOptions)
         option.value: moneyToCents(option.surcharge),
     };
-    final left = leftPowerRange == null
-        ? 0
-        : optionByValue[leftPowerRange];
-    final right = rightPowerRange == null
-        ? 0
-        : optionByValue[rightPowerRange];
+    final left = leftPowerRange == null ? 0 : optionByValue[leftPowerRange];
+    final right = rightPowerRange == null ? 0 : optionByValue[rightPowerRange];
     if (baseCents == null || left == null || right == null) return basePrice;
     final total = baseCents + left + right;
     return '${total ~/ 100}.${(total % 100).toString().padLeft(2, '0')}';
   }
+
   String get currency => variant?.currency ?? product.currency;
   String get key =>
       jsonEncode([product.id, variant?.id, leftPowerRange, rightPowerRange]);

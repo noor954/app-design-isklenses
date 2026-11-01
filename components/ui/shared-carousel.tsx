@@ -158,17 +158,18 @@ export function SharedCarousel<T>({
   let body: ReactNode
   if (variant === 'coverflow') {
     body = (
-      <ul className="relative mx-auto h-[min(26rem,62vw)] min-h-[20rem] w-full max-w-[24rem] [perspective:1200px] sm:max-w-[30rem]" style={{ transformStyle: 'preserve-3d' }}>
+      <ul className="mx-auto grid w-full max-w-5xl overflow-visible py-2 [perspective:1200px]" style={{ transformStyle: 'preserve-3d' }}>
         {items.map((item, itemIndex) => {
           let offset = itemIndex - index
           if (offset > count / 2) offset -= count
           if (offset < -count / 2) offset += count
           const abs = Math.abs(offset)
           const style: CSSProperties = {
-            position: 'absolute',
-            inset: 0,
+            gridArea: '1 / 1',
+            justifySelf: 'center',
+            width: 'min(17rem, 58%)',
             transition: reduced ? 'none' : 'transform 650ms cubic-bezier(.22,1,.36,1), opacity 650ms',
-            transform: `translateX(${offset * 58}%) translateZ(${-abs * 120}px) rotateY(${offset * -38}deg) scale(${abs === 0 ? 1 : 0.82})`,
+            transform: `translateX(${offset * 72}%) translateZ(${-abs * 120}px) rotateY(${offset * -38}deg) scale(${abs === 0 ? 1 : 0.82})`,
             opacity: abs > 2 ? 0 : 1 - abs * 0.25,
             zIndex: 10 - abs,
             pointerEvents: abs === 0 ? 'auto' : 'none',

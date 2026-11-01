@@ -4,7 +4,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-enum IskCarouselVariant { coverflow, fadeSlide, infiniteLoop, smoothSlide, continuous }
+enum IskCarouselVariant {
+  coverflow,
+  fadeSlide,
+  infiniteLoop,
+  smoothSlide,
+  continuous,
+}
 
 const iskCarouselInterval = Duration(seconds: 3);
 
@@ -40,7 +46,8 @@ class IskCarousel extends StatefulWidget {
   State<IskCarousel> createState() => _IskCarouselState();
 }
 
-class _IskCarouselState extends State<IskCarousel> with SingleTickerProviderStateMixin {
+class _IskCarouselState extends State<IskCarousel>
+    with SingleTickerProviderStateMixin {
   PageController? _pages;
   ScrollController? _scroll;
   Ticker? _ticker;
@@ -83,7 +90,10 @@ class _IskCarouselState extends State<IskCarousel> with SingleTickerProviderStat
       _scroll = ScrollController();
       _ticker = createTicker((elapsed) {
         final controller = _scroll;
-        if (controller == null || !controller.hasClients || _touching || _reduced) {
+        if (controller == null ||
+            !controller.hasClients ||
+            _touching ||
+            _reduced) {
           _last = elapsed;
           return;
         }
@@ -96,7 +106,8 @@ class _IskCarouselState extends State<IskCarousel> with SingleTickerProviderStat
     _timer = Timer.periodic(iskCarouselInterval, (_) => _advance());
   }
 
-  bool get _reduced => mounted && (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+  bool get _reduced =>
+      mounted && (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
 
   void _advance() {
     final controller = _pages;
@@ -104,10 +115,18 @@ class _IskCarouselState extends State<IskCarousel> with SingleTickerProviderStat
     if (_touching || _reduced || widget.itemCount < 2) return;
     final next = (controller.page?.round() ?? 0) + 1;
     if (!_looping && next >= widget.itemCount) {
-      controller.animateToPage(0, duration: const Duration(milliseconds: 700), curve: Curves.easeOutCubic);
+      controller.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutCubic,
+      );
       return;
     }
-    controller.animateToPage(next, duration: const Duration(milliseconds: 650), curve: Curves.easeOutCubic);
+    controller.animateToPage(
+      next,
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _dispose() {
@@ -129,7 +148,9 @@ class _IskCarouselState extends State<IskCarousel> with SingleTickerProviderStat
 
   void _noteIndex(int index) {
     _page = index;
-    if (widget.hasMore && widget.onNeedMore != null && index >= widget.itemCount - 3) {
+    if (widget.hasMore &&
+        widget.onNeedMore != null &&
+        index >= widget.itemCount - 3) {
       widget.onNeedMore!();
     }
   }
@@ -162,7 +183,10 @@ class _IskCarouselState extends State<IskCarousel> with SingleTickerProviderStat
         padding: const EdgeInsets.symmetric(horizontal: 18),
         itemBuilder: (context, index) => Padding(
           padding: const EdgeInsets.only(right: 12),
-          child: SizedBox(width: widget.itemWidth, child: widget.itemBuilder(context, index % count)),
+          child: SizedBox(
+            width: widget.itemWidth,
+            child: widget.itemBuilder(context, index % count),
+          ),
         ),
       );
     }
@@ -182,11 +206,15 @@ class _IskCarouselState extends State<IskCarousel> with SingleTickerProviderStat
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: widget.itemBuilder(context, real),
         );
-        if (widget.variant == IskCarouselVariant.smoothSlide || _looping) return child;
+        if (widget.variant == IskCarouselVariant.smoothSlide || _looping) {
+          return child;
+        }
         return AnimatedBuilder(
           animation: _pages!,
           builder: (context, _) {
-            final page = _pages!.hasClients ? (_pages!.page ?? _page.toDouble()) : _page.toDouble();
+            final page = _pages!.hasClients
+                ? (_pages!.page ?? _page.toDouble())
+                : _page.toDouble();
             final delta = (page - index).clamp(-1.0, 1.0);
             final distance = delta.abs();
             if (widget.variant == IskCarouselVariant.coverflow) {
@@ -195,13 +223,21 @@ class _IskCarouselState extends State<IskCarousel> with SingleTickerProviderStat
                 transform: Matrix4.identity()
                   ..setEntry(3, 2, 0.001)
                   ..rotateY(delta * 0.7)
-                  ..scaleByDouble(1 - distance * 0.18, 1 - distance * 0.18, 1, 1),
+                  ..scaleByDouble(
+                    1 - distance * 0.18,
+                    1 - distance * 0.18,
+                    1,
+                    1,
+                  ),
                 child: child,
               );
             }
             return Opacity(
               opacity: 1 - distance * 0.55,
-              child: Transform.translate(offset: Offset(-delta * 26, 0), child: child),
+              child: Transform.translate(
+                offset: Offset(-delta * 26, 0),
+                child: child,
+              ),
             );
           },
         );

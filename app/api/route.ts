@@ -21,6 +21,7 @@ export async function GET() {
         catalog: [
           'GET /api/storefront/home',
           'GET /api/storefront/home/sections/{section}',
+          'GET /api/storefront/home/products',
           'GET /api/products',
           'GET /api/products/{slug}',
           'GET /api/product-categories',

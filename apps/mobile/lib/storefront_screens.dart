@@ -163,7 +163,6 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
               .where((banner) => banner.placement == 'hero')
               .toList();
           _cachedBanners = _heroSlides(heroBanners);
-          final products = data.products;
           final categories = data.categories
               .where(
                 (item) =>
@@ -176,24 +175,6 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
           final shades = data.shades
               .where((item) => item.productCount > 0)
               .toList();
-          final featured = products.where((item) => item.isFeatured).toList();
-          final arrivals = products.where((item) => item.isNewArrival).toList();
-          final offers = products.where((item) {
-            final price = double.tryParse(item.price) ?? 0;
-            final previousPrice = double.tryParse(item.compareAtPrice ?? '');
-            return item.isOnSale ||
-                (previousPrice != null && previousPrice > price);
-          }).toList();
-          final topRated =
-              products
-                  .where(
-                    (item) => item.ratingAvg != null && item.ratingCount > 0,
-                  )
-                  .toList()
-                ..sort(
-                  (first, second) =>
-                      second.ratingAvg!.compareTo(first.ratingAvg!),
-                );
 
           final configuredSections =
               <({String id, List<Widget> slivers})>[
@@ -243,6 +224,7 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                           'bloom',
                           'Browse lenses by collection',
                         ),
+                        variant: IskCarouselVariant.coverflow,
                         items: categories,
                         itemBuilder: (item) => _ImageDirectoryCard(
                           title: item.name,
@@ -273,6 +255,7 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                           'brands',
                           'Explore the brand directory',
                         ),
+                        variant: IskCarouselVariant.fadeSlide,
                         items: brands,
                         itemBuilder: (item) => _ImageDirectoryCard(
                           title: item.name,
@@ -303,6 +286,7 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                           'shades',
                           'Browse the shades linked to active listings',
                         ),
+                        variant: IskCarouselVariant.infiniteLoop,
                         items: shades,
                         itemBuilder: (item) => _ImageDirectoryCard(
                           title: item.name,
@@ -336,63 +320,13 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                         ),
                       ),
                     ),
-                    if (featured.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: _ProductShelf(
-                          title: 'Featured for you',
-                          products: featured,
-                          onProduct: widget.onProduct,
-                          onCompare: widget.onCompare,
-                          onViewAll: () => widget.onBrowse(
-                            const StoreBrowseFilter(sort: 'featured'),
-                          ),
-                        ),
+                    SliverToBoxAdapter(
+                      child: _HomeProductTabs(
+                        api: widget.api,
+                        onProduct: widget.onProduct,
+                        onCompare: widget.onCompare,
                       ),
-                    if (featured.isEmpty && products.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: _ProductShelf(
-                          title: 'Explore the collection',
-                          products: products.take(10).toList(),
-                          onProduct: widget.onProduct,
-                          onCompare: widget.onCompare,
-                          onViewAll: () =>
-                              widget.onBrowse(const StoreBrowseFilter()),
-                        ),
-                      ),
-                    if (topRated.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: _ProductShelf(
-                          title: 'Top-rated listings',
-                          products: topRated.take(10).toList(),
-                          onProduct: widget.onProduct,
-                          onCompare: widget.onCompare,
-                          onViewAll: () => widget.onBrowse(
-                            const StoreBrowseFilter(sort: 'featured'),
-                          ),
-                        ),
-                      ),
-                    if (arrivals.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: _ProductShelf(
-                          title: 'Just arrived',
-                          products: arrivals,
-                          onProduct: widget.onProduct,
-                          onCompare: widget.onCompare,
-                          onViewAll: () =>
-                              widget.onBrowse(const StoreBrowseFilter()),
-                        ),
-                      ),
-                    if (offers.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: _ProductShelf(
-                          title: 'On sale',
-                          products: offers,
-                          onProduct: widget.onProduct,
-                          onCompare: widget.onCompare,
-                          onViewAll: () =>
-                              widget.onBrowse(const StoreBrowseFilter()),
-                        ),
-                      ),
+                    ),
                   ],
                 ),
                 (
@@ -410,6 +344,7 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                           'types',
                           'See the options in each listing',
                         ),
+                        variant: IskCarouselVariant.smoothSlide,
                         items: data.lensTypes
                             .where((item) => item.productCount > 0)
                             .toList(),
@@ -888,8 +823,10 @@ class _DirectorySection<T> extends StatefulWidget {
     required this.items,
     required this.itemBuilder,
     required this.onViewAll,
+    required this.variant,
   });
 
+  final IskCarouselVariant variant;
   final String title;
   final String subtitle;
   final List<T> items;
@@ -901,13 +838,15 @@ class _DirectorySection<T> extends StatefulWidget {
 }
 
 class _DirectorySectionState<T> extends State<_DirectorySection<T>> {
-  static const _pageSize = 10;
-  final _variant = pickIskCarouselVariant();
+  static const _pageSize = 15;
+  late final _variant = widget.variant;
   int _loaded = _pageSize;
 
   void _loadMore() {
     if (_loaded >= widget.items.length) return;
-    setState(() => _loaded = math.min(_loaded + _pageSize, widget.items.length));
+    setState(
+      () => _loaded = math.min(_loaded + _pageSize, widget.items.length),
+    );
   }
 
   @override
@@ -1051,53 +990,115 @@ class _DirectoryPlaceholder extends StatelessWidget {
   );
 }
 
-class _ProductShelf extends StatelessWidget {
-  const _ProductShelf({
-    required this.title,
-    required this.products,
+class _HomeProductTabs extends StatefulWidget {
+  const _HomeProductTabs({
+    required this.api,
     required this.onProduct,
     required this.onCompare,
-    required this.onViewAll,
   });
 
-  final String title;
-  final List<StoreProduct> products;
+  final StoreApi api;
   final ValueChanged<StoreProduct> onProduct;
   final ValueChanged<StoreProduct> onCompare;
-  final VoidCallback onViewAll;
+
+  @override
+  State<_HomeProductTabs> createState() => _HomeProductTabsState();
+}
+
+class _HomeProductTabsState extends State<_HomeProductTabs> {
+  static const _tabs = [
+    ('catalog', 'Catalog', IskCarouselVariant.smoothSlide),
+    ('featured', 'Featured', IskCarouselVariant.coverflow),
+    ('new', 'New arrivals', IskCarouselVariant.fadeSlide),
+    ('reduced', 'On sale', IskCarouselVariant.infiniteLoop),
+  ];
+  final _items = <String, List<StoreProduct>>{};
+  final _pages = <String, int>{};
+  final _more = <String, bool>{};
+  final _busy = <String>{};
+  var _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load('catalog');
+  }
+
+  Future<void> _load(String tab) async {
+    if (_busy.contains(tab) || _more[tab] == false) return;
+    _busy.add(tab);
+    try {
+      final next = (_pages[tab] ?? 0) + 1;
+      final page = await widget.api.getHomeProducts(tab, next);
+      if (!mounted) return;
+      setState(() {
+        final known = (_items[tab] ?? const []).map((item) => item.id).toSet();
+        _items[tab] = [
+          ...?_items[tab],
+          ...page.items.where((item) => !known.contains(item.id)),
+        ];
+        _pages[tab] = next;
+        _more[tab] = page.hasMore;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _more[tab] = false);
+    } finally {
+      _busy.remove(tab);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final tab = _tabs[_tab];
+    final items = _items[tab.$1] ?? const <StoreProduct>[];
     final wide = MediaQuery.sizeOf(context).width >= 800;
-    final cardWidth = wide ? 226.0 : 190.0;
     return Padding(
-      padding: const EdgeInsets.only(top: 34),
+      padding: const EdgeInsets.only(top: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionHeading(
-            title: title,
-            action: 'Shop all',
-            onAction: onViewAll,
-          ),
-          const SizedBox(height: 16),
           SizedBox(
-            height: 320,
+            height: 44,
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
               scrollDirection: Axis.horizontal,
-              itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 14),
-              itemBuilder: (context, index) => SizedBox(
-                width: cardWidth,
-                child: StoreProductCard(
-                  product: products[index],
-                  onTap: () => onProduct(products[index]),
-                  onCompare: () => onCompare(products[index]),
-                ),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              itemCount: _tabs.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) => ChoiceChip(
+                label: Text(_tabs[index].$2),
+                selected: _tab == index,
+                onSelected: (_) {
+                  setState(() => _tab = index);
+                  _load(_tabs[index].$1);
+                },
               ),
             ),
           ),
+          const SizedBox(height: 14),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                (_more[tab.$1] ?? true)
+                    ? 'Loading listings…'
+                    : 'No matching listings in this view.',
+              ),
+            )
+          else
+            IskCarousel(
+              key: ValueKey(tab.$1),
+              variant: tab.$3,
+              height: 320,
+              itemWidth: wide ? 226 : 190,
+              itemCount: items.length,
+              hasMore: _more[tab.$1] ?? false,
+              onNeedMore: () => _load(tab.$1),
+              itemBuilder: (context, index) => StoreProductCard(
+                product: items[index],
+                onTap: () => widget.onProduct(items[index]),
+                onCompare: () => widget.onCompare(items[index]),
+              ),
+            ),
         ],
       ),
     );
@@ -2974,11 +2975,18 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
               initialValue: _leftPower,
               decoration: const InputDecoration(labelText: 'Left eye'),
               items: product.availablePowerOptions
-                  .where((option) => product.availablePowerRanges.contains(option.value))
-                  .map((option) => DropdownMenuItem(
-                    value: option.value,
-                    child: Text('${option.label} D · +Rs ${option.surcharge}'),
-                  ))
+                  .where(
+                    (option) =>
+                        product.availablePowerRanges.contains(option.value),
+                  )
+                  .map(
+                    (option) => DropdownMenuItem(
+                      value: option.value,
+                      child: Text(
+                        '${option.label} D · +Rs ${option.surcharge}',
+                      ),
+                    ),
+                  )
                   .toList(),
               onChanged: (value) => setState(() {
                 _leftPower = value;
@@ -2990,11 +2998,18 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
               initialValue: _rightPower,
               decoration: const InputDecoration(labelText: 'Right eye'),
               items: product.availablePowerOptions
-                  .where((option) => product.availablePowerRanges.contains(option.value))
-                  .map((option) => DropdownMenuItem(
-                    value: option.value,
-                    child: Text('${option.label} D · +Rs ${option.surcharge}'),
-                  ))
+                  .where(
+                    (option) =>
+                        product.availablePowerRanges.contains(option.value),
+                  )
+                  .map(
+                    (option) => DropdownMenuItem(
+                      value: option.value,
+                      child: Text(
+                        '${option.label} D · +Rs ${option.surcharge}',
+                      ),
+                    ),
+                  )
                   .toList(),
               onChanged: (value) => setState(() {
                 _rightPower = value;

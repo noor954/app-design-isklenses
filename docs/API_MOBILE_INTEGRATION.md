@@ -19,7 +19,8 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Discovery | `GET /api` | Public | Endpoint groups and OpenAPI link |
 | Discovery | `GET /api/openapi.json` | Public | OpenAPI 3.1 contract for client generation |
 | Catalog | `GET /api/products` | Public | Active product search/filter; pass `page` and optional `limit` for bounded pagination |
-| Catalog | `GET /api/storefront/home/sections/{section}?page=&q=` | Public | Paginated homepage carousels (`categories`, `brands`, `shades`, `lens-types`); max 10 items per page, `hasMore` drives the next call, search (`q`) is uncapped |
+| Catalog | `GET /api/storefront/home/products?tab=catalog\|featured\|new\|reduced&page=` | Public | Paginated homepage product tabs, 15 per page; `hasMore` drives the next call. Carousels: categories coverflow, brands fade-slide (6th section), shades infinite-loop; tabs smooth-slide/coverflow/fade-slide/infinite-loop |
+| Catalog | `GET /api/storefront/home/sections/{section}?page=&q=` | Public | Paginated homepage carousels (`categories`, `brands`, `shades`, `lens-types`); max 15 items per page, `hasMore` drives the next call, search (`q`) is uncapped |
 | Catalog | `GET /api/storefront/home` | Public | Canonical home banners plus shared palette/control styles, ordered and visible homepage sections, hero layout/autoplay, site chrome, catalog directories/products, and approved reviews |
 | Catalog | `GET /api/products/{slug}` | Public | One active product with variants and media |
 | Catalog | `GET /api/product-categories` | Public | Active category hierarchy and product counts |
@@ -171,4 +172,4 @@ The independent scaffold at [`services/fastapi/README.md`](../services/fastapi/R
 - Products expose `availablePowerOptions` (value/label/surcharge). Product create/update accepts exact option values; legacy grouped ranges are still resolved to exact values.
 - Checkout `leftPowerRange` / `rightPowerRange` are exact option values. The server price is base price + left surcharge + right surcharge; `quotedUnitPrice` must equal that total (compared in cents). Clients must display the same surcharge-inclusive price.
 - Homepage hero slides are topped up with the shared default editorial images (`/isk-home/hero-editorial-*.jpg`) so at least five slides are served to web and mobile alike.
-- Homepage carousels (web `components/ui/shared-carousel.tsx`, Flutter `apps/mobile/lib/isk_carousel.dart`) share five styles: coverflow, fade-slide, infinite-loop, smooth-slide, continuous. Autoplay advances right-to-left every 3 seconds, pauses on interaction, respects reduced motion, and loads at most 10 items per request. Catalog imagery uses contain-fit so images are never cropped.
+- Homepage carousels (web `components/ui/shared-carousel.tsx`, Flutter `apps/mobile/lib/isk_carousel.dart`) share five styles: coverflow, fade-slide, infinite-loop, smooth-slide, continuous. Autoplay advances right-to-left every 3 seconds, pauses on interaction, respects reduced motion, and loads at most 15 items per request. Catalog imagery uses contain-fit so images are never cropped.
