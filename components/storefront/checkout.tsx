@@ -408,7 +408,7 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
                     alt=""
                     fdaApproved={line.product.fdaApproved}
                     className="size-16 overflow-hidden bg-[#dbe7e1]"
-                    imageClassName="size-full object-cover"
+                    imageClassName="size-full object-contain"
                     fallback={<div className="lens-study size-full" aria-hidden="true" />}
                   />
                   <div className="min-w-0">

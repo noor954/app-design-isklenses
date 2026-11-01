@@ -4,7 +4,9 @@ import { ArrowRight, BookOpen, Compass, Eye, Headphones, ShoppingBag, Star, type
 import { Slider } from '@/components/storefront/home/slider'
 import { SectionProgress } from '@/components/storefront/home/section-progress'
 import { HomeScrollMotion } from '@/components/storefront/home/scroll-motion'
-import { CollectionGrid } from '@/components/storefront/home/collection-grid'
+import { PagedSectionCarousel } from '@/components/storefront/home/paged-section-carousel'
+import { pickCarouselVariant } from '@/lib/carousel-variants'
+import { getHomeSectionPage } from '@/lib/data/home-sections'
 import { GalleryCard } from '@/components/storefront/home/gallery-card'
 import { StorefrontFallbackImage } from '@/components/storefront/fallback-image'
 import { TrendingProducts } from '@/components/storefront/home/trending-products'
@@ -216,6 +218,12 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
     shade,
     product: products.find((product) => product.lensShadeId === shade.id),
   }))
+  const [categoriesPage, brandsPage, shadesPage] = await Promise.all([
+    getHomeSectionPage('categories'),
+    getHomeSectionPage('brands'),
+    getHomeSectionPage('shades'),
+  ])
+  const carouselVariants = { categories: pickCarouselVariant(), brands: pickCarouselVariant(), shades: pickCarouselVariant() }
   const contactProduct = products.find((product) => productImage(product))
   const contactImage = productImage(contactProduct)
   return (
@@ -245,31 +253,7 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
               <span className="text-sm font-semibold text-[#526b7b]">{categoryCards.length} available {categoryCards.length === 1 ? 'category' : 'categories'}</span>
             </div>
           </div>
-          <CollectionGrid
-            label="categories"
-            nextSectionId="brands"
-            nextLabel="brands"
-            className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-2"
-          >
-            {categoryCards.length > 0 ? categoryCards.map(({ category, product }, index) => (
-              <li key={category.id} data-scroll-reveal style={{ transitionDelay: `${(index % 4) * 65}ms` }}>
-                <GalleryCard
-                  href={categoryHref(category)}
-                  title={category.name}
-                  detail={`${category.productCount} active ${category.productCount === 1 ? 'listing' : 'listings'}`}
-                  image={category.imageUrl ?? category.fallbackImageUrl ?? productImage(product)}
-                  imageFallback={category.imageUrl ? category.fallbackImageUrl : null}
-                  imageAlt={category.name}
-                  video={productVideo(product)}
-                  fallback={<Eye size={32} strokeWidth={1.3} />}
-                />
-              </li>
-            )) : (
-              <li className="col-span-full rounded-2xl border border-[#cfe2eb] bg-white/70 p-6 text-sm text-[#526b7b]">
-                No active categories are available right now. Browse the catalog or return after categories have been enabled.
-              </li>
-            )}
-          </CollectionGrid>
+          <PagedSectionCarousel section="categories" label="categories" variant={carouselVariants.categories} initialItems={categoriesPage.items} initialHasMore={categoriesPage.hasMore} emptyMessage="No active categories are available right now. Browse the catalog or return after categories have been enabled." />
         </div>
       </section>
 
@@ -282,33 +266,7 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
             href="/brands"
             hrefLabel="View all brands"
           />
-          <CollectionGrid
-            label="brands"
-            nextSectionId="shades"
-            nextLabel="shades"
-            className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
-          >
-            {featuredBrands.length > 0 ? featuredBrands.map((brand, index) => {
-              const product = products.find((item) => item.brandId === brand.id)
-              return (
-                <li key={brand.id} data-scroll-reveal style={{ transitionDelay: `${(index % 4) * 65}ms` }}>
-                  <GalleryCard
-                    href={`/shop?brand=${encodeURIComponent(brand.slug)}`}
-                    title={brand.name}
-                    detail={`${brand.productCount} active ${brand.productCount === 1 ? 'listing' : 'listings'}`}
-                    image={brand.logoUrl ?? brand.fallbackImageUrl ?? productImage(product)}
-                    imageFallback={brand.logoUrl ? brand.fallbackImageUrl : null}
-                    imageAlt={brand.logoUrl ? `${brand.name} logo` : `${brand.name} lens`}
-                    imageFit={brand.logoUrl ? 'contain' : 'cover'}
-                    video={productVideo(product)}
-                    fallback={<span className={`grid size-24 place-items-center rounded-full border border-[#15384d]/20 bg-white/45 text-3xl text-[#15384d] ${brandWordmarkClass(brand.name)}`}>{brand.name.slice(0, 1)}</span>}
-                  />
-                </li>
-              )
-              }) : (
-                <li className="col-span-full rounded-2xl border border-[#cfe2eb] bg-white p-6 text-sm text-[#526b7b]">No active brands are available right now.</li>
-              )}
-          </CollectionGrid>
+          <PagedSectionCarousel section="brands" label="brands" variant={carouselVariants.brands} initialItems={brandsPage.items} initialHasMore={brandsPage.hasMore} emptyMessage="No active brands are available right now." />
         </div>
       </section>
 
@@ -321,33 +279,7 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
             href="/shop"
             hrefLabel="Browse all shades"
           />
-          <CollectionGrid
-            label="shades"
-            nextSectionId="trending"
-            nextLabel="catalog"
-            className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
-          >
-            {shadeCards.length > 0 ? shadeCards.map(({ shade, product }, index) => {
-                const image = shade.imageUrl ?? shade.fallbackImageUrl ?? productImage(product)
-                const swatch = shade.hex && /^#[\da-f]{6}$/i.test(shade.hex) ? shade.hex : null
-                return (
-                  <li key={shade.id} data-scroll-reveal style={{ transitionDelay: `${(index % 4) * 65}ms` }}>
-                    <GalleryCard
-                      href={`/shop?q=${encodeURIComponent(shade.name)}`}
-                      title={shade.name}
-                      detail={`${shade.productCount} active ${shade.productCount === 1 ? 'listing' : 'listings'}`}
-                      image={image}
-                      imageFallback={shade.imageUrl ? shade.fallbackImageUrl : null}
-                      imageAlt={`${shade.name} lens listing`}
-                      video={productVideo(product)}
-                      fallback={<span aria-hidden="true" className="size-16 rounded-full border border-[#cfe2eb]" style={{ backgroundColor: swatch ?? '#e8f6fb' }} />}
-                    />
-                  </li>
-                )
-              }) : (
-                <li className="col-span-full rounded-2xl border border-[#cfe2eb] bg-white p-6 text-sm text-[#526b7b]">No active lens shades are available right now.</li>
-              )}
-          </CollectionGrid>
+          <PagedSectionCarousel section="shades" label="shades" variant={carouselVariants.shades} initialItems={shadesPage.items} initialHasMore={shadesPage.hasMore} emptyMessage="No active lens shades are available right now." />
         </div>
       </section>
 
@@ -388,7 +320,7 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
                           sources={[lensType.fallbackImageUrl]}
                           alt=""
                           className="size-12 shrink-0 rounded-lg"
-                          imageClassName="object-cover"
+                          imageClassName="object-contain"
                         />
                       )}
                       <span>

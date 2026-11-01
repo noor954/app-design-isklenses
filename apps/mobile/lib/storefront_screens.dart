@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'isk_carousel.dart';
 import 'store_api.dart';
 
 const _ink = Color(0xff15384d);
@@ -210,13 +212,6 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                           data,
                           'hero',
                           'Featured lens collections',
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            'Power surcharge: Rs ${_powerSurcharge()} for both eyes',
-                            style: const TextStyle(color: _ink, fontWeight: FontWeight.w700),
-                          ),
                         ),
                       ),
                     ),
@@ -886,7 +881,7 @@ class _FindYourLookBanner extends StatelessWidget {
   );
 }
 
-class _DirectorySection<T> extends StatelessWidget {
+class _DirectorySection<T> extends StatefulWidget {
   const _DirectorySection({
     required this.title,
     required this.subtitle,
@@ -902,6 +897,20 @@ class _DirectorySection<T> extends StatelessWidget {
   final VoidCallback onViewAll;
 
   @override
+  State<_DirectorySection<T>> createState() => _DirectorySectionState<T>();
+}
+
+class _DirectorySectionState<T> extends State<_DirectorySection<T>> {
+  static const _pageSize = 10;
+  final _variant = pickIskCarouselVariant();
+  int _loaded = _pageSize;
+
+  void _loadMore() {
+    if (_loaded >= widget.items.length) return;
+    setState(() => _loaded = math.min(_loaded + _pageSize, widget.items.length));
+  }
+
+  @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final cardWidth = width >= 980
@@ -909,28 +918,27 @@ class _DirectorySection<T> extends StatelessWidget {
         : width >= 680
         ? 208.0
         : 174.0;
+    final visible = widget.items.take(_loaded).toList(growable: false);
     return Padding(
       padding: const EdgeInsets.only(top: 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeading(
-            title: title,
-            subtitle: subtitle,
+            title: widget.title,
+            subtitle: widget.subtitle,
             action: 'View all',
-            onAction: onViewAll,
+            onAction: widget.onViewAll,
           ),
           const SizedBox(height: 15),
-          SizedBox(
+          IskCarousel(
+            variant: _variant,
             height: 208,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              scrollDirection: Axis.horizontal,
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) =>
-                  SizedBox(width: cardWidth, child: itemBuilder(items[index])),
-            ),
+            itemWidth: cardWidth,
+            itemCount: visible.length,
+            hasMore: _loaded < widget.items.length,
+            onNeedMore: _loadMore,
+            itemBuilder: (context, index) => widget.itemBuilder(visible[index]),
           ),
         ],
       ),
@@ -972,10 +980,11 @@ class _ImageDirectoryCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
+                    const ColoredBox(color: _pale),
                     if (imageUrl != null)
                       Image.network(
                         imageUrl!,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) =>
                             _DirectoryPlaceholder(icon: icon, swatch: swatch),
                       )
@@ -3056,13 +3065,13 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
   int _powerSurcharge() {
     final byValue = {
       for (final option in widget.product.availablePowerOptions)
-        option.value: _moneyToCents(option.surcharge) ?? 0,
+        option.value: moneyToCents(option.surcharge) ?? 0,
     };
     return (byValue[_leftPower] ?? 0) + (byValue[_rightPower] ?? 0);
   }
 
   String _powerAdjustedPrice(String basePrice) {
-    final base = _moneyToCents(basePrice);
+    final base = moneyToCents(basePrice);
     if (base == null) return basePrice;
     final total = base + _powerSurcharge();
     return '${total ~/ 100}.${(total % 100).toString().padLeft(2, '0')}';

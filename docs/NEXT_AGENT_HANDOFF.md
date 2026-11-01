@@ -241,3 +241,9 @@ Admin and customer credentials live in `store_admin_users` / `store_customers`. 
 - `store_product_reviews` (guest submit via `POST /api/products/[slug]/reviews`, moderated in admin) and `store_product_relations` (hand-picked related products).
 - Product-page bottom sections (related, also bought, best sellers, recent orders, featured, newest, same category) are configured in Admin → Reviews & product page, stored in `store_settings` key `product_page`.
 - `lib/data/catalog.ts` + `lib/catalog-types.ts` are the cached loaders/types. `scripts/seed-catalog.mjs` seeds a starter tree and 3 sample products (idempotent). Products now have to be created in admin.
+
+## Power lens pricing and shared carousels
+
+- Power options are configured in the `power_options` setting (admin: Power lens options); checkout recomputes base + per-eye surcharge server-side and compares quotes in cents. Keep web, Flutter and OpenAPI aligned.
+- Homepage directory sections are paginated at 10 items via `GET /api/storefront/home/sections/{section}` and use the shared carousels (web `components/ui/shared-carousel.tsx`, Flutter `isk_carousel.dart`); change both together.
+- Product/catalog imagery uses contain-fit; heroes may use cover. Hero images are topped up to five shared defaults.

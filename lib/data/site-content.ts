@@ -45,6 +45,7 @@ const LEGACY_FOOTER_EXPLORE = [
   ['Transparent', 'transparent-lenses'],
 ]
 const LEGACY_HERO_TITLES = new Set(['10.10 sale', 'Sunglasses collection', 'Shop now', 'Deals on contact lenses'])
+const MIN_HERO_SLIDES = 5
 const DEFAULT_HERO_BANNERS: BannerContent[] = [
   {
     id: 'default-hero-1',
@@ -224,9 +225,12 @@ export async function getHomeContent(): Promise<HomeContent> {
   const activeBanners = banners.filter((banner) => banner.isActive && !banner.imageUrl.startsWith('https://eyelenses.pk/') && !(banner.placement === 'hero' && LEGACY_HERO_TITLES.has(banner.title)))
   const heroBanners = activeBanners.filter((banner) => banner.placement === 'hero')
   return {
-    banners: heroBanners.length > 0
-      ? activeBanners
-      : [...activeBanners, ...DEFAULT_HERO_BANNERS],
+    banners: [
+      ...activeBanners,
+      ...DEFAULT_HERO_BANNERS.filter(
+        (fallback) => !heroBanners.some((banner) => banner.imageUrl === fallback.imageUrl),
+      ).slice(0, Math.max(MIN_HERO_SLIDES - heroBanners.length, 0)),
+    ],
     headings,
     seoSections: Array.isArray(settings.seo_sections) ? (settings.seo_sections as SeoSection[]) : [],
     appearance: normalizeAppearance(settings.appearance),

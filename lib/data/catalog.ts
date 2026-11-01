@@ -182,7 +182,7 @@ const productColumns = {
   updatedAt: storeProducts.updatedAt,
 }
 
-async function enrich<T extends { id: string; categoryId: string | null; lensShadeId: string | null; lensTypeId: string | null }>(products: T[]) {
+async function enrich<T extends { id: string; availablePowerRanges: string[] | null; categoryId: string | null; lensShadeId: string | null; lensTypeId: string | null }>(products: T[]) {
   const ids = products.map((product) => product.id)
   if (!ids.length) return []
   const [assets, variants, ratings, categories, assignments, shades, types, imageCandidates, settings] = await Promise.all([
