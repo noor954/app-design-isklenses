@@ -50,3 +50,9 @@ pnpm build
 - **When adding workflows or actions**: Gate every job with `if: github.actor == 'qaiserfccc' && github.triggering_actor == 'qaiserfccc'`.
 
 If you are uncertain about an operation that touches DB, secrets, or deployment, stop and request explicit review from the repository owner.
+
+## Power lens pricing and shared carousels
+
+- Power options are configured in the `power_options` setting (admin: Power lens options); checkout recomputes base + per-eye surcharge server-side and compares quotes in cents. Keep web, Flutter and OpenAPI aligned.
+- Homepage directory sections are paginated at 10 items via `GET /api/storefront/home/sections/{section}` and use the shared carousels (web `components/ui/shared-carousel.tsx`, Flutter `isk_carousel.dart`); change both together.
+- Product/catalog imagery uses contain-fit; heroes may use cover. Hero images are topped up to five shared defaults.

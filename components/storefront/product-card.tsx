@@ -22,7 +22,7 @@ export function ProductCard({ product }: { product: Product }) {
           alt={product.name}
           fdaApproved={product.fdaApproved}
           className="relative aspect-square overflow-hidden"
-          imageClassName="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+          imageClassName="size-full object-contain transition-transform duration-500 group-hover:scale-105"
           fallback={<div role="img" aria-label={`No product image is available for ${product.name}`} className="product-placeholder size-full" />}
         />
         {!available && <span className="absolute left-2 top-2 rounded-full bg-[#b20000] px-3 py-1 text-xs font-semibold text-white">Sold out</span>}

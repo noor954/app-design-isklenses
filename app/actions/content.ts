@@ -8,7 +8,7 @@ import { db } from '@/lib/db'
 import { storeActivityEvents, storeBanners, storeReviews, storeSettings } from '@/lib/db/schema'
 import { deleteMedia, isOwnedMediaUrl, mediaPathFromOwnedUrl } from '@/lib/server/media-storage.mjs'
 import { validateAppearance, validateHomeConfiguration } from '@/lib/home-configuration'
-import { validatePowerLensOptions } from '@/lib/power-lens-options'
+import { normalizePowerLensOptions, validatePowerLensOptions } from '@/lib/power-lens-options'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 

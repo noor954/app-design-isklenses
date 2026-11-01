@@ -22,7 +22,7 @@ function BrandVisual({ brand }: { brand: StorefrontBrand }) {
       sources={[brand.logoUrl, brand.fallbackImageUrl]}
       alt={brand.logoUrl ? `${brand.name} logo` : `${brand.name} lens`}
       className="h-12 w-full"
-      imageClassName={brand.logoUrl ? 'object-contain' : 'object-cover'}
+      imageClassName={brand.logoUrl ? 'object-contain' : 'object-contain'}
       fallback={<span className={`text-lg text-[#15384d] sm:text-xl ${wordmarkClass(brand.name)}`}>{brand.name}</span>}
     />
   )

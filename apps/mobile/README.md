@@ -43,3 +43,17 @@ flutter build ipa --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
 The generated application/bundle identifiers are provisional. Before store distribution, the owner must confirm the permanent Android application ID and Apple bundle ID, configure signing certificates/profiles, provide store accounts and review privacy/store listing requirements. This repository does not contain release credentials.
 
 The Android NDK version is pinned in `android/app/build.gradle.kts` to the valid locally tested `27.1.12297006`; ensure that NDK is installed in the build environment. The current mobile code has passed Flutter analysis/tests and Android debug/iOS simulator builds, but release identifiers and signing credentials must be supplied by the app owner before store distribution.
+
+## Test installs (APK and iPhone)
+
+### Android APK
+```sh
+flutter build apk --release --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
+# output: build/app/outputs/flutter-apk/app-release.apk
+```
+Share the APK, then on the phone allow "Install unknown apps" for the app used to open it (Files/Chrome) and tap the file. Or with USB debugging: `adb install -r app-release.apk`. The release build is signed with the debug key and is for testing only; set up a release keystore before publishing.
+
+### iPhone
+Apple only installs signed apps, so an unsigned bundle needs signing with the tester's Apple ID or a developer account.
+1. Build: `flutter build ios --release --no-codesign --dart-define=ISK_API_ORIGIN=https://www.isklenses.online`, then zip `build/ios/iphoneos/Runner.app` inside a `Payload/` folder and rename the zip to `.ipa` (an unsigned `isk-lenses-unsigned.ipa` can be produced this way).
+2. Install on a device: (a) open `ios/Runner.xcworkspace` in Xcode, pick your team under Signing & Capabilities, connect the iPhone and Run; (b) sideload the unsigned IPA with AltStore/Sideloadly using a free Apple ID (re-sign every 7 days); or (c) for wider testers, run `flutter build ipa`, upload to App Store Connect and invite testers via TestFlight (requires an Apple Developer account).

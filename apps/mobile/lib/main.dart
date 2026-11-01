@@ -1543,7 +1543,7 @@ class CartScreen extends StatelessWidget {
                                   )
                                 : Image.network(
                                     line.product.imageUrl!,
-                                    fit: BoxFit.cover,
+                                    fit: BoxFit.contain,
                                     errorBuilder: (_, __, ___) => const Icon(
                                       Icons.visibility_outlined,
                                       color: _navy,

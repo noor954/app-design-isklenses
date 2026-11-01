@@ -80,7 +80,7 @@ function CatalogProduct({ product }: { product: Product }) {
           alt={product.name}
           fdaApproved={product.fdaApproved}
           className="isk-trending-image-inner aspect-square"
-          imageClassName="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          imageClassName="size-full object-contain transition-transform duration-500 group-hover:scale-[1.03]"
           fallback={<div role="img" aria-label={`No product image is available for ${product.name}`} className="product-placeholder size-full" />}
         />
         {!available && <span className="absolute left-3 top-3 rounded-full bg-[#15384d] px-3 py-1.5 text-xs font-semibold text-white">Unavailable</span>}

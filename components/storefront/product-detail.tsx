@@ -287,7 +287,7 @@ export function StorefrontProductDetail({
                 </label>
               </div>
               <p className="mt-3 text-sm font-medium tabular-nums text-[#15384d]">
-                Power surcharge: {formatPrice((selectedPowerSurcharge ?? 0) / 100, currency)} total for both eyes
+                Power surcharge: {formatPrice(String((selectedPowerSurcharge ?? 0) / 100), currency)} total for both eyes
               </p>
             </fieldset>
           )}

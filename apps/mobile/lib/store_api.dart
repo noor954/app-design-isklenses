@@ -1012,10 +1012,10 @@ class CartLine {
 
   String get price {
     final basePrice = variant?.price ?? product.price;
-    final baseCents = _moneyToCents(basePrice);
+    final baseCents = moneyToCents(basePrice);
     final optionByValue = {
       for (final option in product.availablePowerOptions)
-        option.value: _moneyToCents(option.surcharge),
+        option.value: moneyToCents(option.surcharge),
     };
     final left = leftPowerRange == null
         ? 0
@@ -1040,7 +1040,7 @@ class CartLine {
   );
 }
 
-int? _moneyToCents(String value) {
+int? moneyToCents(String value) {
   final match = RegExp(r'^(\d{1,10})(?:\.(\d{1,2}))?$').firstMatch(value);
   if (match == null) return null;
   final whole = int.tryParse(match.group(1)!);
