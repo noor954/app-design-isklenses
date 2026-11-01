@@ -30,7 +30,7 @@ class StoreApi {
             apiOrigin ??
                 const String.fromEnvironment(
                   'ISK_API_ORIGIN',
-                  defaultValue: 'https://isklenses.com',
+                  defaultValue: 'https://www.isklenses.online',
                 ),
           ),
           connectTimeout: const Duration(seconds: 15),
@@ -301,7 +301,7 @@ class AdminApi {
             apiOrigin ??
                 const String.fromEnvironment(
                   'ISK_API_ORIGIN',
-                  defaultValue: 'https://isklenses.com',
+                  defaultValue: 'https://www.isklenses.online',
                 ),
           ),
           connectTimeout: const Duration(seconds: 15),

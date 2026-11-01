@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import pg from 'pg'
+import { normalizePostgresConnectionString } from '../lib/db/postgres-connection.mjs'
 import { assertMediaStorageConfigured, getMediaPublicUrl, mediaObjectExists, uploadMedia } from '../lib/server/media-storage.mjs'
 
 const databaseUrl = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL
@@ -66,7 +67,11 @@ async function storeSourceImage(sourceUrl) {
   return getMediaPublicUrl(pathname)
 }
 
-const pool = new pg.Pool({ connectionString: databaseUrl, max: 2, connectionTimeoutMillis: 10_000 })
+const pool = new pg.Pool({
+  connectionString: normalizePostgresConnectionString(databaseUrl),
+  max: 2,
+  connectionTimeoutMillis: 10_000,
+})
 const failures = []
 let restoredBanners = 0
 let restoredFooter = 0

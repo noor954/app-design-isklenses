@@ -2,6 +2,7 @@
 
 import { randomBytes, scryptSync } from 'node:crypto'
 import { Pool } from 'pg'
+import { normalizePostgresConnectionString } from '../lib/db/postgres-connection.mjs'
 
 const { DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD } = process.env
 
@@ -28,7 +29,9 @@ const hash = scryptSync(ADMIN_PASSWORD, salt, 64, {
   maxmem: 64 * 1024 * 1024,
 })
 const passwordHash = `scrypt$16384$8$1$${salt.toString('base64url')}$${hash.toString('base64url')}`
-const pool = new Pool({ connectionString: DATABASE_URL })
+const pool = new Pool({
+  connectionString: normalizePostgresConnectionString(DATABASE_URL),
+})
 
 try {
   const client = await pool.connect()

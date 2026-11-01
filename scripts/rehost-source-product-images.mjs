@@ -2,6 +2,7 @@
 
 import { createHash } from 'node:crypto'
 import { Pool } from 'pg'
+import { normalizePostgresConnectionString } from '../lib/db/postgres-connection.mjs'
 import {
   assertMediaStorageConfigured,
   getMediaPublicUrl,
@@ -88,7 +89,9 @@ async function fetchImage(initialUrl) {
   throw new Error('The source image could not be downloaded.')
 }
 
-const pool = new Pool({ connectionString: databaseUrl })
+const pool = new Pool({
+  connectionString: normalizePostgresConnectionString(databaseUrl),
+})
 let uploaded = 0
 let skipped = 0
 let failed = 0

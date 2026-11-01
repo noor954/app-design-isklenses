@@ -1,7 +1,12 @@
 // Deletes database-backed media referenced by products (run only before wiping products).
 import pg from 'pg'
+import { normalizePostgresConnectionString } from '../lib/db/postgres-connection.mjs'
 
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL })
+const client = new pg.Client({
+  connectionString: normalizePostgresConnectionString(
+    process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL,
+  ),
+})
 await client.connect()
 const { rows } = await client.query(
   `select blob_pathname as pathname from store_product_assets

@@ -22,18 +22,18 @@ Install the Flutter SDK and an Android emulator or Xcode/iOS simulator. From thi
 
 ```sh
 flutter pub get
-flutter run --dart-define=ISK_API_ORIGIN=https://isklenses.com
+flutter run --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
 ```
 
-Set `ISK_API_ORIGIN` to the origin that serves this project's API. For a local Android emulator, the host machine is usually reachable at `http://10.0.2.2:3000`; for an iOS simulator use `http://localhost:3000`. Do not use plain HTTP for production. The default origin is `https://isklenses.com`.
+Set `ISK_API_ORIGIN` to the origin that serves this project's API. For a local Android emulator, the host machine is usually reachable at `http://10.0.2.2:3000`; for an iOS simulator use `http://localhost:3000`. Do not use plain HTTP for production. The default production origin is `https://www.isklenses.online`.
 
 ## Build
 
 ```sh
 flutter analyze
 flutter test
-flutter build appbundle --dart-define=ISK_API_ORIGIN=https://isklenses.com
-flutter build ipa --dart-define=ISK_API_ORIGIN=https://isklenses.com
+flutter build appbundle --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
+flutter build ipa --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
 ```
 
 The generated application/bundle identifiers are provisional. Before store distribution, the owner must confirm the permanent Android application ID and Apple bundle ID, configure signing certificates/profiles, provide store accounts and review privacy/store listing requirements. This repository does not contain release credentials.

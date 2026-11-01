@@ -1,5 +1,6 @@
 // Usage: node scripts/seed-catalog.mjs  (idempotent starter category tree + sample products; run with DATABASE_URL set)
 import pg from 'pg'
+import { normalizePostgresConnectionString } from '../lib/db/postgres-connection.mjs'
 
 const tree = [
   ['Colored Lenses', 'colored-lenses', [
@@ -13,7 +14,11 @@ const tree = [
   ['Accessories', 'accessories', []],
 ]
 
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL })
+const client = new pg.Client({
+  connectionString: normalizePostgresConnectionString(
+    process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL,
+  ),
+})
 await client.connect()
 const ids = {}
 async function insert(nodes, parentId) {

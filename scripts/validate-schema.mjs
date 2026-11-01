@@ -7,6 +7,7 @@
  */
 
 import { Pool } from 'pg'
+import { normalizePostgresConnectionString } from '../lib/db/postgres-connection.mjs'
 
 const DATABASE_URL = process.env.DATABASE_URL
 
@@ -15,7 +16,9 @@ if (!DATABASE_URL) {
   process.exit(1)
 }
 
-const pool = new Pool({ connectionString: DATABASE_URL })
+const pool = new Pool({
+  connectionString: normalizePostgresConnectionString(DATABASE_URL),
+})
 
 const REQUIRED_TABLES = [
   'store_products',
@@ -44,8 +47,8 @@ const TABLE_SCHEMAS = {
   store_products: [
     'id', 'name', 'slug', 'description', 'category_id', 'brand', 'brand_id', 'lens_shade_id', 'lens_type_id', 'source_product_id', 'source_url', 'source_payload', 'source_content_hash', 'source_image_url', 'sku', 'short_description', 'price', 'compare_at_price',
     'currency', 'status', 'stock_quantity', 'hero_image_url', 'colors', 'diameter_mm', 'base_curve', 'water_content',
-    'material', 'wear_duration', 'pack_contents', 'power_type', 'power_range', 'uv_protection', 'fda_approved', 'features', 'specs',
-    'usage_instructions', 'is_featured', 'seo_title', 'seo_description', 'created_at', 'updated_at',
+    'material', 'wear_duration', 'pack_contents', 'power_type', 'power_range', 'available_power_ranges', 'uv_protection', 'fda_approved', 'features', 'specs',
+    'usage_instructions', 'is_featured', 'is_new_arrival', 'is_on_sale', 'seo_title', 'seo_description', 'created_at', 'updated_at',
   ],
   store_customers: [
     'id',
@@ -87,6 +90,8 @@ const TABLE_SCHEMAS = {
     'unit_price',
     'quantity',
     'line_total',
+    'power_left',
+    'power_right',
     'created_at',
   ],
   store_product_assets: ['id', 'product_id', 'blob_pathname', 'blob_url', 'alt_text', 'media_type', 'sort_order', 'created_at'],
