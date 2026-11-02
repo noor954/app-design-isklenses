@@ -14,6 +14,7 @@ export const SETTING_KEYS = [
   'appearance',
   'home_configuration',
   'power_options',
+  'free_gift',
 ] as const
 export type SettingKey = (typeof SETTING_KEYS)[number]
 

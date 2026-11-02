@@ -41,7 +41,7 @@ export function SharedCarousel<T>({
   hasMore = false,
   onNeedMore,
   intervalMs = CAROUSEL_INTERVAL_MS,
-  maxVisible = 4,
+  maxVisible = 6,
 }: Props<T>) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLUListElement>(null)
@@ -60,7 +60,7 @@ export function SharedCarousel<T>({
     if (!node) return
     const measure = () => {
       const width = node.clientWidth
-      setPer(Math.min(maxVisible, width < 560 ? 2 : width < 900 ? 3 : 4))
+      setPer(Math.min(maxVisible, width < 560 ? 2 : width < 900 ? 3 : width < 1280 ? 4 : width < 1600 ? 5 : 6))
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -158,7 +158,7 @@ export function SharedCarousel<T>({
   let body: ReactNode
   if (variant === 'coverflow') {
     body = (
-      <ul className="mx-auto grid w-full max-w-5xl overflow-visible py-2 [perspective:1200px]" style={{ transformStyle: 'preserve-3d' }}>
+      <ul className="mx-auto grid w-full overflow-visible py-2 [perspective:1400px]" style={{ transformStyle: 'preserve-3d' }}>
         {items.map((item, itemIndex) => {
           let offset = itemIndex - index
           if (offset > count / 2) offset -= count
@@ -167,10 +167,10 @@ export function SharedCarousel<T>({
           const style: CSSProperties = {
             gridArea: '1 / 1',
             justifySelf: 'center',
-            width: 'min(17rem, 58%)',
+            width: 'clamp(13rem, min(24vw, 36vh), 26rem)',
             transition: reduced ? 'none' : 'transform 650ms cubic-bezier(.22,1,.36,1), opacity 650ms',
-            transform: `translateX(${offset * 72}%) translateZ(${-abs * 120}px) rotateY(${offset * -38}deg) scale(${abs === 0 ? 1 : 0.82})`,
-            opacity: abs > 2 ? 0 : 1 - abs * 0.25,
+            transform: `translateX(${offset * 82}%) translateZ(${-abs * 140}px) rotateY(${offset * -34}deg) scale(${abs === 0 ? 1.06 : 0.84})`,
+            opacity: abs > 3 ? 0 : 1 - abs * 0.22,
             zIndex: 10 - abs,
             pointerEvents: abs === 0 ? 'auto' : 'none',
           }
@@ -197,7 +197,7 @@ export function SharedCarousel<T>({
     body = (
       <ul ref={trackRef} className="flex w-max will-change-transform">
         {[...items, ...items].map((item, itemIndex) => (
-          <li key={`${getKey(item)}-${itemIndex}`} className="w-[min(70vw,16rem)] shrink-0 px-2" aria-hidden={itemIndex >= count}>
+          <li key={`${getKey(item)}-${itemIndex}`} className="w-[clamp(13rem,min(22vw,34vh),24rem)] shrink-0 px-2.5" aria-hidden={itemIndex >= count}>
             {renderItem(item, itemIndex % Math.max(count, 1))}
           </li>
         ))}

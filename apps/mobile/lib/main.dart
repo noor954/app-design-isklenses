@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'admin_free_gift_settings.dart';
 import 'admin_product_editor.dart';
 import 'isk_controls.dart';
 import 'store_api.dart';
@@ -12,6 +13,7 @@ import 'storefront_screens.dart';
 const _navy = Color(0xff15384d);
 const _paleBlue = Color(0xffe8f6fb);
 const _controlBlue = Color(0xff006f9b);
+const _giftBlue = Color(0xff087ba5);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1682,12 +1684,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<DeliveryRule>? _rules;
   String? _error;
   var _loadingRules = true;
+  FreeGiftOffer? _giftOffer;
+  String? _selectedGiftProductId;
+  String? _giftError;
+  var _giftDecisionMade = false;
+  var _giftConfirmed = false;
+  var _loadingGift = true;
   var _submitting = false;
 
   @override
   void initState() {
     super.initState();
     _loadRules();
+    _loadGift();
+  }
+
+  @override
+  void didUpdateWidget(covariant CheckoutScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_giftEligible) {
+      _selectedGiftProductId = null;
+      _giftDecisionMade = false;
+      _giftConfirmed = false;
+      _giftError = null;
+    }
   }
 
   @override
@@ -1728,6 +1748,53 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   int get _subtotalCents => _cartSubtotal(widget.cart);
+
+  int _lensUnits(FreeGiftOffer offer) {
+    final giftCategoryId = offer.categoryId ?? offer.config.categoryId;
+    return widget.cart
+        .where(
+          (line) =>
+              giftCategoryId == null ||
+              !line.product.categoryIds.contains(giftCategoryId),
+        )
+        .fold(0, (total, line) => total + line.quantity);
+  }
+
+  bool get _giftEligible {
+    final offer = _giftOffer;
+    return offer != null &&
+        offer.config.enabled &&
+        offer.products.isNotEmpty &&
+        _lensUnits(offer) >= offer.config.minLensQuantity;
+  }
+
+  FreeGiftProduct? get _selectedGift {
+    final id = _selectedGiftProductId;
+    if (id == null) return null;
+    for (final product in _giftOffer?.products ?? const <FreeGiftProduct>[]) {
+      if (product.id == id) return product;
+    }
+    return null;
+  }
+
+  Future<void> _loadGift() async {
+    try {
+      final offer = await widget.api.getFreeGift();
+      if (mounted) {
+        setState(() {
+          _giftOffer = offer;
+          _loadingGift = false;
+          if (!_giftEligible) {
+            _selectedGiftProductId = null;
+            _giftDecisionMade = false;
+            _giftConfirmed = false;
+          }
+        });
+      }
+    } on StoreApiException {
+      if (mounted) setState(() => _loadingGift = false);
+    }
+  }
 
   int? get _deliveryCents {
     final rules = _rules;
@@ -1781,6 +1848,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _field(_city, 'City', validator: _required),
             _field(_province, 'Province or territory', validator: _required),
             _field(_postal, 'Postal code (optional)'),
+            if (_giftEligible) ...[
+              const SizedBox(height: 10),
+              _giftCard(context),
+            ],
             const SizedBox(height: 8),
             Card(
               color: _paleBlue,
@@ -1788,6 +1859,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
+                    if (_selectedGift case final gift?) ...[
+                      _SummaryRow(
+                        label: '${gift.name} gift',
+                        value: 'FREE',
+                        bold: true,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     _SummaryRow(
                       label: 'Subtotal',
                       value: _money(_amount(_subtotalCents), 'PKR'),
@@ -1828,7 +1907,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
             const SizedBox(height: 14),
             FilledButton(
-              onPressed: _submitting || _loadingRules || deliveryCents == null
+              onPressed:
+                  _submitting ||
+                      _loadingRules ||
+                      _loadingGift ||
+                      deliveryCents == null
                   ? null
                   : _submit,
               child: _submitting
@@ -1844,6 +1927,195 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.black54, fontSize: 12),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _giftCard(BuildContext context) {
+    final offer = _giftOffer!;
+    final selected = _selectedGift;
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xff54c7e9), Color(0xffb8e8f5), Color(0xff87d8f0)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xfff7fcff),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: _giftBlue,
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Text(
+                offer.config.badge,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              offer.config.title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: _navy,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (offer.config.message.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(offer.config.message, style: const TextStyle(color: _navy)),
+            ],
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 154,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: offer.products.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  final product = offer.products[index];
+                  final isSelected = selected?.id == product.id;
+                  return SizedBox(
+                    width: 126,
+                    child: Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => setState(() {
+                          _selectedGiftProductId = product.id;
+                          _giftDecisionMade = true;
+                          _giftConfirmed = false;
+                          _giftError = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: isSelected
+                                  ? _giftBlue
+                                  : const Color(0xffcfe2eb),
+                              width: isSelected ? 2 : 1,
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Center(
+                                  child: product.imageUrl == null
+                                      ? const Icon(
+                                          Icons.card_giftcard_outlined,
+                                          color: _giftBlue,
+                                          size: 38,
+                                        )
+                                      : Image.network(
+                                          product.imageUrl!,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                                Icons.card_giftcard_outlined,
+                                                color: _giftBlue,
+                                                size: 38,
+                                              ),
+                                        ),
+                                ),
+                              ),
+                              Text(
+                                product.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: _navy,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              const Text(
+                                'FREE',
+                                style: TextStyle(
+                                  color: _giftBlue,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ChoiceChip(
+                  label: const Text('No gift, thanks'),
+                  selected: _giftDecisionMade && selected == null,
+                  onSelected: (value) {
+                    if (!value) return;
+                    setState(() {
+                      _selectedGiftProductId = null;
+                      _giftDecisionMade = true;
+                      _giftConfirmed = false;
+                      _giftError = null;
+                    });
+                  },
+                ),
+                if (!_giftDecisionMade)
+                  const Text(
+                    'Choose a gift or select no gift to continue.',
+                    style: TextStyle(color: _navy, fontSize: 12),
+                  ),
+              ],
+            ),
+            if (selected != null)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _giftConfirmed,
+                activeColor: _giftBlue,
+                title: Text(
+                  'I confirm I want ${selected.name} as my free gift',
+                  style: const TextStyle(color: _navy, fontSize: 13),
+                ),
+                onChanged: (value) => setState(() {
+                  _giftConfirmed = value == true;
+                  _giftError = null;
+                }),
+              ),
+            if (_giftError != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                _giftError!,
+                style: const TextStyle(
+                  color: Color(0xffb4233e),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1889,6 +2161,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _submit() async {
+    if (_loadingGift) return;
+    if (_giftEligible && !_giftDecisionMade) {
+      setState(
+        () => _giftError =
+            'Choose a gift or select “No gift, thanks” to continue.',
+      );
+      return;
+    }
+    if (_giftEligible && _selectedGift != null && !_giftConfirmed) {
+      setState(
+        () => _giftError =
+            'Confirm your selected free gift before placing the order.',
+      );
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     final delivery = _deliveryCents;
     if (delivery == null) {
@@ -1918,6 +2205,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'postalCode': _postal.text.trim(),
         },
         deliveryFee: _amount(delivery),
+        giftProductId: _giftEligible ? _selectedGift?.id : null,
+        giftConfirmed: _giftEligible && _selectedGift != null && _giftConfirmed,
       );
       if (mounted) Navigator.of(context).pop(orderNumber);
     } on StoreApiException catch (error) {
@@ -2317,6 +2606,7 @@ class _AdminWorkspaceScreenState extends State<AdminWorkspaceScreen> {
     'Storefront content': '/api/admin/content',
     'Product page': '/api/admin/product-page-settings',
     'Delivery': '/api/admin/delivery-settings',
+    'Free gift': '/api/admin/content',
     'Chatbot': '/api/chatbot/settings',
     'System users': '/api/admin/system-users',
     'Error logs': '/api/admin/error-logs',
@@ -3700,6 +3990,15 @@ class _AdminWorkspaceScreenState extends State<AdminWorkspaceScreen> {
   }
 
   Future<void> _openSettingsEditor() async {
+    if (_module == 'Free gift') {
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => AdminFreeGiftSettingsScreen(api: widget.api),
+        ),
+      );
+      if (saved == true && mounted) await _loadModule();
+      return;
+    }
     if (_module == 'Delivery') {
       await _editDelivery();
       return;
@@ -3951,6 +4250,7 @@ class _AdminWorkspaceScreenState extends State<AdminWorkspaceScreen> {
                           ),
                           if ([
                             'Delivery',
+                            'Free gift',
                             'Product page',
                             'Storefront content',
                             'Chatbot',

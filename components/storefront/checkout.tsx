@@ -11,6 +11,8 @@ import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { reportError } from '@/lib/ui/notifications'
 import { getCartLinePrice } from '@/lib/hooks/use-storefront-cart'
 import { priceWithPowerSurcharge } from '@/lib/power-lens-options'
+import { FreeGiftPicker, type GiftChoice } from '@/components/storefront/free-gift-picker'
+import type { FreeGiftOffer } from '@/lib/free-gift'
 
 type Customer = { email: string }
 
@@ -49,6 +51,18 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
   const [submitting, setSubmitting] = useState(false)
   const [orderError, setOrderError] = useState('')
   const checkoutKey = useRef<string | null>(null)
+  const [giftOffer, setGiftOffer] = useState<FreeGiftOffer | null>(null)
+  const [giftChoice, setGiftChoice] = useState<GiftChoice>(null)
+  const [giftInvalid, setGiftInvalid] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/storefront/gift')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => { if (active && body?.data) setGiftOffer(body.data as FreeGiftOffer) })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     if (!productsLoading && !productsError) syncProducts(products)
@@ -82,6 +96,15 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
   const deliveryFeeCents = getDeliveryFeeCents(deliveryRules, subtotalCents)
   const freeShippingThreshold = getFreeShippingThreshold(deliveryRules)
   const orderTotalCents = deliveryFeeCents === null ? null : subtotalCents + deliveryFeeCents
+
+  const lensUnits = giftOffer?.categoryId
+    ? lines.reduce((sum, line) => {
+        const ids = line.product.categoryIds?.length ? line.product.categoryIds : line.product.categoryId ? [line.product.categoryId] : []
+        return sum + (ids.includes(giftOffer.categoryId as string) ? 0 : line.quantity)
+      }, 0)
+    : 0
+  const giftEligible = Boolean(giftOffer?.config.enabled && giftOffer.products.length && lensUnits >= giftOffer.config.minLensQuantity)
+  const selectedGift = giftEligible ? giftOffer?.products.find((product) => product.id === giftChoice?.productId) ?? null : null
 
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -159,6 +182,14 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
       return
     }
 
+    const giftDecided = giftChoice !== null && (giftChoice.productId === null || giftChoice.confirmed)
+    if (giftEligible && !giftDecided) {
+      setGiftInvalid(true)
+      setSubmitting(false)
+      document.getElementById('free-gift')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+
     const form = new FormData(event.currentTarget)
     checkoutKey.current ??= window.crypto.randomUUID()
     try {
@@ -191,6 +222,8 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
             }
           }),
           quotedDeliveryFee: moneyFromCents(deliveryFeeCents),
+          giftProductId: selectedGift?.id ?? null,
+          giftConfirmed: selectedGift ? true : undefined,
         }),
       })
       const body = await response.json()
@@ -348,6 +381,15 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
             </div>
           </section>
 
+          {giftEligible && giftOffer && (
+            <FreeGiftPicker
+              offer={giftOffer}
+              choice={giftChoice}
+              invalid={giftInvalid && !(giftChoice !== null && (giftChoice.productId === null || giftChoice.confirmed))}
+              onChange={(choice) => { setGiftChoice(choice); setGiftInvalid(false) }}
+            />
+          )}
+
           <section aria-labelledby="payment-heading" className="py-7">
             <h2 id="payment-heading" className="text-xl font-bold tracking-[-.035em]">Payment</h2>
             <div className="mt-4 flex items-start gap-3 border border-[#152a52] bg-white px-4 py-4">
@@ -419,6 +461,21 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
                 </li>
               )
             })}
+            {selectedGift && giftChoice?.confirmed && (
+              <li className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 bg-[#d3ff48]/35 py-4">
+                <span className="grid size-16 place-items-center bg-white">
+                  {selectedGift.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={selectedGift.imageUrl} alt="" className="size-full object-contain" />
+                  ) : null}
+                </span>
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-semibold leading-5">{selectedGift.name}</p>
+                  <p className="mt-1 text-xs leading-5 text-[#314a63]">Free gift · Qty 1</p>
+                  <p className="mt-2 font-mono text-xs font-bold text-[#087ba5]">FREE</p>
+                </div>
+              </li>
+            )}
           </ul>
           <div className="space-y-3 border-t border-[#152a52]/25 pt-4 text-sm">
             <div className="flex items-start justify-between gap-4"><span>Products subtotal</span><strong className="font-mono text-right">{formatPrice(subtotal, currency)}</strong></div>

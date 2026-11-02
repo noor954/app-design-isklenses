@@ -9,6 +9,7 @@ import { storeActivityEvents, storeBanners, storeReviews, storeSettings } from '
 import { deleteMedia, isOwnedMediaUrl, mediaPathFromOwnedUrl } from '@/lib/server/media-storage.mjs'
 import { validateAppearance, validateHomeConfiguration } from '@/lib/home-configuration'
 import { normalizePowerLensOptions, validatePowerLensOptions } from '@/lib/power-lens-options'
+import { normalizeFreeGiftConfig, validateFreeGiftConfig } from '@/lib/free-gift'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -95,6 +96,7 @@ export async function getContentAdmin() {
     settings: {
       ...settingValues,
       power_options: normalizePowerLensOptions(settingValues.power_options),
+      free_gift: normalizeFreeGiftConfig(settingValues.free_gift),
     },
   }
 }
@@ -204,6 +206,9 @@ function validateSetting(key: SettingKey, value: unknown) {
     case 'power_options':
       validatePowerLensOptions(value)
       return
+    case 'free_gift':
+      validateFreeGiftConfig(value)
+      return
     case 'chatbot':
       return
   }
@@ -219,5 +224,5 @@ export async function saveSetting(key: string, value: unknown) {
     .onConflictDoUpdate({ target: storeSettings.key, set: { value, updatedAt: new Date() } })
   await logChange('setting', key, 'setting.updated')
   await invalidateCache('content')
-  if (key === 'power_options') await invalidateCache('catalog')
+  if (key === 'power_options' || key === 'free_gift') await invalidateCache('catalog')
 }

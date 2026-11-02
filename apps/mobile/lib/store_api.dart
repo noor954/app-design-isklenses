@@ -305,18 +305,41 @@ class StoreApi {
         .toList(growable: false);
   }
 
+  Future<FreeGiftOffer> getFreeGift() async {
+    final body = await _getObject('/api/storefront/gift');
+    final data = body['data'];
+    if (data is! Map || data['config'] is! Map || data['products'] is! List) {
+      throw const StoreApiException('The free-gift response is invalid.');
+    }
+    final origin = Uri.parse(_dio.options.baseUrl);
+    return FreeGiftOffer(
+      config: FreeGiftConfig.fromJson(
+        Map<String, dynamic>.from(data['config'] as Map),
+      ),
+      categoryId: data['categoryId']?.toString(),
+      products: (data['products'] as List)
+          .whereType<Map>()
+          .map((value) => FreeGiftProduct.fromJson(value, origin))
+          .toList(growable: false),
+    );
+  }
+
   Future<String> placeOrder({
     required String checkoutKey,
     required String email,
     required List<CartLine> items,
     required Map<String, String> shippingAddress,
     required String deliveryFee,
+    String? giftProductId,
+    bool giftConfirmed = false,
   }) async {
     final body = await _postObject('/api/orders', {
       'checkoutKey': checkoutKey,
       'email': email.trim(),
       'shippingAddress': shippingAddress,
       'quotedDeliveryFee': deliveryFee,
+      'giftProductId': giftProductId,
+      'giftConfirmed': giftConfirmed,
       'items': items
           .map(
             (line) => {
@@ -552,6 +575,78 @@ class AdminApi {
     await _request('DELETE', '/api/admin/session');
     await clearSessionCookie();
   }
+}
+
+class FreeGiftOffer {
+  const FreeGiftOffer({
+    required this.config,
+    required this.categoryId,
+    required this.products,
+  });
+
+  final FreeGiftConfig config;
+  final String? categoryId;
+  final List<FreeGiftProduct> products;
+}
+
+class FreeGiftConfig {
+  const FreeGiftConfig({
+    required this.enabled,
+    required this.categoryId,
+    required this.title,
+    required this.message,
+    required this.badge,
+    required this.maxItems,
+    required this.minLensQuantity,
+  });
+
+  final bool enabled;
+  final String? categoryId;
+  final String title;
+  final String message;
+  final String badge;
+  final int maxItems;
+  final int minLensQuantity;
+
+  factory FreeGiftConfig.fromJson(Map value) => FreeGiftConfig(
+    enabled: value['enabled'] == true,
+    categoryId: value['categoryId']?.toString(),
+    title: value['title']?.toString() ?? 'Free gift',
+    message: value['message']?.toString() ?? '',
+    badge: value['badge']?.toString() ?? 'FREE GIFT',
+    maxItems: _asInt(value['maxItems']),
+    minLensQuantity: _asInt(value['minLensQuantity']),
+  );
+}
+
+class FreeGiftProduct {
+  const FreeGiftProduct({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.price,
+    required this.currency,
+    required this.imageUrl,
+  });
+
+  final String id;
+  final String name;
+  final String slug;
+  final String price;
+  final String currency;
+  final String? imageUrl;
+
+  factory FreeGiftProduct.fromJson(Map value, Uri origin) => FreeGiftProduct(
+    id: value['id']?.toString() ?? '',
+    name: value['name']?.toString() ?? 'Gift',
+    slug: value['slug']?.toString() ?? '',
+    price: value['price']?.toString() ?? '0.00',
+    currency: value['currency']?.toString() ?? 'PKR',
+    imageUrl: StoreProduct.mediaUrl(
+      value['imageUrl']?.toString() ?? value['heroImageUrl']?.toString(),
+      origin,
+    ),
+  );
 }
 
 class ProductPage {
@@ -837,6 +932,7 @@ class StoreProduct {
     required this.description,
     required this.brand,
     required this.category,
+    required this.categoryIds,
     required this.shade,
     required this.lensType,
     required this.compareAtPrice,
@@ -870,6 +966,7 @@ class StoreProduct {
   final String? description;
   final String? brand;
   final String? category;
+  final List<String> categoryIds;
   final Map<String, dynamic>? shade;
   final Map<String, dynamic>? lensType;
   final String? compareAtPrice;
@@ -942,6 +1039,15 @@ class StoreProduct {
       description: value['description']?.toString(),
       brand: value['brand']?.toString(),
       category: value['category']?.toString(),
+      categoryIds: {
+        if (value['categoryIds'] is List)
+          for (final category in value['categoryIds'] as List)
+            if (category is Map && category['id'] != null)
+              category['id'].toString()
+            else if (category != null)
+              category.toString(),
+        if (value['categoryId'] != null) value['categoryId'].toString(),
+      }.toList(growable: false),
       shade: shade is Map ? Map<String, dynamic>.from(shade) : null,
       lensType: lensType is Map ? Map<String, dynamic>.from(lensType) : null,
       compareAtPrice: value['compareAtPrice']?.toString(),

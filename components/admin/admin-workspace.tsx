@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import {
-  Activity, ArrowDown, ArrowUp, BarChart3, Bot, ClipboardList, Eye, LayoutDashboard, LoaderCircle,
+  Activity, ArrowDown, ArrowUp, BarChart3, Bot, ClipboardList, Eye, Gift, LayoutDashboard, LoaderCircle,
   AlertTriangle, BadgePercent, Images, LogOut, Package, Plus, RefreshCw, Search, ShoppingBag, ShieldCheck, Sparkles, Star, Tags, Truck, Users, X,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -38,6 +38,7 @@ import { ChatbotManager } from '@/components/admin/chatbot-manager'
 import { ProductEditor } from '@/components/admin/product-editor'
 import { ContentManager } from '@/components/admin/content-manager'
 import { HomeDesignManager } from '@/components/admin/home-design-manager'
+import { FreeGiftManager } from '@/components/admin/free-gift-manager'
 import { PowerLensOptionsManager } from '@/components/admin/power-lens-options-manager'
 import { BrandManager, ErrorLogManager, LensShadeManager, LensTypeManager } from '@/components/admin/catalog-taxonomy-manager'
 import { CatalogSyncManager } from '@/components/admin/catalog-sync-manager'
@@ -75,6 +76,7 @@ const sections: Array<{ id: Section; label: string; icon: typeof LayoutDashboard
   { id: 'content', label: 'Storefront content', icon: Tags },
   { id: 'home-design', label: 'Home and design', icon: Images },
   { id: 'power-options', label: 'Power lens options', icon: Eye },
+  { id: 'free-gift', label: 'Free gift', icon: Gift },
   { id: 'delivery', label: 'Delivery', icon: Truck },
   { id: 'system-users', label: 'System users', icon: Users },
   { id: 'project-plan', label: 'Project Kanban', icon: ClipboardList },
@@ -1235,6 +1237,7 @@ export function AdminWorkspace({ section = 'overview' }: { section?: AdminSectio
     'home-design': <HomeDesignManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
     'hero-slider': <HomeDesignManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
     'power-options': <PowerLensOptionsManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
+    'free-gift': <FreeGiftManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
     delivery: <DeliveryManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
     'system-users': session.role === 'owner' && session.userId
       ? <SystemUsersWorkspace signedInUserId={session.userId} signedInEmail={session.email ?? ''} />

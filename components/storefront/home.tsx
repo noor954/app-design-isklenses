@@ -40,6 +40,7 @@ function Heading({
   hrefLabel,
   inverse = false,
   id,
+  eyebrow,
 }: {
   first: string
   accent?: string
@@ -48,18 +49,24 @@ function Heading({
   hrefLabel?: string
   inverse?: boolean
   id?: string
+  eyebrow?: string
 }) {
   return (
-    <div className={`flex flex-col gap-5 md:flex-row md:items-end md:justify-between ${inverse ? 'text-white' : 'text-[#15384d]'}`}>
-      <div className="max-w-3xl">
-        <h2 id={id} className="text-balance text-4xl font-extrabold leading-[0.98] tracking-[-0.055em] sm:text-5xl lg:text-6xl">
+    <div className={`flex flex-col gap-4 md:flex-row md:items-end md:justify-between ${inverse ? 'text-white' : 'text-[#15384d]'}`}>
+      <div className="min-w-0 max-w-5xl">
+        {eyebrow && (
+          <p className={`mb-3 inline-flex items-center gap-3 text-xs font-bold uppercase tracking-[.22em] ${inverse ? 'text-[#b8e8f5]' : 'text-[#087ba5]'}`}>
+            <span aria-hidden="true" className="h-px w-10 bg-current" /> {eyebrow}
+          </p>
+        )}
+        <h2 id={id} className="text-balance text-[clamp(2.4rem,5.6vw,5.5rem)] font-extrabold leading-[0.95] tracking-[-0.06em]">
           {first}
           {accent && <span className={`ml-2 font-serif font-normal italic ${inverse ? 'text-[#b8e8f5]' : 'text-[#087ba5]'}`}>{` ${accent}`}</span>}
         </h2>
-        {description && <p className={`mt-4 max-w-2xl text-base leading-7 sm:text-lg ${inverse ? 'text-white/75' : 'text-[#526b7b]'}`}>{description}</p>}
+        {description && <p className={`mt-3 max-w-3xl text-base leading-7 sm:text-lg ${inverse ? 'text-white/75' : 'text-[#526b7b]'}`}>{description}</p>}
       </div>
       {href && (
-        <Link href={href} className={`inline-flex shrink-0 items-center gap-2 text-sm font-semibold transition-colors ${inverse ? 'text-[#b8e8f5] hover:text-white' : 'text-[#006f9b] hover:text-[#15384d]'}`}>
+        <Link href={href} className={`inline-flex min-h-12 shrink-0 items-center gap-2 rounded-full border px-6 text-sm font-semibold transition-colors ${inverse ? 'border-white/40 text-white hover:bg-white hover:text-[#15384d]' : 'border-[#087ba5]/40 text-[#006f9b] hover:bg-[#006f9b] hover:text-white'}`}>
           {hrefLabel ?? 'Browse all'} <ArrowRight size={17} aria-hidden="true" />
         </Link>
       )}
@@ -218,13 +225,14 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
     shade,
     product: products.find((product) => product.lensShadeId === shade.id),
   }))
-  const [categoriesPage, brandsPage, shadesPage, catalogPage] = await Promise.all([
+  const [categoriesPage, brandsPage, shadesPage, lensTypesPage, catalogPage] = await Promise.all([
     getHomeSectionPage('categories'),
     getHomeSectionPage('brands'),
     getHomeSectionPage('shades'),
+    getHomeSectionPage('lens-types'),
     getHomeProductsPage('catalog', 1),
   ])
-  const carouselVariants = { categories: 'coverflow', brands: 'fade-slide', shades: 'infinite-loop' } as const
+  const carouselVariants = { categories: 'coverflow', brands: 'fade-slide', shades: 'infinite-loop', 'lens-types': 'continuous' } as const
   const contactProduct = products.find((product) => productImage(product))
   const contactImage = productImage(contactProduct)
   return (
@@ -240,55 +248,56 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
       />
       <SectionProgress sections={homeConfiguration.sections} />
 
-      <section id="bloom" aria-labelledby="bloom-heading" style={sectionStyle('bloom')} className="isk-home-section min-h-full snap-start snap-always bg-[#e8f6fb] py-8 sm:py-10 lg:flex lg:items-center">
-        <div className="mx-auto grid w-full max-w-[1440px] items-center gap-8 px-4 sm:px-8 lg:grid-cols-[.85fr_1.4fr] lg:gap-10 lg:px-12">
-          <div>
-            <h2 id="bloom-heading" className="mt-8 max-w-xl text-5xl font-extrabold leading-[0.94] tracking-[-0.06em] sm:text-6xl">
-              {sectionCopy('bloom')?.title ?? 'Browse collections'}
-            </h2>
-            <p className="mt-5 max-w-lg text-base leading-7 text-[#526b7b]">{sectionCopy('bloom')?.description ?? 'Shop active product categories from the ISK Lenses catalog.'}</p>
-            <div className="mt-7 flex flex-wrap items-center gap-5">
-              <Link href="/shop" className="inline-flex min-h-12 items-center gap-3 rounded-full bg-[#006f9b] px-6 text-sm font-bold text-white transition hover:bg-[#087ba5]">
-                Browse the catalog <ArrowRight size={17} aria-hidden="true" />
-              </Link>
-              <span className="text-sm font-semibold text-[#526b7b]">{categoryCards.length} available {categoryCards.length === 1 ? 'category' : 'categories'}</span>
-            </div>
+      <section id="bloom" aria-labelledby="bloom-heading" style={sectionStyle('bloom')} className="isk-home-section min-h-full snap-start snap-always bg-[linear-gradient(180deg,#e8f6fb_0%,#f7fcff_100%)] py-8 sm:py-10 lg:flex lg:items-center">
+        <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-10">
+          <Heading
+            id="bloom-heading"
+            eyebrow={`${categoryCards.length} categories`}
+            first={sectionCopy('bloom')?.title ?? 'Browse collections'}
+            description={sectionCopy('bloom')?.description ?? 'Shop active product categories from the ISK Lenses catalog.'}
+            href="/shop"
+            hrefLabel="Browse the catalog"
+          />
+          <div className="mt-6 lg:mt-8">
+            <PagedSectionCarousel section="categories" label="categories" variant={carouselVariants.categories} initialItems={categoriesPage.items} initialHasMore={categoriesPage.hasMore} emptyMessage="No active categories are available right now. Browse the catalog or return after categories have been enabled." />
           </div>
-          <PagedSectionCarousel section="categories" label="categories" variant={carouselVariants.categories} initialItems={categoriesPage.items} initialHasMore={categoriesPage.hasMore} emptyMessage="No active categories are available right now. Browse the catalog or return after categories have been enabled." />
         </div>
       </section>
 
       <section id="brands" aria-labelledby="brands-heading" style={sectionStyle('brands')} className="isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] py-8 sm:py-10 lg:flex lg:items-center">
-        <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-12">
+        <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-10">
           <Heading
             id="brands-heading"
+            eyebrow={`${brands.length} brands`}
             first={sectionCopy('brands')?.title ?? 'Shop by brand'}
             description={sectionCopy('brands')?.description}
             href="/brands"
             hrefLabel="View all brands"
           />
-          <PagedSectionCarousel section="brands" label="brands" variant={carouselVariants.brands} initialItems={brandsPage.items} initialHasMore={brandsPage.hasMore} emptyMessage="No active brands are available right now." />
+          <div className="mt-6 lg:mt-8"><PagedSectionCarousel section="brands" label="brands" variant={carouselVariants.brands} initialItems={brandsPage.items} initialHasMore={brandsPage.hasMore} emptyMessage="No active brands are available right now." /></div>
         </div>
       </section>
 
       <section id="shades" aria-labelledby="shades-heading" style={sectionStyle('shades')} className="isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] py-8 sm:py-10 lg:flex lg:items-center">
-        <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-12">
+        <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-10">
           <Heading
             id="shades-heading"
+            eyebrow={`${shades.length} shades`}
             first={sectionCopy('shades')?.title ?? 'Shop by shade'}
             description={sectionCopy('shades')?.description}
             href="/shop"
             hrefLabel="Browse all shades"
           />
-          <PagedSectionCarousel section="shades" label="shades" variant={carouselVariants.shades} initialItems={shadesPage.items} initialHasMore={shadesPage.hasMore} emptyMessage="No active lens shades are available right now." />
+          <div className="mt-6 lg:mt-8"><PagedSectionCarousel section="shades" label="shades" variant={carouselVariants.shades} initialItems={shadesPage.items} initialHasMore={shadesPage.hasMore} emptyMessage="No active lens shades are available right now." /></div>
         </div>
       </section>
 
       <section id="trending" aria-labelledby="trending-heading" style={sectionStyle('trending')} className="isk-home-section min-h-full snap-start snap-always bg-white py-8 sm:py-10 lg:flex lg:items-center">
-        <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-12">
-          <div className="mb-8">
+        <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-10">
+          <div className="mb-6">
             <Heading
               id="trending-heading"
+              eyebrow="Featured, new and on sale"
               first={sectionCopy('trending')?.title ?? 'Browse the catalog'}
               description={sectionCopy('trending')?.description}
               href="/shop"
@@ -299,51 +308,19 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         </div>
       </section>
 
-      <section id="types" aria-labelledby="types-heading" style={sectionStyle('types')} className="isk-home-section min-h-full snap-start snap-always bg-[#e8f6fb] py-8 sm:py-10 lg:flex lg:items-center">
-        <div className="mx-auto grid w-full max-w-[1440px] gap-10 px-4 sm:px-8 lg:grid-cols-[.8fr_1.3fr] lg:items-center lg:gap-16 lg:px-12">
-          <div>
-            <h2 id="types-heading" className="mt-5 text-5xl font-extrabold leading-[0.96] tracking-[-0.06em] sm:text-6xl">
-              {sectionCopy('types')?.title ?? 'Shop by lens type'}
-            </h2>
-            <p className="mt-5 max-w-md text-lg leading-8 text-[#526b7b]">{sectionCopy('types')?.description}</p>
-            <Link href="/faq" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[#15384d] hover:text-[#087ba5]">
-              Need help choosing? <ArrowRight size={17} aria-hidden="true" />
-            </Link>
+      <section id="types" aria-labelledby="types-heading" style={sectionStyle('types')} className="isk-home-section min-h-full snap-start snap-always bg-[linear-gradient(180deg,#e8f6fb_0%,#d7f0fa_100%)] py-8 sm:py-10 lg:flex lg:items-center">
+        <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-10">
+          <Heading
+            id="types-heading"
+            eyebrow={`${lensTypes.length} lens types`}
+            first={sectionCopy('types')?.title ?? 'Shop by lens type'}
+            description={sectionCopy('types')?.description}
+            href="/faq"
+            hrefLabel="Need help choosing?"
+          />
+          <div className="mt-6 lg:mt-8">
+            <PagedSectionCarousel section="lens-types" label="lens types" variant={carouselVariants['lens-types']} initialItems={lensTypesPage.items} initialHasMore={lensTypesPage.hasMore} emptyMessage="No lens types are available yet." />
           </div>
-          {lensTypes.length > 0 ? (
-            <ul className="grid grid-cols-2 gap-x-5 sm:grid-cols-3">
-              {lensTypes.map((lensType) => (
-                <li key={lensType.id}>
-                  {lensType.productCount > 0 ? (
-                    <Link href={`/shop?q=${encodeURIComponent(lensType.name)}`} className="group flex min-h-28 items-center justify-between gap-3 border-t border-[#15384d]/20 py-4 transition-colors hover:border-[#087ba5] sm:min-h-32">
-                      {lensType.fallbackImageUrl && (
-                        <StorefrontFallbackImage
-                          sources={[lensType.fallbackImageUrl]}
-                          alt=""
-                          className="size-12 shrink-0 rounded-lg"
-                          imageClassName="object-contain"
-                        />
-                      )}
-                      <span>
-                        <span className="block text-base font-bold tracking-[-0.035em] text-[#15384d] sm:text-lg">{lensType.name}</span>
-                        <span className="mt-1 block text-xs text-[#526b7b] sm:text-sm">{lensType.productCount} active {lensType.productCount === 1 ? 'listing' : 'listings'}</span>
-                      </span>
-                      <ArrowRight size={18} className="shrink-0 text-[#087ba5] transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                    </Link>
-                  ) : (
-                    <div className="flex min-h-28 items-center justify-between gap-3 border-t border-[#15384d]/20 py-4 sm:min-h-32">
-                      <span>
-                        <span className="block text-base font-bold tracking-[-0.035em] text-[#15384d] sm:text-lg">{lensType.name}</span>
-                        <span className="mt-1 block text-xs text-[#526b7b] sm:text-sm">No active listings linked yet</span>
-                      </span>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="rounded-2xl border border-[#cfe2eb] bg-white/70 p-6 text-sm text-[#526b7b]">No lens types are available yet.</p>
-          )}
         </div>
       </section>
 
