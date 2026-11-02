@@ -344,7 +344,7 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                           'types',
                           'See the options in each listing',
                         ),
-                        variant: IskCarouselVariant.smoothSlide,
+                        variant: IskCarouselVariant.continuous,
                         items: data.lensTypes
                             .where((item) => item.productCount > 0)
                             .toList(),
@@ -853,10 +853,11 @@ class _DirectorySectionState<T> extends State<_DirectorySection<T>> {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final cardWidth = width >= 980
-        ? 236.0
+        ? math.min(width / 4.4, 320.0)
         : width >= 680
-        ? 208.0
-        : 174.0;
+        ? math.min(width / 3.2, 280.0)
+        : math.min(width * 0.62, 240.0);
+    final cardHeight = width >= 680 ? 300.0 : 252.0;
     final visible = widget.items.take(_loaded).toList(growable: false);
     return Padding(
       padding: const EdgeInsets.only(top: 30),
@@ -872,7 +873,7 @@ class _DirectorySectionState<T> extends State<_DirectorySection<T>> {
           const SizedBox(height: 15),
           IskCarousel(
             variant: _variant,
-            height: 208,
+            height: cardHeight,
             itemWidth: cardWidth,
             itemCount: visible.length,
             hasMore: _loaded < widget.items.length,

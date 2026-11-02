@@ -6,6 +6,8 @@ import { db } from '@/lib/db'
 import { getDeliveryFeeCents as deliveryFeeForSubtotal, moneyToCents, parseDeliveryRules } from '@/lib/delivery'
 import {
   storeActivityEvents,
+  storeCategories,
+  storeProductCategories,
   storeCustomers,
   storeOrderItems,
   storeOrders,
@@ -14,6 +16,7 @@ import {
   storeSettings,
 } from '@/lib/db/schema'
 import { CustomerAuthError, getCustomerSession, getOrderReceipt, type StoreCustomerSession } from '@/lib/auth/store-customer'
+import { normalizeFreeGiftConfig, resolveGiftCategoryId } from '@/lib/free-gift'
 import {
   isPowerLensValue,
   normalizePowerLensOptions,
@@ -164,8 +167,17 @@ function parseOrderInput(value: unknown) {
     email: value.email,
     shippingAddress,
     items,
+    giftProductId: parseGiftProductId(value),
     delivery: parseDeliveryInput(value),
   }
+}
+
+function parseGiftProductId(value: Record<string, unknown>) {
+  const giftProductId = value.giftProductId
+  if (giftProductId === undefined || giftProductId === null) return null
+  if (typeof giftProductId !== 'string' || !uuidPattern.test(giftProductId)) throw new CheckoutError('The selected free gift is invalid.')
+  if (value.giftConfirmed !== true) throw new CheckoutError('Confirm your free gift choice before placing the order.')
+  return giftProductId
 }
 
 function parseDeliveryInput(value: Record<string, unknown>): CheckoutDeliveryInput {
@@ -308,6 +320,48 @@ async function submitCodOrderImpl(value: unknown) {
         return { item, product, variant, unitPrice, lineTotalCents }
       })
 
+      let giftLine: { product: typeof products[number]; variant: (typeof variants)[number] | null } | null = null
+      if (input.giftProductId) {
+        const [giftSetting] = await tx.select({ value: storeSettings.value }).from(storeSettings).where(eq(storeSettings.key, 'free_gift')).limit(1)
+        const giftConfig = normalizeFreeGiftConfig(giftSetting?.value)
+        if (!giftConfig.enabled) throw new CheckoutError('The free gift offer is no longer available. Review your order and try again.', 409)
+        const categories = await tx
+          .select({ id: storeCategories.id, name: storeCategories.name, slug: storeCategories.slug })
+          .from(storeCategories)
+          .where(eq(storeCategories.isActive, true))
+        const giftCategoryId = resolveGiftCategoryId(giftConfig, categories)
+        if (!giftCategoryId) throw new CheckoutError('The free gift offer is no longer available. Review your order and try again.', 409)
+        const productIds = [...new Set([...resolvedLines.map((line) => line.product.id), input.giftProductId])]
+        const memberships = await tx
+          .select({ productId: storeProductCategories.productId })
+          .from(storeProductCategories)
+          .where(and(eq(storeProductCategories.categoryId, giftCategoryId), inArray(storeProductCategories.productId, productIds)))
+        const inGiftCategory = new Set(memberships.map((row) => row.productId))
+        const isGift = (candidate: { id: string; categoryId: string | null }) => candidate.categoryId === giftCategoryId || inGiftCategory.has(candidate.id)
+        const lensQuantity = resolvedLines.reduce((sum, line) => sum + (isGift(line.product) ? 0 : line.item.quantity), 0)
+        if (lensQuantity < giftConfig.minLensQuantity) {
+          throw new CheckoutError('The free gift needs a lens in your order. Review your order and try again.', 409)
+        }
+        const [giftProduct] = await tx.select().from(storeProducts).where(eq(storeProducts.id, input.giftProductId)).for('update')
+        if (!giftProduct || giftProduct.status !== 'active' || !isGift(giftProduct)) {
+          throw new CheckoutError('The selected free gift is no longer available. Choose another gift.', 409)
+        }
+        const giftVariants = await tx
+          .select()
+          .from(storeProductVariants)
+          .where(and(eq(storeProductVariants.productId, giftProduct.id), eq(storeProductVariants.isActive, true)))
+          .orderBy(storeProductVariants.id)
+          .for('update')
+        const giftVariant = giftVariants.find((entry) => entry.stockQuantity > 0) ?? null
+        if (giftVariants.length && !giftVariant) throw new CheckoutError('The selected free gift is out of stock. Choose another gift.', 409)
+        const alreadyReserved = resolvedLines
+          .filter((line) => line.product.id === giftProduct.id && (line.variant?.id ?? null) === (giftVariant?.id ?? null))
+          .reduce((sum, line) => sum + line.item.quantity, 0)
+        const giftStock = (giftVariant?.stockQuantity ?? giftProduct.stockQuantity) - alreadyReserved
+        if (giftStock < 1) throw new CheckoutError('The selected free gift is out of stock. Choose another gift.', 409)
+        giftLine = { product: giftProduct, variant: giftVariant }
+      }
+
       for (const { item, product, variant } of resolvedLines) {
         if (variant) {
           await tx
@@ -328,6 +382,22 @@ async function submitCodOrderImpl(value: unknown) {
             .update(storeProducts)
             .set({ stockQuantity: product.stockQuantity - item.quantity, updatedAt: new Date() })
             .where(eq(storeProducts.id, product.id))
+        }
+      }
+
+      if (giftLine) {
+        const { product: giftProduct, variant: giftVariant } = giftLine
+        if (giftVariant) {
+          const [current] = await tx.select({ stockQuantity: storeProductVariants.stockQuantity }).from(storeProductVariants).where(eq(storeProductVariants.id, giftVariant.id))
+          await tx.update(storeProductVariants).set({ stockQuantity: (current?.stockQuantity ?? giftVariant.stockQuantity) - 1, updatedAt: new Date() }).where(eq(storeProductVariants.id, giftVariant.id))
+          const remaining = await tx
+            .select({ stockQuantity: storeProductVariants.stockQuantity })
+            .from(storeProductVariants)
+            .where(and(eq(storeProductVariants.productId, giftProduct.id), eq(storeProductVariants.isActive, true)))
+          await tx.update(storeProducts).set({ stockQuantity: remaining.reduce((sum, entry) => sum + entry.stockQuantity, 0), updatedAt: new Date() }).where(eq(storeProducts.id, giftProduct.id))
+        } else {
+          const [current] = await tx.select({ stockQuantity: storeProducts.stockQuantity }).from(storeProducts).where(eq(storeProducts.id, giftProduct.id))
+          await tx.update(storeProducts).set({ stockQuantity: (current?.stockQuantity ?? giftProduct.stockQuantity) - 1, updatedAt: new Date() }).where(eq(storeProducts.id, giftProduct.id))
         }
       }
 
@@ -428,7 +498,18 @@ async function submitCodOrderImpl(value: unknown) {
         unitPrice,
         quantity: item.quantity,
         lineTotal: moneyString(lineTotalCents),
-      })))
+      })).concat(giftLine ? [{
+        orderId: order.id,
+        productId: giftLine.product.id,
+        variantId: giftLine.variant?.id ?? null,
+        powerLeft: null,
+        powerRight: null,
+        inventoryReserved: true,
+        productName: `${giftLine.variant ? `${giftLine.product.name} — ${giftLine.variant.name}` : giftLine.product.name} (Free gift)`,
+        unitPrice: '0.00',
+        quantity: 1,
+        lineTotal: '0.00',
+      }] : [])) 
       await tx.insert(storeActivityEvents).values({
         entityType: 'order',
         entityId: order.id,

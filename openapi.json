@@ -3020,29 +3020,37 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "tab": {
-                      "type": "string"
-                    },
-                    "items": {
-                      "type": "array",
-                      "maxItems": 15,
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": true
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tab": {
+                          "type": "string"
+                        },
+                        "items": {
+                          "type": "array",
+                          "maxItems": 15,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "pageSize": {
+                          "type": "integer",
+                          "const": 15
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        }
                       }
                     },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "pageSize": {
-                      "type": "integer",
-                      "const": 15
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "hasMore": {
-                      "type": "boolean"
+                    "timestamp": {
+                      "type": "string"
                     }
                   }
                 }
@@ -3051,6 +3059,20 @@
           },
           "404": {
             "description": "Unknown tab"
+          }
+        }
+      }
+    },
+    "/api/storefront/gift": {
+      "get": {
+        "tags": [
+          "Storefront"
+        ],
+        "summary": "Free Cosmetic gift offer for checkout",
+        "description": "Returns whether the free gift is enabled, its rules (maxItems, minLensQuantity, badge, title, message) and eligible in-stock gift products.",
+        "responses": {
+          "200": {
+            "description": "Gift offer wrapped in data."
           }
         }
       }
@@ -3781,6 +3803,14 @@
           "quotedDeliveryFee": {
             "type": "string",
             "description": "Current delivery quote shown to the shopper; the server validates it."
+          },
+          "giftProductId": {
+            "type": "string",
+            "description": "Optional free gift product id from GET /api/storefront/gift. Requires giftConfirmed=true and at least minLensQuantity non-gift units in the order."
+          },
+          "giftConfirmed": {
+            "type": "boolean",
+            "description": "Must be true when giftProductId is set."
           }
         }
       },

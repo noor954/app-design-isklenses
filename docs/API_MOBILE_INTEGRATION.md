@@ -173,3 +173,9 @@ The independent scaffold at [`services/fastapi/README.md`](../services/fastapi/R
 - Checkout `leftPowerRange` / `rightPowerRange` are exact option values. The server price is base price + left surcharge + right surcharge; `quotedUnitPrice` must equal that total (compared in cents). Clients must display the same surcharge-inclusive price.
 - Homepage hero slides are topped up with the shared default editorial images (`/isk-home/hero-editorial-*.jpg`) so at least five slides are served to web and mobile alike.
 - Homepage carousels (web `components/ui/shared-carousel.tsx`, Flutter `apps/mobile/lib/isk_carousel.dart`) share five styles: coverflow, fade-slide, infinite-loop, smooth-slide, continuous. Autoplay advances right-to-left every 3 seconds, pauses on interaction, respects reduced motion, and loads at most 15 items per request. Catalog imagery uses contain-fit so images are never cropped.
+
+## Free Cosmetic gift and full-width homepage carousels
+
+- `GET /api/storefront/gift` returns the offer: `enabled`, `maxItems`, `minLensQuantity`, `badge`, `title`, `message` and eligible in-stock gift products. Admin config is the `free_gift` settings key (`/api/admin/settings`, Admin > Free gift).
+- `POST /api/orders` accepts `giftProductId` and `giftConfirmed`. The gift is valid only when the order has at least `minLensQuantity` units whose product is not in the gift (Cosmetics) category; `giftConfirmed` must be `true`. The server revalidates and adds a $0 "(Free gift)" line. Web and Flutter show a prominent confirmation card before placing the order.
+- Homepage carousels are full width. Section order and styles are identical on web and mobile: categories coverflow, shades infinite-loop, brands (6th) fade-slide, lens types continuous; product tabs use distinct styles.

@@ -19,6 +19,7 @@ export const ADMIN_SECTION_IDS = [
   'content',
   'home-design',
   'power-options',
+  'free-gift',
   'hero-slider',
   'delivery',
   'system-users',
