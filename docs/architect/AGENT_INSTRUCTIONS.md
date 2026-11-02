@@ -58,3 +58,5 @@ If you are uncertain about an operation that touches DB, secrets, or deployment,
 - Product/catalog imagery uses contain-fit; heroes may use cover. Hero images are topped up to five shared defaults.
 
 - Free Cosmetic gift: `free_gift` setting, `GET /api/storefront/gift`, `giftProductId`/`giftConfirmed` on orders; lens line = non-Cosmetics product. Homepage carousels are full width; lens types use the continuous carousel on web and mobile.
+
+- Gift flash bar + cart gift choice shared with checkout; homepage `showcase` section (config id `showcase`) with big spotlight images; default order puts brands 6th. Keep web and Flutter identical.

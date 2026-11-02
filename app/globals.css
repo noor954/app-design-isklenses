@@ -963,3 +963,12 @@ html[data-navigation-style="minimal"] :is(.storefront-sky header nav a, .admin-t
 .isk-carousel-fade {
   animation: isk-carousel-fade-in var(--isk-carousel-ms, 650ms) cubic-bezier(.22, 1, .36, 1) both;
 }
+
+@keyframes isk-gift-flash {
+  0%, 100% { background-color: #d3ff48; }
+  50% { background-color: #fff27a; }
+}
+.isk-gift-flash { animation: isk-gift-flash 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .isk-gift-flash { animation: none; }
+}

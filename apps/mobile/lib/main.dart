@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'admin_free_gift_settings.dart';
+import 'free_gift_widgets.dart';
 import 'admin_product_editor.dart';
 import 'isk_controls.dart';
 import 'store_api.dart';
@@ -13,7 +14,6 @@ import 'storefront_screens.dart';
 const _navy = Color(0xff15384d);
 const _paleBlue = Color(0xffe8f6fb);
 const _controlBlue = Color(0xff006f9b);
-const _giftBlue = Color(0xff087ba5);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +36,8 @@ class _IskLensesAppState extends State<IskLensesApp> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _catalogKey = GlobalKey<_CatalogScreenState>();
   final List<CartLine> _cart = [];
+  final GiftSelectionState _giftSelection = GiftSelectionState();
+  FreeGiftOffer? _giftOffer;
   final List<StoreProduct> _comparison = [];
   ShopperSession? _session;
   Map<String, dynamic> _appearance = const {};
@@ -51,6 +53,26 @@ class _IskLensesAppState extends State<IskLensesApp> {
     _adminApi = widget.adminApi ?? AdminApi();
     _loadSession();
     _loadAppearance();
+    _loadFreeGift();
+  }
+
+  Future<void> _loadFreeGift() async {
+    try {
+      final offer = await _api.getFreeGift();
+      if (!mounted) return;
+      _giftOffer = offer;
+      _giftSelection.setOffer(offer, _cart);
+      setState(() {});
+    } on StoreApiException {
+      _giftSelection.finishLoading();
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _giftSelection.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAppearance() async {
@@ -143,6 +165,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
         );
       }
     });
+    _giftSelection.updateCart(_cart);
   }
 
   void _updateCart(CartLine line, int quantity) {
@@ -155,9 +178,14 @@ class _IskLensesAppState extends State<IskLensesApp> {
         _cart[index] = line.withQuantity(quantity);
       }
     });
+    _giftSelection.updateCart(_cart);
   }
 
-  void _clearCart() => setState(_cart.clear);
+  void _clearCart() {
+    setState(_cart.clear);
+    _giftSelection.resetSelection();
+    _giftSelection.updateCart(_cart);
+  }
 
   void _browse(StoreBrowseFilter filter) {
     setState(() {
@@ -175,6 +203,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
           onChange: _updateCart,
           onCheckoutComplete: _clearCart,
           customerEmail: _session?.email,
+          giftSelection: _giftSelection,
         ),
       ),
     );
@@ -705,24 +734,38 @@ class _IskLensesAppState extends State<IskLensesApp> {
                 const SizedBox(width: 8),
               ],
             ),
-            body: wide
-                ? Row(
-                    children: [
-                      NavigationRail(
-                        selectedIndex: _tab,
-                        onDestinationSelected: (value) =>
-                            setState(() => _tab = value),
-                        extended: MediaQuery.sizeOf(context).width >= 1200,
-                        labelType: MediaQuery.sizeOf(context).width >= 1200
-                            ? null
-                            : NavigationRailLabelType.all,
-                        destinations: destinations,
-                      ),
-                      const VerticalDivider(width: 1),
-                      Expanded(child: _tabContent()),
-                    ],
-                  )
-                : _tabContent(),
+            body: Column(
+              children: [
+                if (_giftOffer case final offer?
+                    when offer.config.enabled && offer.products.isNotEmpty)
+                  _FlashingGiftStrip(
+                    badge: offer.config.badge,
+                    onTap: _openCart,
+                  ),
+                Expanded(
+                  child: wide
+                      ? Row(
+                          children: [
+                            NavigationRail(
+                              selectedIndex: _tab,
+                              onDestinationSelected: (value) =>
+                                  setState(() => _tab = value),
+                              extended:
+                                  MediaQuery.sizeOf(context).width >= 1200,
+                              labelType:
+                                  MediaQuery.sizeOf(context).width >= 1200
+                                  ? null
+                                  : NavigationRailLabelType.all,
+                              destinations: destinations,
+                            ),
+                            const VerticalDivider(width: 1),
+                            Expanded(child: _tabContent()),
+                          ],
+                        )
+                      : _tabContent(),
+                ),
+              ],
+            ),
             bottomNavigationBar: wide
                 ? null
                 : NavigationBar(
@@ -769,6 +812,104 @@ class _IskLensesAppState extends State<IskLensesApp> {
       ),
     );
   }
+}
+
+class _FlashingGiftStrip extends StatefulWidget {
+  const _FlashingGiftStrip({required this.badge, required this.onTap});
+
+  final String badge;
+  final VoidCallback onTap;
+
+  @override
+  State<_FlashingGiftStrip> createState() => _FlashingGiftStripState();
+}
+
+class _FlashingGiftStripState extends State<_FlashingGiftStrip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool? _reducedMotion;
+  static const _lime = Color(0xffd3ff48);
+  static const _yellow = Color(0xfffff27a);
+  static const _ink = Color(0xff0d3a52);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    if (_reducedMotion == reduced) return;
+    _reducedMotion = reduced;
+    if (reduced) {
+      _controller.stop();
+      _controller.value = 0;
+    } else {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    builder: (context, _) {
+      final background = _reducedMotion == true
+          ? _lime
+          : Color.lerp(_lime, _yellow, _controller.value)!;
+      return Material(
+        color: background,
+        child: InkWell(
+          onTap: widget.onTap,
+          child: SizedBox(
+            height: 46,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.card_giftcard_outlined,
+                    color: _ink,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Choose a free gift on every order · ${widget.badge.isEmpty ? 'New Launch Gift' : widget.badge}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _ink,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: _ink,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class CatalogScreen extends StatefulWidget {
@@ -1500,6 +1641,7 @@ class CartScreen extends StatelessWidget {
     required this.onChange,
     required this.onCheckoutComplete,
     required this.customerEmail,
+    required this.giftSelection,
     super.key,
   });
 
@@ -1508,6 +1650,7 @@ class CartScreen extends StatelessWidget {
   final void Function(CartLine, int) onChange;
   final VoidCallback onCheckoutComplete;
   final String? customerEmail;
+  final GiftSelectionState giftSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -1523,6 +1666,9 @@ class CartScreen extends StatelessWidget {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                FreeGiftChooser(state: giftSelection, cart: cart),
+                if (giftSelection.isEligible(cart)) const SizedBox(height: 14),
+                FreeGiftSummaryLine(state: giftSelection),
                 for (final line in cart)
                   Card(
                     color: Colors.white,
@@ -1611,40 +1757,49 @@ class CartScreen extends StatelessWidget {
                   value: _money(_amount(subtotalCents), 'PKR'),
                 ),
                 const SizedBox(height: 16),
+                if (giftSelection.loading)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 10),
+                    child: Text('Checking free-gift availability…'),
+                  ),
                 FilledButton(
-                  onPressed: () async {
-                    final result = await Navigator.of(context).push<String>(
-                      MaterialPageRoute(
-                        builder: (_) => CheckoutScreen(
-                          api: api,
-                          cart: List.unmodifiable(cart),
-                          initialEmail: customerEmail,
-                        ),
-                      ),
-                    );
-                    if (result == null || !context.mounted) return;
-                    onCheckoutComplete();
-                    showDialog<void>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        icon: const Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 42,
-                        ),
-                        title: const Text('Order placed'),
-                        content: Text(
-                          'Your order number is $result. We’ll contact you to confirm delivery.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Done'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                  onPressed: giftSelection.loading
+                      ? null
+                      : () async {
+                          final result = await Navigator.of(context)
+                              .push<String>(
+                                MaterialPageRoute(
+                                  builder: (_) => CheckoutScreen(
+                                    api: api,
+                                    cart: List.unmodifiable(cart),
+                                    initialEmail: customerEmail,
+                                    giftSelection: giftSelection,
+                                  ),
+                                ),
+                              );
+                          if (result == null || !context.mounted) return;
+                          onCheckoutComplete();
+                          showDialog<void>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              icon: const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 42,
+                              ),
+                              title: const Text('Order placed'),
+                              content: Text(
+                                'Your order number is $result. We’ll contact you to confirm delivery.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Done'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                   child: const Text('Continue to checkout'),
                 ),
               ],
@@ -1658,12 +1813,14 @@ class CheckoutScreen extends StatefulWidget {
     required this.api,
     required this.cart,
     required this.initialEmail,
+    required this.giftSelection,
     super.key,
   });
 
   final StoreApi api;
   final List<CartLine> cart;
   final String? initialEmail;
+  final GiftSelectionState giftSelection;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -1684,30 +1841,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<DeliveryRule>? _rules;
   String? _error;
   var _loadingRules = true;
-  FreeGiftOffer? _giftOffer;
-  String? _selectedGiftProductId;
-  String? _giftError;
-  var _giftDecisionMade = false;
-  var _giftConfirmed = false;
-  var _loadingGift = true;
   var _submitting = false;
 
   @override
   void initState() {
     super.initState();
     _loadRules();
-    _loadGift();
-  }
-
-  @override
-  void didUpdateWidget(covariant CheckoutScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!_giftEligible) {
-      _selectedGiftProductId = null;
-      _giftDecisionMade = false;
-      _giftConfirmed = false;
-      _giftError = null;
-    }
   }
 
   @override
@@ -1749,52 +1888,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   int get _subtotalCents => _cartSubtotal(widget.cart);
 
-  int _lensUnits(FreeGiftOffer offer) {
-    final giftCategoryId = offer.categoryId ?? offer.config.categoryId;
-    return widget.cart
-        .where(
-          (line) =>
-              giftCategoryId == null ||
-              !line.product.categoryIds.contains(giftCategoryId),
-        )
-        .fold(0, (total, line) => total + line.quantity);
-  }
-
-  bool get _giftEligible {
-    final offer = _giftOffer;
-    return offer != null &&
-        offer.config.enabled &&
-        offer.products.isNotEmpty &&
-        _lensUnits(offer) >= offer.config.minLensQuantity;
-  }
-
-  FreeGiftProduct? get _selectedGift {
-    final id = _selectedGiftProductId;
-    if (id == null) return null;
-    for (final product in _giftOffer?.products ?? const <FreeGiftProduct>[]) {
-      if (product.id == id) return product;
-    }
-    return null;
-  }
-
-  Future<void> _loadGift() async {
-    try {
-      final offer = await widget.api.getFreeGift();
-      if (mounted) {
-        setState(() {
-          _giftOffer = offer;
-          _loadingGift = false;
-          if (!_giftEligible) {
-            _selectedGiftProductId = null;
-            _giftDecisionMade = false;
-            _giftConfirmed = false;
-          }
-        });
-      }
-    } on StoreApiException {
-      if (mounted) setState(() => _loadingGift = false);
-    }
-  }
+  bool get _giftEligible => widget.giftSelection.isEligible(widget.cart);
 
   int? get _deliveryCents {
     final rules = _rules;
@@ -1850,7 +1944,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _field(_postal, 'Postal code (optional)'),
             if (_giftEligible) ...[
               const SizedBox(height: 10),
-              _giftCard(context),
+              FreeGiftChooser(state: widget.giftSelection, cart: widget.cart),
             ],
             const SizedBox(height: 8),
             Card(
@@ -1859,14 +1953,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    if (_selectedGift case final gift?) ...[
-                      _SummaryRow(
-                        label: '${gift.name} gift',
-                        value: 'FREE',
-                        bold: true,
-                      ),
-                      const SizedBox(height: 8),
-                    ],
+                    FreeGiftSummaryLine(state: widget.giftSelection),
                     _SummaryRow(
                       label: 'Subtotal',
                       value: _money(_amount(_subtotalCents), 'PKR'),
@@ -1909,8 +1996,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             FilledButton(
               onPressed:
                   _submitting ||
+                      widget.giftSelection.loading ||
                       _loadingRules ||
-                      _loadingGift ||
                       deliveryCents == null
                   ? null
                   : _submit,
@@ -1927,195 +2014,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.black54, fontSize: 12),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _giftCard(BuildContext context) {
-    final offer = _giftOffer!;
-    final selected = _selectedGift;
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xff54c7e9), Color(0xffb8e8f5), Color(0xff87d8f0)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xfff7fcff),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: _giftBlue,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Text(
-                offer.config.badge,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              offer.config.title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: _navy,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (offer.config.message.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(offer.config.message, style: const TextStyle(color: _navy)),
-            ],
-            const SizedBox(height: 14),
-            SizedBox(
-              height: 154,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: offer.products.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final product = offer.products[index];
-                  final isSelected = selected?.id == product.id;
-                  return SizedBox(
-                    width: 126,
-                    child: Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => setState(() {
-                          _selectedGiftProductId = product.id;
-                          _giftDecisionMade = true;
-                          _giftConfirmed = false;
-                          _giftError = null;
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.all(9),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: isSelected
-                                  ? _giftBlue
-                                  : const Color(0xffcfe2eb),
-                              width: isSelected ? 2 : 1,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Center(
-                                  child: product.imageUrl == null
-                                      ? const Icon(
-                                          Icons.card_giftcard_outlined,
-                                          color: _giftBlue,
-                                          size: 38,
-                                        )
-                                      : Image.network(
-                                          product.imageUrl!,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Icon(
-                                                Icons.card_giftcard_outlined,
-                                                color: _giftBlue,
-                                                size: 38,
-                                              ),
-                                        ),
-                                ),
-                              ),
-                              Text(
-                                product.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: _navy,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              const Text(
-                                'FREE',
-                                style: TextStyle(
-                                  color: _giftBlue,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                ChoiceChip(
-                  label: const Text('No gift, thanks'),
-                  selected: _giftDecisionMade && selected == null,
-                  onSelected: (value) {
-                    if (!value) return;
-                    setState(() {
-                      _selectedGiftProductId = null;
-                      _giftDecisionMade = true;
-                      _giftConfirmed = false;
-                      _giftError = null;
-                    });
-                  },
-                ),
-                if (!_giftDecisionMade)
-                  const Text(
-                    'Choose a gift or select no gift to continue.',
-                    style: TextStyle(color: _navy, fontSize: 12),
-                  ),
-              ],
-            ),
-            if (selected != null)
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: _giftConfirmed,
-                activeColor: _giftBlue,
-                title: Text(
-                  'I confirm I want ${selected.name} as my free gift',
-                  style: const TextStyle(color: _navy, fontSize: 13),
-                ),
-                onChanged: (value) => setState(() {
-                  _giftConfirmed = value == true;
-                  _giftError = null;
-                }),
-              ),
-            if (_giftError != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                _giftError!,
-                style: const TextStyle(
-                  color: Color(0xffb4233e),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -2161,18 +2059,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _submit() async {
-    if (_loadingGift) return;
-    if (_giftEligible && !_giftDecisionMade) {
-      setState(
-        () => _giftError =
-            'Choose a gift or select “No gift, thanks” to continue.',
+    if (_giftEligible && !widget.giftSelection.decisionMade) {
+      widget.giftSelection.showError(
+        'Choose a gift or select “No gift, thanks” to continue.',
       );
       return;
     }
-    if (_giftEligible && _selectedGift != null && !_giftConfirmed) {
-      setState(
-        () => _giftError =
-            'Confirm your selected free gift before placing the order.',
+    if (_giftEligible &&
+        widget.giftSelection.selectedProduct != null &&
+        !widget.giftSelection.confirmed) {
+      widget.giftSelection.showError(
+        'Confirm your selected free gift before placing the order.',
       );
       return;
     }
@@ -2205,9 +2102,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'postalCode': _postal.text.trim(),
         },
         deliveryFee: _amount(delivery),
-        giftProductId: _giftEligible ? _selectedGift?.id : null,
-        giftConfirmed: _giftEligible && _selectedGift != null && _giftConfirmed,
+        giftProductId: _giftEligible
+            ? widget.giftSelection.selectedProduct?.id
+            : null,
+        giftConfirmed:
+            _giftEligible &&
+            widget.giftSelection.selectedProduct != null &&
+            widget.giftSelection.confirmed,
       );
+      widget.giftSelection.resetSelection();
       if (mounted) Navigator.of(context).pop(orderNumber);
     } on StoreApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
