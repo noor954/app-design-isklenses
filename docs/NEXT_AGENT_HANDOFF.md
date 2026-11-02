@@ -251,3 +251,5 @@ Admin and customer credentials live in `store_admin_users` / `store_customers`. 
 - Free Cosmetic gift: `free_gift` setting, `GET /api/storefront/gift`, `giftProductId`/`giftConfirmed` on orders; lens line = non-Cosmetics product. Homepage carousels are full width; lens types use the continuous carousel on web and mobile.
 
 - Gift flash bar + cart gift choice shared with checkout; homepage `showcase` section (config id `showcase`) with big spotlight images; default order puts brands 6th. Keep web and Flutter identical.
+
+- Bulk price/power product actions: `bulkUpdateProductPrices`, `bulkUpdateProductPowerOptions` (catalog-admin.ts), REST `/api/admin/products/bulk-price|bulk-power`. Power defaults extend to -14.00. Mobile admin bulk UI not implemented.

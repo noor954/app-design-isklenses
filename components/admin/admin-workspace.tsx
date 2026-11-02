@@ -47,6 +47,7 @@ import { DeliveryManager } from '@/components/admin/delivery-manager'
 import { ProductVariantManager } from '@/components/admin/product-variant-manager'
 import { MerchandisingManager } from '@/components/admin/merchandising-manager'
 import { CrmWorkspace } from '@/components/admin/crm-workspace'
+import { ProductBulkTools } from '@/components/admin/product-bulk-tools'
 import { DataTable, type DataTableBulkAction, type DataTableColumn } from '@/components/admin/data-table'
 import { Pagination } from '@/components/ui/pagination'
 import { getProductImageSources } from '@/components/storefront/product-image'
@@ -445,6 +446,7 @@ function ProductWorkspace({ canEdit }: { canEdit: boolean }) {
               <button type="button" disabled={bulkBusy} onClick={() => { setSelectedIds(new Set()); setMessage('') }} className="rounded-full px-3 py-2 text-sm text-[#68675f] underline underline-offset-4">Clear</button>
             </>}
           </div>
+          {selectedIds.size > 0 && <ProductBulkTools ids={[...selectedIds]} busy={bulkBusy} run={runBulkAction} />}
         </div>
       )}
       {isLoading ? <LoadingRows label="Loading products" /> : isError ? null : filtered.length === 0 ? (

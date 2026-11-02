@@ -743,3 +743,108 @@ export async function saveProductPageSettings(input: ProductPageSettings) {
     .onConflictDoUpdate({ target: storeSettings.key, set: { value, updatedAt: new Date() } })
   bust()
 }
+
+export type BulkPriceMode = 'set' | 'percent' | 'amount'
+
+function toCents(value: string) {
+  const match = /^(\d{1,10})(?:\.(\d{1,2}))?$/.exec(value)
+  return match ? Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0')) : null
+}
+
+function fromCents(cents: number) {
+  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`
+}
+
+/**
+ * Bulk price update. `set` takes a price (e.g. "1500.00"); `percent` and `amount`
+ * take a signed number (e.g. "-10" or "250"). Variant prices change alongside the product.
+ */
+export async function bulkUpdateProductPrices(
+  ids: string[],
+  mode: BulkPriceMode,
+  value: string,
+  includeCompareAt = true,
+) {
+  await requireAdminSession('admin')
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) throw new Error('Select between 1 and 100 products.')
+  if (!['set', 'percent', 'amount'].includes(mode)) throw new Error('Choose a valid price update type.')
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!/^-?\d{1,10}(?:\.\d{1,2})?$/.test(raw)) throw new Error('Enter a valid number for the price update.')
+  const negative = raw.startsWith('-')
+  const magnitude = toCents(negative ? raw.slice(1) : raw)
+  if (magnitude === null) throw new Error('Enter a valid number for the price update.')
+  if (mode === 'set' && (negative || magnitude <= 0)) throw new Error('The new price must be greater than zero.')
+
+  const adjust = (current: string) => {
+    const cents = toCents(current)
+    if (cents === null) throw new Error('A selected product has an invalid price.')
+    const next = mode === 'set'
+      ? magnitude
+      : mode === 'percent'
+        ? Math.round(cents * (1 + ((negative ? -magnitude : magnitude) / 100) / 100))
+        : cents + (negative ? -magnitude : magnitude)
+    if (next <= 0 || next > 999_999_999_999) throw new Error('The update would make a price zero, negative, or too large.')
+    return fromCents(next)
+  }
+
+  const productIds = [...new Set(ids.map((id) => uuid(id, 'Product')))]
+  await db.transaction(async (tx) => {
+    const products = await tx.select({ id: storeProducts.id, price: storeProducts.price, compareAtPrice: storeProducts.compareAtPrice })
+      .from(storeProducts).where(inArray(storeProducts.id, productIds))
+    if (products.length !== productIds.length) throw new Error('One or more selected products no longer exist.')
+    const variants = await tx.select({ id: storeProductVariants.id, price: storeProductVariants.price })
+      .from(storeProductVariants).where(inArray(storeProductVariants.productId, productIds))
+    const now = new Date()
+    for (const product of products) {
+      const price = adjust(product.price)
+      const compareAtPrice = includeCompareAt && product.compareAtPrice && mode !== 'set' ? adjust(product.compareAtPrice) : product.compareAtPrice
+      await tx.update(storeProducts).set({ price, compareAtPrice, updatedAt: now }).where(eq(storeProducts.id, product.id))
+    }
+    for (const variant of variants) {
+      await tx.update(storeProductVariants).set({ price: adjust(variant.price), updatedAt: now }).where(eq(storeProductVariants.id, variant.id))
+    }
+    await tx.insert(storeActivityEvents).values(productIds.map((id) => ({
+      entityType: 'product',
+      entityId: id,
+      eventType: 'bulk_price_updated',
+      payload: { mode, value: raw, includeCompareAt },
+    })))
+  })
+  bust()
+}
+
+export type BulkPowerMode = 'replace' | 'add' | 'remove'
+
+/** Bulk-edit which power lens values customers can choose on the selected products. */
+export async function bulkUpdateProductPowerOptions(ids: string[], values: string[], mode: BulkPowerMode) {
+  await requireAdminSession('admin')
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) throw new Error('Select between 1 and 100 products.')
+  if (!['replace', 'add', 'remove'].includes(mode)) throw new Error('Choose a valid power update type.')
+  if (!Array.isArray(values) || (mode !== 'replace' && values.length === 0)) throw new Error('Choose at least one power value.')
+  const valid = await currentPowerOptionValues()
+  const validSet = new Set(valid)
+  if (values.some((entry) => typeof entry !== 'string' || !validSet.has(entry))) throw new Error('One or more selected power values are invalid.')
+  const chosen = new Set(values)
+  const productIds = [...new Set(ids.map((id) => uuid(id, 'Product')))]
+
+  await db.transaction(async (tx) => {
+    const products = await tx.select({ id: storeProducts.id, ranges: storeProducts.availablePowerRanges })
+      .from(storeProducts).where(inArray(storeProducts.id, productIds))
+    if (products.length !== productIds.length) throw new Error('One or more selected products no longer exist.')
+    const now = new Date()
+    for (const product of products) {
+      const current = new Set(product.ranges ?? [])
+      const next = mode === 'replace' ? chosen : mode === 'add' ? new Set([...current, ...chosen]) : new Set([...current].filter((entry) => !chosen.has(entry)))
+      await tx.update(storeProducts)
+        .set({ availablePowerRanges: valid.filter((entry) => next.has(entry)), updatedAt: now })
+        .where(eq(storeProducts.id, product.id))
+    }
+    await tx.insert(storeActivityEvents).values(productIds.map((id) => ({
+      entityType: 'product',
+      entityId: id,
+      eventType: 'bulk_power_options_updated',
+      payload: { mode, values },
+    })))
+  })
+  bust()
+}

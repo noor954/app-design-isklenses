@@ -3076,6 +3076,125 @@
           }
         }
       }
+    },
+    "/api/admin/products/bulk-price": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Bulk update product (and variant) prices",
+        "security": [
+          {
+            "adminCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Products with featured, new-arrival, and sale flags."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids",
+                  "mode",
+                  "value"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "set",
+                      "percent",
+                      "amount"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Price for set; signed number for percent/amount"
+                  },
+                  "includeCompareAt": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/products/bulk-power": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Bulk add, remove or replace product power lens values",
+        "security": [
+          {
+            "adminCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Products with featured, new-arrival, and sale flags."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids",
+                  "mode",
+                  "values"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "replace",
+                      "add",
+                      "remove"
+                    ]
+                  },
+                  "values": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "example": "-0.25"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
