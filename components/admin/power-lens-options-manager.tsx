@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { getContentAdmin, saveSetting } from '@/app/actions/content'
 import { Alert, Field, inputClass, primaryButton, secondaryButton } from '@/components/admin/admin-ui'
-import { DEFAULT_POWER_LENS_OPTIONS, normalizePowerLensOptions, type PowerLensOption } from '@/lib/power-lens-options'
+import { DEFAULT_POWER_LENS_OPTIONS, missingStandardPowerOptions, normalizePowerLensOptions, type PowerLensOption } from '@/lib/power-lens-options'
 import { reportError } from '@/lib/ui/notifications'
 
 export function PowerLensOptionsManager({ canEdit }: { canEdit: boolean }) {
@@ -124,6 +124,17 @@ export function PowerLensOptionsManager({ canEdit }: { canEdit: boolean }) {
               className={secondaryButton}
             >
               <Plus size={16} aria-hidden="true" /> Add power option
+            </button>
+            <button
+              type="button"
+              disabled={!canEdit || saving || missingStandardPowerOptions(options).length === 0}
+              onClick={() => {
+                setOptions((current) => [...current, ...missingStandardPowerOptions(current)].sort((a, b) => Number(b.value) - Number(a.value)))
+                setSaved('')
+              }}
+              className={secondaryButton}
+            >
+              Add missing values (0.00 to -14.00)
             </button>
             <button type="button" disabled={!canEdit || saving} onClick={() => void save()} className={primaryButton}>
               <Save size={16} aria-hidden="true" /> {saving ? 'Saving…' : 'Save options'}

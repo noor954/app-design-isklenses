@@ -185,3 +185,9 @@ The independent scaffold at [`services/fastapi/README.md`](../services/fastapi/R
 - A sticky flashing strip ("Choose a free gift on every order · New Launch Gift") appears on every storefront and mobile screen while `GET /api/storefront/gift` reports `config.enabled` with products; it links to the cart.
 - The gift can be chosen in the cart or at checkout; both surfaces share one choice (web: `localStorage` key `isk-free-gift-choice`; mobile: shared app state). The order API contract is unchanged (`giftProductId` + `giftConfirmed`).
 - The homepage has a new big-image `showcase` section (home configuration id `showcase`, defaults to order 1). Default order: hero, showcase, categories, shades, catalog, brands (6th), lens types, guidance, reviews, contact. It is driven by `GET /api/storefront/home` products (featured first) on web and mobile.
+
+## Bulk product price and power options
+
+- `PATCH /api/admin/products/bulk-price` `{ ids (1-100), mode: set|percent|amount, value, includeCompareAt }` updates product and variant prices.
+- `PATCH /api/admin/products/bulk-power` `{ ids (1-100), mode: replace|add|remove, values[] }` edits available power values.
+- Default power values are now 0.00 and -0.25 to -14.00 (0.25 steps); the admin power manager has an "Add missing values" button. Flutter has no bulk product list yet (web/REST only).

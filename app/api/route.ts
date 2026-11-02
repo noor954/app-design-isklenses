@@ -59,6 +59,8 @@ export async function GET() {
           'PATCH /api/admin/products/{productId}/stock',
           'PUT /api/admin/products/{productId}/relations',
           'GET, PATCH /api/admin/products/merchandising',
+          'PATCH /api/admin/products/bulk-price',
+          'PATCH /api/admin/products/bulk-power',
           'POST /api/admin/products/categories',
           'GET, POST, PATCH /api/admin/categories',
           'PUT, DELETE /api/admin/categories/{categoryId}',

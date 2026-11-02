@@ -12,7 +12,7 @@ function buildDefaultOptions(): PowerLensOption[] {
   const options: PowerLensOption[] = [
     { value: '0.00', label: '0.00 - Plain', surcharge: '0.00' },
   ]
-  for (let quarterDiopters = 2; quarterDiopters <= 32; quarterDiopters += 1) {
+  for (let quarterDiopters = 1; quarterDiopters <= 56; quarterDiopters += 1) {
     const value = -quarterDiopters / 4
     options.push({
       value: formatDiopter(value),
@@ -24,6 +24,12 @@ function buildDefaultOptions(): PowerLensOption[] {
 }
 
 export const DEFAULT_POWER_LENS_OPTIONS = buildDefaultOptions()
+
+/** Standard values (0.00 to -14.00 in 0.25 steps) missing from a configured list. */
+export function missingStandardPowerOptions(existing: readonly PowerLensOption[]): PowerLensOption[] {
+  const present = new Set(existing.map((option) => option.value))
+  return DEFAULT_POWER_LENS_OPTIONS.filter((option) => !present.has(option.value))
+}
 
 const powerValuePattern = /^-?(?:0|[1-9]\d{0,2})\.\d{2}$/
 const moneyPattern = /^\d{1,10}(?:\.\d{1,2})?$/
