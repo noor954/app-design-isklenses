@@ -179,3 +179,9 @@ The independent scaffold at [`services/fastapi/README.md`](../services/fastapi/R
 - `GET /api/storefront/gift` returns the offer: `enabled`, `maxItems`, `minLensQuantity`, `badge`, `title`, `message` and eligible in-stock gift products. Admin config is the `free_gift` settings key (`/api/admin/settings`, Admin > Free gift).
 - `POST /api/orders` accepts `giftProductId` and `giftConfirmed`. The gift is valid only when the order has at least `minLensQuantity` units whose product is not in the gift (Cosmetics) category; `giftConfirmed` must be `true`. The server revalidates and adds a $0 "(Free gift)" line. Web and Flutter show a prominent confirmation card before placing the order.
 - Homepage carousels are full width. Section order and styles are identical on web and mobile: categories coverflow, shades infinite-loop, brands (6th) fade-slide, lens types continuous; product tabs use distinct styles.
+
+## Gift banner, cart gift choice and Showcase section
+
+- A sticky flashing strip ("Choose a free gift on every order · New Launch Gift") appears on every storefront and mobile screen while `GET /api/storefront/gift` reports `config.enabled` with products; it links to the cart.
+- The gift can be chosen in the cart or at checkout; both surfaces share one choice (web: `localStorage` key `isk-free-gift-choice`; mobile: shared app state). The order API contract is unchanged (`giftProductId` + `giftConfirmed`).
+- The homepage has a new big-image `showcase` section (home configuration id `showcase`, defaults to order 1). Default order: hero, showcase, categories, shades, catalog, brands (6th), lens types, guidance, reviews, contact. It is driven by `GET /api/storefront/home` products (featured first) on web and mobile.

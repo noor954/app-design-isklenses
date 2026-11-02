@@ -12,7 +12,7 @@ import { reportError } from '@/lib/ui/notifications'
 import { getCartLinePrice } from '@/lib/hooks/use-storefront-cart'
 import { priceWithPowerSurcharge } from '@/lib/power-lens-options'
 import { FreeGiftPicker, type GiftChoice } from '@/components/storefront/free-gift-picker'
-import type { FreeGiftOffer } from '@/lib/free-gift'
+import { useFreeGiftOffer, useGiftChoice, useGiftEligibility } from '@/lib/hooks/use-free-gift'
 
 type Customer = { email: string }
 
@@ -51,18 +51,10 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
   const [submitting, setSubmitting] = useState(false)
   const [orderError, setOrderError] = useState('')
   const checkoutKey = useRef<string | null>(null)
-  const [giftOffer, setGiftOffer] = useState<FreeGiftOffer | null>(null)
-  const [giftChoice, setGiftChoice] = useState<GiftChoice>(null)
+  const giftOffer = useFreeGiftOffer()
+  const [giftChoice, setGiftChoice] = useGiftChoice()
   const [giftInvalid, setGiftInvalid] = useState(false)
 
-  useEffect(() => {
-    let active = true
-    fetch('/api/storefront/gift')
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body) => { if (active && body?.data) setGiftOffer(body.data as FreeGiftOffer) })
-      .catch(() => undefined)
-    return () => { active = false }
-  }, [])
 
   useEffect(() => {
     if (!productsLoading && !productsError) syncProducts(products)
@@ -97,13 +89,7 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
   const freeShippingThreshold = getFreeShippingThreshold(deliveryRules)
   const orderTotalCents = deliveryFeeCents === null ? null : subtotalCents + deliveryFeeCents
 
-  const lensUnits = giftOffer?.categoryId
-    ? lines.reduce((sum, line) => {
-        const ids = line.product.categoryIds?.length ? line.product.categoryIds : line.product.categoryId ? [line.product.categoryId] : []
-        return sum + (ids.includes(giftOffer.categoryId as string) ? 0 : line.quantity)
-      }, 0)
-    : 0
-  const giftEligible = Boolean(giftOffer?.config.enabled && giftOffer.products.length && lensUnits >= giftOffer.config.minLensQuantity)
+  const { eligible: giftEligible } = useGiftEligibility(giftOffer, lines)
   const selectedGift = giftEligible ? giftOffer?.products.find((product) => product.id === giftChoice?.productId) ?? null : null
 
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
@@ -236,6 +222,7 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
         throw new Error(body.error || 'The order could not be placed.')
       }
       clear()
+      setGiftChoice(null)
       router.push('/checkout/confirmation')
     } catch (error) {
       setOrderError(reportError(error, 'The order could not be placed. Your bag is unchanged; try again.'))

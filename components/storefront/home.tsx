@@ -4,6 +4,7 @@ import { ArrowRight, BookOpen, Compass, Eye, Headphones, ShoppingBag, Star, type
 import { Slider } from '@/components/storefront/home/slider'
 import { SectionProgress } from '@/components/storefront/home/section-progress'
 import { HomeScrollMotion } from '@/components/storefront/home/scroll-motion'
+import { Showcase } from '@/components/storefront/home/showcase'
 import { PagedSectionCarousel } from '@/components/storefront/home/paged-section-carousel'
 import { getHomeSectionPage } from '@/lib/data/home-sections'
 import { GalleryCard } from '@/components/storefront/home/gallery-card'
@@ -247,6 +248,10 @@ export async function Home({ chrome }: { chrome: SiteChrome }) {
         label={sectionCopy('hero')?.title ?? 'Featured lens collections'}
       />
       <SectionProgress sections={homeConfiguration.sections} />
+
+      <section id="showcase" aria-labelledby="showcase-heading" style={sectionStyle('showcase')} className="isk-home-section min-h-full snap-start snap-always bg-[#f7fcff] py-8 sm:py-10 lg:flex lg:items-center">
+        <Showcase products={products} title={sectionCopy('showcase')?.title ?? 'Made to be seen'} description={sectionCopy('showcase')?.description} />
+      </section>
 
       <section id="bloom" aria-labelledby="bloom-heading" style={sectionStyle('bloom')} className="isk-home-section min-h-full snap-start snap-always bg-[linear-gradient(180deg,#e8f6fb_0%,#f7fcff_100%)] py-8 sm:py-10 lg:flex lg:items-center">
         <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-10">

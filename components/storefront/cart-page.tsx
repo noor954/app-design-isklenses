@@ -7,12 +7,17 @@ import { cartTotals } from '@/components/storefront/shell/mini-cart'
 import { getProductImageSources, StorefrontProductImage } from '@/components/storefront/product-image'
 import { getCartLinePrice, useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { useProducts } from '@/lib/hooks/use-storefront-data'
+import { FreeGiftPicker } from '@/components/storefront/free-gift-picker'
+import { useFreeGiftOffer, useGiftChoice, useGiftEligibility } from '@/lib/hooks/use-free-gift'
 import { formatPrice } from '@/lib/store-config'
 
 export function CartPage() {
   const { lines, setQuantity, syncProducts, count } = useStorefrontCart()
   const { products, isLoading, isError } = useProducts()
   const totals = cartTotals(lines)
+  const giftOffer = useFreeGiftOffer()
+  const [giftChoice, setGiftChoice] = useGiftChoice()
+  const { eligible: giftEligible } = useGiftEligibility(giftOffer, lines)
 
   useEffect(() => {
     if (!isLoading && !isError) syncProducts(products)
@@ -68,7 +73,12 @@ export function CartPage() {
             )
           })}
         </ul>
-        <aside className="rounded-2xl border border-[#080b10]/10 bg-[#edf8fc] p-6 shadow-[var(--storefront-shadow)] lg:sticky lg:top-32">
+        {giftEligible && giftOffer && (
+          <div className="lg:col-start-1">
+            <FreeGiftPicker offer={giftOffer} choice={giftChoice} invalid={false} onChange={setGiftChoice} />
+          </div>
+        )}
+        <aside className="lg:col-start-2 lg:row-start-1 lg:row-span-2 rounded-2xl border border-[#080b10]/10 bg-[#edf8fc] p-6 shadow-[var(--storefront-shadow)] lg:sticky lg:top-32">
           <h2 className="text-lg font-bold text-[#033473]">Cart totals</h2>
           <dl className="mt-5 space-y-3 text-sm">
             <div className="flex justify-between"><dt>Items</dt><dd>{count}</dd></div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChevronDown, Menu, Phone, Search, ShoppingBag, Truck, User, X } from 'lucide-react'
+import { GiftFlashBar } from '@/components/storefront/shell/gift-flash-bar'
 import { MiniCart } from '@/components/storefront/shell/mini-cart'
 import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { useStorefrontCategories, type ProductCategory } from '@/lib/hooks/use-storefront-categories'
@@ -122,6 +123,7 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
 
   return (
     <header ref={headerRef} className="sticky top-0 z-40 border-b border-[#e6dce1] bg-[#f7fcff]/95 shadow-[0_8px_30px_rgba(21,56,77,0.08)] backdrop-blur-xl">
+      <GiftFlashBar />
       <div className="bg-[#087ba5] text-white">
         <div className="mx-auto flex h-9 max-w-[1440px] items-center justify-between gap-3 px-4 text-xs sm:px-6">
           <p className="hidden min-w-0 flex-1 items-center gap-3 truncate text-white/90 lg:flex" aria-live="off">

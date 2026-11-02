@@ -6,6 +6,12 @@ export const HOME_SECTION_DEFAULTS = [
     description: 'Lead with the shared, editable banner slider.',
   },
   {
+    id: 'showcase',
+    label: 'Showcase',
+    title: 'Made to be seen',
+    description: 'Big, image-led highlights from the featured catalog.',
+  },
+  {
     id: 'bloom',
     label: 'Categories',
     title: 'Browse collections',
@@ -24,16 +30,16 @@ export const HOME_SECTION_DEFAULTS = [
     description: 'Product details and prices come from active listings.',
   },
   {
-    id: 'types',
-    label: 'Lens types',
-    title: 'Shop by lens type',
-    description: 'Browse the lens types linked to active listings.',
-  },
-  {
     id: 'brands',
     label: 'Brands',
     title: 'Shop by brand',
     description: 'Explore a selection from the full brand directory.',
+  },
+  {
+    id: 'types',
+    label: 'Lens types',
+    title: 'Shop by lens type',
+    description: 'Browse the lens types linked to active listings.',
   },
   {
     id: 'why-us',

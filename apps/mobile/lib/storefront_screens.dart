@@ -210,6 +210,28 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                   ],
                 ),
                 (
+                  id: 'showcase',
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _ShowcaseSection(
+                        title: _homeSectionTitle(
+                          data,
+                          'showcase',
+                          'Made to be seen',
+                        ),
+                        subtitle: _homeSectionDescription(
+                          data,
+                          'showcase',
+                          'Big, image-led highlights from the featured catalog.',
+                        ),
+                        products: data.products,
+                        onProduct: widget.onProduct,
+                        onBrowse: () => widget.onBrowse(const StoreBrowseFilter()),
+                      ),
+                    ),
+                  ],
+                ),
+                (
                   id: 'bloom',
                   slivers: [
                     SliverToBoxAdapter(
@@ -879,6 +901,258 @@ class _DirectorySectionState<T> extends State<_DirectorySection<T>> {
             hasMore: _loaded < widget.items.length,
             onNeedMore: _loadMore,
             itemBuilder: (context, index) => widget.itemBuilder(visible[index]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShowcaseSection extends StatelessWidget {
+  const _ShowcaseSection({
+    required this.title,
+    required this.subtitle,
+    required this.products,
+    required this.onProduct,
+    required this.onBrowse,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<StoreProduct> products;
+  final ValueChanged<StoreProduct> onProduct;
+  final VoidCallback onBrowse;
+
+  @override
+  Widget build(BuildContext context) {
+    final withImage = products
+        .where((product) => product.imageUrl != null)
+        .toList(growable: false);
+    final pool = [
+      ...withImage.where((product) => product.isFeatured),
+      ...withImage.where((product) => !product.isFeatured),
+    ];
+    if (pool.isEmpty) return const SizedBox.shrink();
+    final spotlight = pool.first;
+    final tiles = pool.skip(1).take(2).toList(growable: false);
+    final wide = MediaQuery.sizeOf(context).width >= 760;
+
+    Widget spotlightCard() => Material(
+      color: _pale,
+      borderRadius: BorderRadius.circular(28),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => onProduct(spotlight),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment(-0.4, -0.6),
+              radius: 1.2,
+              colors: [Colors.white, Color(0xffd7f0fa), Color(0xffb8e1f0)],
+            ),
+          ),
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: wide ? 1.6 : 1.05,
+                child: Image.network(
+                  spotlight.imageUrl!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.remove_red_eye_outlined, size: 64),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xffd3ff48),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  spotlight.isFeatured ? 'FEATURED' : 'SPOTLIGHT',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                    color: _ink,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (spotlight.brand != null)
+                Text(
+                  spotlight.brand!.toUpperCase(),
+                  style: const TextStyle(
+                    color: _blue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+              Text(
+                spotlight.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 26,
+                  height: 1.1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    _money(spotlight.price, spotlight.currency),
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: () => onProduct(spotlight),
+                    icon: const Icon(Icons.arrow_forward, size: 18),
+                    label: const Text('Shop now'),
+                    style: FilledButton.styleFrom(backgroundColor: _blue),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    Widget tile(StoreProduct product) => Material(
+      color: _pale,
+      borderRadius: BorderRadius.circular(28),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => onProduct(product),
+        child: AspectRatio(
+          aspectRatio: wide ? 1.1 : 1.5,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Image.network(
+                  product.imageUrl!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.center,
+                    colors: [Color(0xd9071d2b), Colors.transparent],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 14,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            _money(product.price, product.currency),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward, color: Colors.white),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final perks = [
+      (Icons.card_giftcard, 'Free gift on every order'),
+      (Icons.verified_outlined, 'Authentic lenses'),
+      (Icons.local_shipping_outlined, 'Cash on delivery'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 30, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeading(
+            title: title,
+            subtitle: subtitle,
+            action: 'Browse all',
+            onAction: onBrowse,
+          ),
+          const SizedBox(height: 15),
+          if (wide)
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 3, child: spotlightCard()),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      children: [
+                        for (final item in tiles) ...[
+                          Expanded(child: tile(item)),
+                          if (item != tiles.last) const SizedBox(height: 14),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            spotlightCard(),
+            for (final item in tiles) ...[const SizedBox(height: 12), tile(item)],
+          ],
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final perk in perks)
+                Chip(
+                  avatar: Icon(perk.$1, size: 18, color: _blue),
+                  label: Text(perk.$2),
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: _rule),
+                ),
+            ],
           ),
         ],
       ),
