@@ -7,6 +7,8 @@ import 'package:uuid/uuid.dart';
 
 const _sessionCookieName = 'isk-lenses-customer-session';
 const _sessionCookieStorageKey = 'customer-session-cookie';
+const _receiptCookieName = 'isk-lenses-order-receipt';
+const _receiptCookieStorageKey = 'order-receipt-cookie';
 const _adminSessionCookieName = 'isk-lenses-admin-session';
 const _adminSessionCookieStorageKey = 'admin-session-cookie';
 const _uuid = Uuid();
@@ -51,9 +53,12 @@ class StoreApi {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final cookie = await _storage.read(key: _sessionCookieStorageKey);
-          if (cookie != null && cookie.isNotEmpty) {
-            options.headers['Cookie'] = cookie;
+          final cookies = [
+            await _storage.read(key: _sessionCookieStorageKey),
+            await _storage.read(key: _receiptCookieStorageKey),
+          ].whereType<String>().where((cookie) => cookie.isNotEmpty).join('; ');
+          if (cookies.isNotEmpty) {
+            options.headers['Cookie'] = cookies;
           }
           handler.next(options);
         },
@@ -106,6 +111,14 @@ class StoreApi {
     if (values == null) return;
     for (final value in values) {
       final cookie = value.split(';').first.trim();
+      if (cookie.startsWith('$_receiptCookieName=')) {
+        if (cookie == '$_receiptCookieName=') {
+          await _storage.delete(key: _receiptCookieStorageKey);
+        } else {
+          await _storage.write(key: _receiptCookieStorageKey, value: cookie);
+        }
+        continue;
+      }
       if (!cookie.startsWith('$_sessionCookieName=')) continue;
       if (cookie == '$_sessionCookieName=') {
         await clearSessionCookie();
@@ -293,6 +306,39 @@ class StoreApi {
     await clearSessionCookie();
   }
 
+  Future<List<Map<String, dynamic>>> getBlogArticles() async {
+    final body = await _getObject('/api/blogs');
+    final data = body['data'];
+    if (data is! List || data.any((item) => item is! Map)) {
+      throw const StoreApiException('The articles response is invalid.');
+    }
+    return data
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> getProductReviews(String slug) =>
+      _getObject('/api/products/${Uri.encodeComponent(slug)}/reviews');
+
+  Future<Map<String, dynamic>> submitProductReview(
+    String slug,
+    Map<String, dynamic> review,
+  ) =>
+      _postObject('/api/products/${Uri.encodeComponent(slug)}/reviews', review);
+
+  Future<List<Map<String, dynamic>>> getBlogResources() async {
+    final body = await _getObject('/api/blog-resources');
+    final data = body['data'];
+    if (data is! List || data.any((item) => item is! Map)) {
+      throw const StoreApiException(
+        'The reading resources response is invalid.',
+      );
+    }
+    return data
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
   Future<List<ShopperOrder>> getOrders() async {
     final body = await _getObject('/api/storefront/orders');
     final values = body['data'];
@@ -303,6 +349,17 @@ class StoreApi {
         .whereType<Map>()
         .map(ShopperOrder.fromJson)
         .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> getOrderDetail(String id) async {
+    final body = await _getObject(
+      '/api/storefront/orders/${Uri.encodeComponent(id)}',
+    );
+    final data = body['data'];
+    if (data is! Map || data['items'] is! List || data['status'] is! String) {
+      throw const StoreApiException('The order details response is invalid.');
+    }
+    return Map<String, dynamic>.from(data);
   }
 
   Future<List<DeliveryRule>> getDeliveryRules() async {
@@ -1249,18 +1306,21 @@ class ShopperSession {
 
 class ShopperOrder {
   const ShopperOrder({
+    required this.id,
     required this.orderNumber,
     required this.status,
     required this.total,
     required this.currency,
   });
 
+  final String id;
   final String orderNumber;
   final String status;
   final String total;
   final String currency;
 
   factory ShopperOrder.fromJson(Map value) => ShopperOrder(
+    id: value['id']?.toString() ?? '',
     orderNumber: value['orderNumber']?.toString() ?? '',
     status: value['status']?.toString() ?? 'pending',
     total: value['total']?.toString() ?? '0',

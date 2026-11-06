@@ -2686,7 +2686,10 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
           return ListView(
             padding: EdgeInsets.zero,
             children: [
-              _InfoContent(path: widget.path, chrome: data.chrome),
+              if (widget.path == '/blogs')
+                _ExternalBlogResources(api: widget.api)
+              else
+                _InfoContent(path: widget.path, chrome: data.chrome),
               StoreSiteFooter(
                 data: data,
                 onPage: (route) => Navigator.of(context).push(
@@ -2702,6 +2705,172 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       ),
     );
   }
+}
+
+class _ExternalBlogResources extends StatefulWidget {
+  const _ExternalBlogResources({required this.api});
+  final StoreApi api;
+
+  @override
+  State<_ExternalBlogResources> createState() => _ExternalBlogResourcesState();
+}
+
+class _ExternalBlogResourcesState extends State<_ExternalBlogResources> {
+  late Future<List<Map<String, dynamic>>> _resources;
+  late Future<List<Map<String, dynamic>>> _articles;
+
+  @override
+  void initState() {
+    super.initState();
+    _resources = widget.api.getBlogResources();
+    _articles = widget.api.getBlogArticles();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(20),
+    child: FutureBuilder<List<Map<String, dynamic>>>(
+      future: _resources,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Reading resources are unavailable.'),
+              TextButton(
+                onPressed: () =>
+                    setState(() => _resources = widget.api.getBlogResources()),
+                child: const Text('Try again'),
+              ),
+            ],
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Lens reading',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: _navy,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'For personal advice, speak with an eye-care professional.',
+            ),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _articles,
+              builder: (context, articles) {
+                if (articles.hasError) {
+                  return TextButton(
+                    onPressed: () => setState(
+                      () => _articles = widget.api.getBlogArticles(),
+                    ),
+                    child: const Text('Articles unavailable. Try again'),
+                  );
+                }
+                if (!articles.hasData) return const CircularProgressIndicator();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final article in articles.data!)
+                      ExpansionTile(
+                        title: Text(article['title']?.toString() ?? ''),
+                        subtitle: Text(article['summary']?.toString() ?? ''),
+                        children: [
+                          for (final section
+                              in (article['sections'] is List
+                                      ? article['sections'] as List
+                                      : const [])
+                                  .whereType<Map>())
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    section['heading']?.toString() ?? '',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  for (final paragraph
+                                      in (section['paragraphs'] is List
+                                          ? section['paragraphs'] as List
+                                          : const []))
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(paragraph.toString()),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Text(
+                              'General information only; consult an eye-care professional. Source: CDC contact lens guidance.',
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'External articles are published by other websites, not ISK Lenses.',
+            ),
+            for (final resource in snapshot.data!) ...[
+              const Divider(height: 32),
+              Text('${resource['publisher']} · External website'),
+              Text(
+                resource['title']?.toString() ?? '',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(resource['description']?.toString() ?? ''),
+              TextButton.icon(
+                onPressed: () async {
+                  final uri = Uri.tryParse(resource['url']?.toString() ?? '');
+                  if (uri != null &&
+                      uri.scheme == 'https' &&
+                      uri.host == 'bellalense.com') {
+                    try {
+                      if (await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      )) {
+                        return;
+                      }
+                    } catch (error) {
+                      debugPrint(
+                        'External article archive could not be opened: $error',
+                      );
+                    }
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Could not open the article archive. Please try again.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Visit archive'),
+              ),
+            ],
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class _InfoContent extends StatelessWidget {
@@ -3146,6 +3315,146 @@ class _EmptyCompare extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+class _ProductReviews extends StatefulWidget {
+  const _ProductReviews({required this.api, required this.slug, super.key});
+  final StoreApi api;
+  final String slug;
+
+  @override
+  State<_ProductReviews> createState() => _ProductReviewsState();
+}
+
+class _ProductReviewsState extends State<_ProductReviews> {
+  late Future<Map<String, dynamic>> _reviews;
+  final _author = TextEditingController();
+  final _text = TextEditingController();
+  int _rating = 5;
+  bool _sending = false;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _reviews = widget.api.getProductReviews(widget.slug);
+  }
+
+  @override
+  void dispose() {
+    _author.dispose();
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_author.text.trim().isEmpty || _text.text.trim().isEmpty) {
+      setState(() => _message = 'Enter your name and review.');
+      return;
+    }
+    setState(() {
+      _sending = true;
+      _message = null;
+    });
+    try {
+      final result = await widget.api.submitProductReview(widget.slug, {
+        'author': _author.text.trim(),
+        'body': _text.text.trim(),
+        'rating': _rating,
+      });
+      if (!mounted) return;
+      _author.clear();
+      _text.clear();
+      setState(() {
+        _message = result['pending'] == true
+            ? 'Thank you. Your review will appear once approved.'
+            : 'Thank you. Your review is live.';
+        _reviews = widget.api.getProductReviews(widget.slug);
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _message =
+              'Your review could not be submitted. Please try again.',
+        );
+      }
+      debugPrint('Review submission failed: $error');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+    future: _reviews,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return TextButton(
+          onPressed: () => setState(
+            () => _reviews = widget.api.getProductReviews(widget.slug),
+          ),
+          child: const Text('Reviews unavailable. Try again'),
+        );
+      }
+      if (!snapshot.hasData) return const SizedBox.shrink();
+      final body = snapshot.data!;
+      final settings = body['settings'];
+      if (settings is! Map || settings['enabled'] != true) {
+        return const SizedBox.shrink();
+      }
+      final reviews = body['data'] is List
+          ? (body['data'] as List).whereType<Map>()
+          : <Map>[];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(height: 32),
+          Text('Reviews', style: Theme.of(context).textTheme.titleLarge),
+          if (reviews.isEmpty) const Text('No reviews yet.'),
+          for (final review in reviews)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('${review['rating']} / 5 · ${review['author']}'),
+              subtitle: Text(
+                [
+                  if (review['title'] is String &&
+                      (review['title'] as String).isNotEmpty)
+                    review['title'],
+                  review['body'],
+                ].join('\n'),
+              ),
+            ),
+          if (settings['allowSubmission'] == true) ...[
+            TextField(
+              controller: _author,
+              maxLength: 80,
+              decoration: const InputDecoration(labelText: 'Your name'),
+            ),
+            DropdownButtonFormField<int>(
+              initialValue: _rating,
+              decoration: const InputDecoration(labelText: 'Rating'),
+              items: [
+                for (var value = 1; value <= 5; value++)
+                  DropdownMenuItem(value: value, child: Text('$value / 5')),
+              ],
+              onChanged: (value) => setState(() => _rating = value ?? 5),
+            ),
+            TextField(
+              controller: _text,
+              maxLength: 2000,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Your review'),
+            ),
+            if (_message != null) Text(_message!),
+            FilledButton(
+              onPressed: _sending ? null : _submit,
+              child: Text(_sending ? 'Submitting…' : 'Submit review'),
+            ),
+          ],
+        ],
+      );
+    },
   );
 }
 
@@ -3624,6 +3933,11 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen>
                 label: const Text('Copy link'),
               ),
             ],
+          ),
+          _ProductReviews(
+            key: ValueKey(product.slug),
+            api: widget.api,
+            slug: product.slug,
           ),
           FutureBuilder<StoreHomeData>(
             future: _footerData,

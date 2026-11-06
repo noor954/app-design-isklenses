@@ -42,6 +42,8 @@ export async function GET() {
           'GET /api/products/{slug}/reviews',
           'POST /api/products/{slug}/reviews',
           'POST /api/products/{slug}/viewers',
+          'GET /api/blog-resources',
+          'GET /api/blogs',
         ],
         shopper: [
           'GET, POST /api/storefront/session',

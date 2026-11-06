@@ -91,6 +91,7 @@ export function AccountPage() {
   return (
     <main className="mx-auto max-w-md px-4 py-14 sm:py-20">
       <h1 className="text-3xl font-bold tracking-tight text-[#033473]">My account</h1>
+      <p className="mt-3 text-sm text-[#314a63]">Placed an order as a guest? <Link href="/checkout/confirmation" className="font-semibold text-[#006f9b] underline">View your latest receipt on this browser</Link>.</p>
       {error && <div role="alert" className="mt-5 rounded-lg border border-[#b20000]/30 bg-[#fff4f2] px-4 py-3 text-sm text-[#7a1c1c]">{error}</div>}
       {loading ? (
         <p className="mt-8 inline-flex items-center gap-2 text-sm text-[#4a5568]"><LoaderCircle size={16} className="animate-spin" /> Checking account…</p>

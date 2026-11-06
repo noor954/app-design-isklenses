@@ -23,6 +23,8 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Catalog | `GET /api/storefront/home/sections/{section}?page=&q=` | Public | Paginated homepage carousels (`categories`, `brands`, `shades`, `lens-types`); max 15 items per page, `hasMore` drives the next call, search (`q`) is uncapped |
 | Catalog | `GET /api/storefront/home` | Public | Canonical home banners plus shared palette/control styles, ordered and visible homepage sections, hero layout/autoplay, site chrome, catalog directories/products, and approved reviews |
 | Catalog | `GET /api/products/{slug}` | Public | One active product with variants and media |
+| Catalog | `GET /api/blog-resources` | Public | Links to third-party lens-reading resources |
+| Catalog | `GET /api/blogs` | Public | Published ISK articles and sections |
 | Catalog | `POST /api/products/{slug}/viewers` | Public, rate-limited | Record anonymous product viewing session and return recent count |
 | Catalog | `GET /api/product-categories` | Public | Active category hierarchy and product counts |
 | Catalog | `GET /api/brands` | Public | Active brands and product counts |
@@ -34,6 +36,7 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Shopper | `GET, POST /api/storefront/session` | Public / shopper cookie | Read session; register, log in, or log out |
 | Shopper | `POST /api/orders` | Public / optional shopper cookie | Place a COD order; server reprices, reserves inventory, and validates delivery |
 | Shopper | `GET /api/storefront/orders` | Shopper cookie | Up to 50 summaries for the signed-in shopper |
+| Shopper | `GET /api/storefront/orders/{orderId}` | Shopper cookie or matching receipt cookie | Current order status, items, totals and delivery address |
 | Integration | `GET /api/chatbot/knowledge?q=...` | Public | FAQ and up to eight matching published products for grounding |
 | Integration | `POST /api/chatbot` | Public, rate-limited | Ask the store assistant using public FAQ/catalog facts only |
 | Integration | `GET /api/chatbot/settings` | Public | Read assistant enabled state and welcome message |
@@ -85,6 +88,12 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Admin | `POST /api/admin/catalog-sync` | Admin cookie, admin role | Sync selected catalog source data |
 
 These REST handlers call the same permission-checked server operations used by the web admin, so server-side role, inventory, validation, and business-transition rules remain authoritative. JSON admin writes reject cross-origin browser requests; native clients may omit `Origin`. Do not call internal Server Action URLs from a mobile app. Upload endpoints remain multipart and use the explicit file/type/size validation described above. All newly added endpoints and payload details are also published in the OpenAPI contract; where an operation uses the reusable `AdminJsonObject` schema, the named server operation provides the authoritative field validation.
+
+Order details are authorized by the shopper session for orders belonging to that account, or by the matching signed `isk-lenses-order-receipt` cookie. Send `receipt` as the order ID to read the most recently issued receipt. Native clients must store this cookie securely and send it alongside the shopper cookie; the Flutter app does so. New receipts last 90 days and are replaced by the next checkout on the same device; previously issued receipts keep their original expiry. Existing guest orders and statuses are unchanged, but old guest orders cannot be recovered from an order number alone. Guests without a valid receipt should contact the store. A status is the latest store-entered order status; there is no separate per-item tracking, courier integration, history, or independent shipment status. Never interpret `paid` or `refunded` as proof of transit or delivery. Expiry or sign-out does not delete orders.
+
+Product reviews are genuine customer submissions or store-entered feedback, not fabricated content. The review GET response includes `settings.enabled`, `settings.allowSubmission`, and `settings.autoApprove` alongside approved reviews; show the review section and submission form according to those flags. Submissions follow the existing moderation setting.
+
+The blog resources endpoint lists external publishers, not hosted articles. Web and Flutter link to the Bella Lense archive on its own site; the archive and its articles are maintained independently. No third-party article text or images are copied. The separate `/api/blogs` endpoint provides original code-managed ISK articles; adding or editing them currently requires a code change and deployment. No blog database tables or admin editor exist.
 
 The home API is the canonical cross-platform design contract. Read `data.content.appearance` for the shared `palette`, `button`, `textbox`, `menu`, and `navigation` values. Read `data.content.configuration` for the visible/order-ranked sections plus `heroLayout` and `heroAutoplayMs`. The banner collection at `data.content.banners` is the same active hero set consumed by the website and mobile storefront. Native clients should treat these values as display settings, preserve API order, and ignore unknown enum values by falling back to the documented sky defaults. Admin clients save these through `PUT /api/admin/content/settings/appearance` or `/api/admin/content/settings/home_configuration`; the server validates every write and database migration `0021_home_and_appearance_settings.sql` must be applied before saving the new settings.
 

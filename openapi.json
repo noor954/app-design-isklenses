@@ -369,6 +369,82 @@
         }
       }
     },
+    "/api/blogs": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List ISK lens-reading articles",
+        "description": "Returns the full text of the currently published code-managed articles. Articles are general information, not medical advice.",
+        "responses": {
+          "200": {
+            "description": "Published articles.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["slug", "title", "summary", "sections", "source"],
+                        "properties": {
+                          "slug": {"type": "string"},
+                          "title": {"type": "string"},
+                          "summary": {"type": "string"},
+                          "source": {"type": "string", "format": "uri"},
+                          "sections": {"type": "array", "items": {
+                            "type": "object",
+                            "required": ["heading", "paragraphs"],
+                            "properties": {"heading": {"type": "string"}, "paragraphs": {"type": "array", "items": {"type": "string"}}}
+                          }}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/blog-resources": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List external lens-reading resources",
+        "description": "Returns links to third-party publishers. Their articles are not hosted by ISK and may change independently.",
+        "responses": {
+          "200": {
+            "description": "External resources.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "title", "publisher", "description", "url"],
+                        "properties": {
+                          "id": {"type": "string"},
+                          "title": {"type": "string"},
+                          "publisher": {"type": "string"},
+                          "description": {"type": "string"},
+                          "url": {"type": "string", "format": "uri"}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/product-categories": {
       "get": {
         "tags": [
@@ -503,6 +579,7 @@
           "Catalog"
         ],
         "summary": "List approved reviews for a published product",
+        "description": "Returns approved reviews and settings.enabled, settings.allowSubmission, and settings.autoApprove. Clients must respect enabled and allowSubmission when displaying reviews and submission controls.",
         "parameters": [
           {
             "$ref": "#/components/parameters/Slug"
@@ -510,11 +587,20 @@
         ],
         "responses": {
           "200": {
-            "description": "Approved reviews.",
+            "description": "Approved reviews and review display/submission settings.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DataResponse"
+                  "type": "object",
+                  "required": ["data", "settings"],
+                  "properties": {
+                    "data": {"type": "array", "items": {"type": "object"}},
+                    "settings": {
+                      "type": "object",
+                      "required": ["enabled", "allowSubmission", "autoApprove"],
+                      "properties": {"enabled": {"type": "boolean"}, "allowSubmission": {"type": "boolean"}, "autoApprove": {"type": "boolean"}}
+                    }
+                  }
                 }
               }
             }
@@ -558,6 +644,47 @@
           "429": {
             "$ref": "#/components/responses/RateLimited"
           }
+        }
+      }
+    },
+    "/api/storefront/orders/{orderId}": {
+      "get": {
+        "tags": ["Shopper"],
+        "summary": "Get an authorized order's current details",
+        "description": "Use the order UUID from the signed-in shopper's order list, or the literal receipt for the latest signed receipt cookie. A receipt also grants access to its matching UUID. Returns only the account owner's order or the order authorized by that cookie. Latest receipt cookies issued at checkout expire after 90 days; a later checkout replaces the previous receipt cookie. Older issued cookies retain their original expiry. Status is the store's current order status; there is no separate courier tracking or per-item transit data.",
+        "parameters": [{"name": "orderId", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {
+          "200": {
+            "description": "Order details and items; no-store.",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "required": ["data"],
+              "properties": {"data": {
+                "type": "object",
+                "required": ["id", "orderNumber", "status", "paymentMethod", "shippingFeeConfirmed", "subtotal", "shippingTotal", "taxTotal", "total", "currency", "shippingAddress", "createdAt", "updatedAt", "items"],
+                "properties": {
+                  "id": {"type": "string", "format": "uuid"},
+                  "orderNumber": {"type": "integer"},
+                  "status": {"type": "string"},
+                  "paymentMethod": {"type": ["string", "null"]},
+                  "shippingFeeConfirmed": {"type": "boolean"},
+                  "subtotal": {"type": "string"}, "shippingTotal": {"type": "string"},
+                  "taxTotal": {"type": "string"}, "total": {"type": "string"},
+                  "currency": {"type": "string"},
+                  "shippingAddress": {"type": "object", "additionalProperties": {"type": "string"}},
+                  "createdAt": {"type": "string", "format": "date-time"},
+                  "updatedAt": {"type": "string", "format": "date-time"},
+                  "items": {"type": "array", "items": {
+                    "type": "object",
+                    "required": ["productName", "powerLeft", "powerRight", "unitPrice", "quantity", "lineTotal"],
+                    "properties": {"productName": {"type": "string"}, "powerLeft": {"type": ["string", "null"]}, "powerRight": {"type": ["string", "null"]}, "unitPrice": {"type": "string"}, "quantity": {"type": "integer"}, "lineTotal": {"type": "string"}}
+                  }}
+                }
+              }}
+            }}}
+          },
+          "404": {"description": "Order does not exist or is not accessible to this session."},
+          "500": {"description": "Order details temporarily unavailable."}
         }
       }
     },
@@ -650,7 +777,7 @@
           "Shopper"
         ],
         "summary": "List the signed-in shopper's orders",
-        "description": "Returns up to 50 order summaries. Customer order details/history beyond these summaries are not implemented.",
+        "description": "Returns up to 50 order summaries. Use each order's id with GET /api/storefront/orders/{orderId} for details.",
         "security": [
           {
             "shopperCookie": []

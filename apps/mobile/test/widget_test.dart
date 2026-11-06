@@ -17,6 +17,70 @@ class _FakeStoreApi extends StoreApi {
   Future<int> recordProductViewer(String slug, String viewerId) async => 1;
 
   @override
+  Future<Map<String, dynamic>> getProductReviews(String slug) async => {
+    'data': [
+      {'author': 'Customer', 'rating': 4, 'body': 'A genuine review'},
+    ],
+    'settings': {
+      'enabled': true,
+      'allowSubmission': true,
+      'autoApprove': false,
+    },
+  };
+
+  @override
+  Future<Map<String, dynamic>> submitProductReview(
+    String slug,
+    Map<String, dynamic> review,
+  ) async => {'pending': true};
+
+  @override
+  Future<List<Map<String, dynamic>>> getBlogArticles() async => [
+    {
+      'slug': 'test',
+      'title': 'Lens care',
+      'summary': 'A guide',
+      'sections': [],
+    },
+  ];
+
+  @override
+  Future<List<Map<String, dynamic>>> getBlogResources() async => [
+    {
+      'id': 'bella-contact-lens-blog',
+      'title': 'Contact lens articles',
+      'publisher': 'Bella Lense',
+      'description':
+          'Browse the publisher’s complete contact lens article archive on its own website.',
+      'url': 'https://bellalense.com/blogs/contact-lenses',
+    },
+  ];
+
+  @override
+  Future<Map<String, dynamic>> getOrderDetail(String id) async => {
+    'orderNumber': 123,
+    'status': 'shipped',
+    'paymentMethod': 'cash_on_delivery',
+    'currency': 'PKR',
+    'subtotal': '100',
+    'shippingTotal': '10',
+    'shippingFeeConfirmed': true,
+    'taxTotal': '0',
+    'total': '110',
+    'shippingAddress': {'city': 'Lahore'},
+    'items': [
+      {
+        'productName': 'Sample lens',
+        'quantity': 1,
+        'unitPrice': '100',
+        'lineTotal': '100',
+        'powerLeft': 'plain',
+        'powerRight': 'plain',
+      },
+    ],
+  };
+
+  @override
   Future<ProductPage> getProducts({
     int page = 1,
     String query = '',
@@ -109,6 +173,70 @@ class _FakeAdminApi extends AdminApi {
 }
 
 void main() {
+  testWidgets('journal identifies external reading resources', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoreInformationScreen(api: _FakeStoreApi(), path: '/blogs'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Bella Lense · External website'), findsOneWidget);
+    expect(find.text('Lens care'), findsOneWidget);
+    expect(find.text('Visit archive'), findsOneWidget);
+  });
+
+  testWidgets('product displays and submits reviews', (tester) async {
+    final product = StoreProduct.fromJson({
+      'id': 'review-test',
+      'name': 'Review lens',
+      'slug': 'review-lens',
+      'price': '100',
+      'currency': 'PKR',
+      'stockQuantity': 1,
+    }, Uri.parse('https://isklenses.com'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoreProductDetailsScreen(
+          api: _FakeStoreApi(),
+          product: product,
+          onAdd: (_) {},
+          onPage: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(
+          of: find.byType(StoreProductDetailsScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('A genuine review'),
+      200,
+      scrollable: scrollable,
+    );
+    expect(find.text('A genuine review'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Submit review'),
+      200,
+      scrollable: scrollable,
+    );
+    await tester.enterText(find.widgetWithText(TextField, 'Your name'), 'Sam');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Your review'),
+      'Good product',
+    );
+    await Scrollable.ensureVisible(tester.element(find.text('Submit review')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit review'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Thank you. Your review will appear once approved.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('plain selection hides power controls and adds at base price', (
     tester,
   ) async {
@@ -498,11 +626,32 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Account'));
     await tester.pumpAndSettle();
+    await Scrollable.ensureVisible(
+      tester.element(find.text('Admin workspace')),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Admin workspace'));
     await tester.pumpAndSettle();
 
     expect(find.text('Admin sign in'), findsOneWidget);
     expect(find.text('Sign in securely'), findsOneWidget);
+  });
+
+  testWidgets('guest receipt shows current status and selected items', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrderDetailScreen(api: _FakeStoreApi(), orderId: 'receipt'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Order #123'), findsOneWidget);
+    expect(find.text('Order status: shipped'), findsOneWidget);
+    expect(find.text('Delivery status: Dispatched'), findsOneWidget);
+    expect(find.text('Sample lens × 1'), findsOneWidget);
+    expect(find.textContaining('Plain lenses'), findsOneWidget);
   });
 
   testWidgets('opens the lens finder from app navigation', (tester) async {

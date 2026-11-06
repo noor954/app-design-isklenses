@@ -14,8 +14,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const { slug } = await params
     const product = await getProduct(slug)
     if (!product) return NextResponse.json({ error: 'Product not found.' }, { status: 404 })
+    const settings = await getProductPageSettings()
     return NextResponse.json(
-      { data: await getApprovedReviews(product.id) },
+      { data: await getApprovedReviews(product.id), settings: settings.reviews },
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {

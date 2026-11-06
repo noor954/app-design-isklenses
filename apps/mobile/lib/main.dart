@@ -1894,6 +1894,21 @@ class CartScreen extends StatelessWidget {
                               ),
                               actions: [
                                 TextButton(
+                                  onPressed: () {
+                                    final navigator = Navigator.of(context);
+                                    navigator.pop();
+                                    navigator.push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => OrderDetailScreen(
+                                          api: api,
+                                          orderId: 'receipt',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('View order'),
+                                ),
+                                TextButton(
                                   onPressed: () => Navigator.pop(context),
                                   child: const Text('Done'),
                                 ),
@@ -2546,6 +2561,18 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 const Divider(height: 32),
                 OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => OrderDetailScreen(
+                        api: widget.api,
+                        orderId: 'receipt',
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('View latest guest order'),
+                ),
+                OutlinedButton.icon(
                   onPressed: _openAdminWorkspace,
                   icon: const Icon(Icons.admin_panel_settings_outlined),
                   label: const Text('Admin workspace'),
@@ -2601,6 +2628,14 @@ class _AccountScreenState extends State<AccountScreen> {
                       leading: const Icon(Icons.receipt_long, color: _navy),
                       title: Text('Order #${order.orderNumber}'),
                       subtitle: Text(order.status.replaceAll('_', ' ')),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => OrderDetailScreen(
+                            api: widget.api,
+                            orderId: order.id,
+                          ),
+                        ),
+                      ),
                       trailing: Text(
                         _money(order.total, order.currency),
                         style: const TextStyle(fontWeight: FontWeight.w700),
@@ -2617,6 +2652,182 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
     );
   }
+}
+
+class OrderDetailScreen extends StatefulWidget {
+  const OrderDetailScreen({
+    required this.api,
+    required this.orderId,
+    super.key,
+  });
+
+  final StoreApi api;
+  final String orderId;
+
+  @override
+  State<OrderDetailScreen> createState() => _OrderDetailScreenState();
+}
+
+class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  late Future<Map<String, dynamic>> _order;
+
+  @override
+  void initState() {
+    super.initState();
+    _order = widget.api.getOrderDetail(widget.orderId);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Order details')),
+    body: FutureBuilder<Map<String, dynamic>>(
+      future: _order,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Order details are unavailable. Guest receipts are available only on the device used at checkout. Contact the store if you need help.',
+                  ),
+                  TextButton(
+                    onPressed: () => setState(
+                      () => _order = widget.api.getOrderDetail(widget.orderId),
+                    ),
+                    child: const Text('Try again'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final order = snapshot.data!;
+        final status = order['status'] as String;
+        final cod = order['paymentMethod'] == 'cash_on_delivery';
+        final transit = switch (status) {
+          'pending' || 'processing' => 'Not dispatched',
+          'shipped' => 'Dispatched',
+          'delivered' => 'Delivered',
+          'cancelled' => 'Cancelled',
+          _ => 'Not recorded',
+        };
+        final address = order['shippingAddress'] is Map
+            ? Map<String, dynamic>.from(order['shippingAddress'] as Map)
+            : <String, dynamic>{};
+        final items = (order['items'] as List).whereType<Map>();
+        final currency = order['currency']?.toString() ?? 'PKR';
+        return RefreshIndicator(
+          onRefresh: () async {
+            final future = widget.api.getOrderDetail(widget.orderId);
+            setState(() => _order = future);
+            try {
+              await future;
+            } catch (_) {
+              /* FutureBuilder displays the error. */
+            }
+          },
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text(
+                'Order #${order['orderNumber']}',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: _navy,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Order status: $status',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text('Delivery status: $transit'),
+              const SizedBox(height: 8),
+              const Text(
+                'Delivery status reflects the store’s order update. Live courier tracking is not available. Pull down to refresh.',
+              ),
+              const Divider(height: 32),
+              Text('Items', style: Theme.of(context).textTheme.titleLarge),
+              for (final item in items)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${item['productName']} × ${item['quantity']}'),
+                  subtitle: Text(
+                    [
+                      '${_money(item['unitPrice']?.toString() ?? '0', currency)} each',
+                      if (item['powerLeft'] == 'plain' &&
+                          item['powerRight'] == 'plain')
+                        'Plain lenses'
+                      else if (item['powerLeft'] != null ||
+                          item['powerRight'] != null)
+                        'Left: ${item['powerLeft'] ?? '—'} D · Right: ${item['powerRight'] ?? '—'} D',
+                    ].join('\n'),
+                  ),
+                  trailing: Text(
+                    _money(item['lineTotal']?.toString() ?? '0', currency),
+                  ),
+                ),
+              const Divider(),
+              _SummaryRow(
+                label: 'Subtotal',
+                value: _money(order['subtotal']?.toString() ?? '0', currency),
+              ),
+              _SummaryRow(
+                label: 'Delivery',
+                value: order['shippingFeeConfirmed'] == true
+                    ? _money(
+                        order['shippingTotal']?.toString() ?? '0',
+                        currency,
+                      )
+                    : 'To be confirmed',
+              ),
+              _SummaryRow(
+                label: 'Tax',
+                value: _money(order['taxTotal']?.toString() ?? '0', currency),
+              ),
+              _SummaryRow(
+                label: 'Total',
+                value: _money(order['total']?.toString() ?? '0', currency),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Delivery details',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              Text(
+                [
+                  address['firstName'],
+                  address['lastName'],
+                ].whereType<String>().join(' '),
+              ),
+              for (final key in [
+                'phone',
+                'addressLine1',
+                'addressLine2',
+                'city',
+                'province',
+                'postalCode',
+                'country',
+              ])
+                if (address[key] is String &&
+                    (address[key] as String).isNotEmpty)
+                  Text(address[key] as String),
+              const SizedBox(height: 12),
+              Text(
+                'Payment: ${cod ? 'Cash on delivery' : order['paymentMethod'] ?? 'Not recorded'}',
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class AdminWorkspaceScreen extends StatefulWidget {

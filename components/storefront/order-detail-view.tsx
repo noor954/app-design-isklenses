@@ -19,7 +19,7 @@ export function OrderDetailView({ order }: { order: Awaited<ReturnType<typeof ge
     <main className="storefront-sky mx-auto min-h-[calc(100vh-72px)] max-w-[1000px] bg-[#edf4ef] px-5 pb-24 text-[#152a52] sm:px-8 lg:px-12">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#152a52]/20 py-4">
         <Link href="/shop" className="text-xs font-bold uppercase tracking-[.1em] hover:text-[#16468a] focus-visible:outline-2 focus-visible:outline-[#16468a]">ISK Lenses / Products</Link>
-        <span className="font-mono text-xs uppercase tracking-[.15em] text-[#314a63]">Cash on delivery</span>
+        <span className="font-mono text-xs uppercase tracking-[.15em] text-[#314a63]">Order details</span>
       </header>
       {order ? (
         <article className="mx-auto max-w-2xl py-10 sm:py-14">
@@ -49,6 +49,7 @@ export function OrderDetailView({ order }: { order: Awaited<ReturnType<typeof ge
               <li key={`${item.productName}-${index}`} className="flex flex-wrap items-start justify-between gap-3 py-4">
                 <span className="max-w-[70%] text-sm leading-5">
                   {item.productName} × {item.quantity}
+                  <span className="mt-1 block text-xs text-[#526b7b]">{formatPrice(item.unitPrice, order.currency)} each</span>
                   {item.powerLeft === 'plain' && item.powerRight === 'plain' ? <span className="mt-1 block text-xs text-[#526b7b]">Plain lenses</span> : (item.powerLeft || item.powerRight) && <span className="mt-1 block text-xs text-[#526b7b]">Left eye: {item.powerLeft ?? '—'} D · Right eye: {item.powerRight ?? '—'} D</span>}
                 </span>
                 <span className="font-mono text-sm">{formatPrice(item.lineTotal, order.currency)}</span>
@@ -58,6 +59,7 @@ export function OrderDetailView({ order }: { order: Awaited<ReturnType<typeof ge
           <div className="space-y-3 border-t border-[#152a52]/25 py-4 text-sm">
             <div className="flex justify-between gap-4"><span>Products subtotal</span><strong>{formatPrice(order.subtotal, order.currency)}</strong></div>
             <div className="flex justify-between gap-4 text-[#314a63]"><span>Delivery charge</span><span>{order.shippingFeeConfirmed ? formatPrice(order.shippingTotal, order.currency) : 'To be confirmed by store'}</span></div>
+            <div className="flex justify-between gap-4 text-[#314a63]"><span>Tax</span><span>{formatPrice(order.taxTotal, order.currency)}</span></div>
             <div className="flex justify-between gap-4 border-t border-[#152a52]/20 pt-3 text-base font-bold"><span>Order total</span><strong>{formatPrice(order.total, order.currency)}</strong></div>
           </div>
           <div className="border border-[#152a52]/20 bg-[#e5f0ec] px-4 py-4 text-sm leading-6 text-[#314a63]">
