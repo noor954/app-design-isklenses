@@ -5,6 +5,15 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val releaseStoreFile = System.getenv("ISK_ANDROID_KEYSTORE")
+val releaseStorePassword = System.getenv("ISK_ANDROID_STORE_PASSWORD")
+val releaseKeyAlias = System.getenv("ISK_ANDROID_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("ISK_ANDROID_KEY_PASSWORD")
+val releaseSigningValues = listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+require(releaseSigningValues.all { it.isNullOrBlank() } || releaseSigningValues.none { it.isNullOrBlank() }) {
+    "Set all four ISK_ANDROID_* release signing variables."
+}
+
 android {
     namespace = "com.isklenses.isk_lenses_mobile"
     compileSdk = flutter.compileSdkVersion
@@ -30,11 +39,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningValues.none { it.isNullOrBlank() }) {
+            create("iskRelease") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("iskRelease") ?: signingConfigs.getByName("debug")
         }
     }
 }

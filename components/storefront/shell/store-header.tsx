@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ChevronDown, Menu, MessageCircle, Phone, Search, ShoppingBag, Truck, User, X } from 'lucide-react'
+import { ChevronDown, Menu, MessageCircle, Phone, Search, ShoppingBag, Smartphone, Truck, User, X } from 'lucide-react'
 import { GiftFlashBar } from '@/components/storefront/shell/gift-flash-bar'
 import { MiniCart } from '@/components/storefront/shell/mini-cart'
 import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
@@ -137,6 +137,7 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
           <a href={chrome.whatsappSupportUrl} target="_blank" rel="noopener noreferrer" aria-label="Connect on WhatsApp" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 font-semibold text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
             <MessageCircle size={16} aria-hidden="true" /> WhatsApp
           </a>
+          <Link href="/mobile-app" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 font-semibold text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"><Smartphone size={16} aria-hidden="true" /> <span className="hidden sm:inline">Get the app</span><span className="sm:hidden">App</span></Link>
           <Link href="/contact-us" className="hidden shrink-0 text-white/90 hover:text-white hover:underline sm:inline">Contact us</Link>
         </div>
       </div>

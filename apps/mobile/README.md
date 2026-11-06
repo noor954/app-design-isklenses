@@ -51,7 +51,15 @@ The Android NDK version is pinned in `android/app/build.gradle.kts` to the valid
 flutter build apk --release --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
 # output: build/app/outputs/flutter-apk/app-release.apk
 ```
-Share the APK, then on the phone allow "Install unknown apps" for the app used to open it (Files/Chrome) and tap the file. Or with USB debugging: `adb install -r app-release.apk`. The release build is signed with the debug key and is for testing only; set up a release keystore before publishing.
+Share the APK, then on the phone allow "Install unknown apps" for the app used to open it (Files/Chrome) and tap the file. Or with USB debugging: `adb install -r app-release.apk`. Without release signing environment variables the local build uses the debug key and is for testing only; never publish it.
+
+### Public Android release
+
+The `/mobile-app` page and `GET /api/mobile/android` look for `isklenses.apk` in the public GitHub release tagged `android-latest`. The release workflow builds on changes under `apps/mobile/` on `main` and can also be started manually on `main`; jobs run only for the repository owner. A successful signed, analyzed and tested build replaces that asset. Until an asset has been published, the page displays an unavailable message. The workflow and page do not publish anything until changes are deployed and the owner configures signing.
+
+The owner must first confirm the permanent application ID (`com.isklenses.isk_lenses_mobile`) and provide a dedicated release keystore, securely backed up outside the repository. Configure GitHub Actions secrets `ANDROID_KEYSTORE_BASE64` (base64-encoded keystore), `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, and `ANDROID_CERT_SHA256` (the release certificate SHA-256 fingerprint). The workflow verifies the APK's actual signing fingerprint before upload. Protect the keystore and retain the same signing key across releases: changing it prevents normal upgrades of existing installations. The workflow build number uses the Actions run number; ensure it exceeds any distributed version codes before enabling it. Enable repository Actions permissions to create releases. Workflow failures leave the prior APK intact until asset replacement; GitHub's replace operation may briefly make it unavailable.
+
+For an explicitly signed local build, provide `ISK_ANDROID_KEYSTORE` (absolute file path), `ISK_ANDROID_STORE_PASSWORD`, `ISK_ANDROID_KEY_ALIAS`, and `ISK_ANDROID_KEY_PASSWORD` in the environment. These are never committed. The previously produced debug-key APK is not a public release.
 
 ### iPhone
 Apple only installs signed apps, so an unsigned bundle needs signing with the tester's Apple ID or a developer account.

@@ -133,7 +133,7 @@ void main() {
     await tester.tap(find.byTooltip('Send'));
     await tester.pumpAndSettle();
     expect(find.text('Unsafe'), findsNothing);
-    await tester.tap(find.text('Connect on WhatsApp'));
+    await tester.tap(find.text('Connect on WhatsApp').last);
     await tester.pump();
     expect(openedUrl, 'https://wa.me/923015740405?text=Hello');
   });

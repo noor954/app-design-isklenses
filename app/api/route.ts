@@ -52,6 +52,7 @@ export async function GET() {
           'POST /api/chatbot',
           'GET /api/chatbot/knowledge',
           'GET /api/chatbot/settings',
+          'GET /api/mobile/android',
           'PUT /api/chatbot/settings',
           'GET, HEAD /api/media/{path}',
           'GET, POST /api/webhooks/meta-leads',

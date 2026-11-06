@@ -63,6 +63,47 @@
         }
       }
     },
+    "/api/mobile/android": {
+      "get": {
+        "tags": ["Integrations"],
+        "summary": "Find the latest available Android app",
+        "description": "Returns the public Android APK release when available. The release lookup is cached for up to 60 seconds; errors are not reported as absence.",
+        "responses": {
+          "200": {
+            "description": "The Android release is available or has not been published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "required": ["status", "downloadUrl", "publishedAt"],
+                          "properties": {
+                            "status": { "const": "available" },
+                            "downloadUrl": { "type": "string", "format": "uri" },
+                            "publishedAt": { "type": "string", "format": "date-time", "description": "Publication time of the release container, not the APK replacement time." }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "required": ["status"],
+                          "properties": { "status": { "const": "unavailable" } }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
     "/api/products": {
       "get": {
         "tags": [
