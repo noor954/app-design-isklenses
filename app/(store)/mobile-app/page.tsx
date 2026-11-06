@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { ArrowDownToLine, Check, Smartphone } from 'lucide-react'
+import Image from 'next/image'
+import { ArrowDownToLine, Check } from 'lucide-react'
 import { getAndroidRelease } from '@/lib/android-release'
 
 export const metadata: Metadata = { title: 'ISK Lenses mobile app', description: 'Explore the ISK Lenses Android app and download the latest available release.' }
@@ -20,9 +21,12 @@ export default async function MobileAppPage() {
             )}
             <p className="mt-3 text-sm text-[#526b7b]">For Android devices. The APK is installed outside Google Play.</p>
           </div>
-          <div aria-hidden="true" className="mx-auto flex h-64 w-40 items-center justify-center rounded-[2rem] border-[7px] border-[#15384d] bg-white shadow-[0_20px_40px_rgba(21,56,77,.18)] sm:h-80 sm:w-48">
-            <div className="text-center text-[#006f9b]"><Smartphone className="mx-auto" size={58} strokeWidth={1.4} /><p className="mt-3 text-xl font-bold">ISK Lenses</p></div>
-          </div>
+          <figure className="mx-auto w-full max-w-[230px] sm:max-w-[260px]">
+            <div className="overflow-hidden rounded-[2rem] border-[7px] border-[#15384d] bg-white shadow-[0_20px_40px_rgba(21,56,77,.18)]">
+              <Image src="/isk-mobile-app-shop.png" width={350} height={720} alt="ISK Lenses Android app showing the shop and lens catalog" sizes="(max-width: 640px) 230px, 260px" className="h-auto w-full" />
+            </div>
+            <figcaption className="mt-3 text-center text-sm text-[#526b7b]">The ISK Lenses Android app</figcaption>
+          </figure>
         </div>
       </section>
       <section className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
