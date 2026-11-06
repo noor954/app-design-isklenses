@@ -2782,6 +2782,17 @@ class _ExternalBlogResourcesState extends State<_ExternalBlogResources> {
                         title: Text(article['title']?.toString() ?? ''),
                         subtitle: Text(article['summary']?.toString() ?? ''),
                         children: [
+                          if (article['image'] is String)
+                            Image.network(
+                              widget.api.assetUrl(article['image'] as String),
+                              semanticLabel:
+                                  article['imageAlt']?.toString() ??
+                                  'Article illustration',
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Text(
+                                    'Article illustration unavailable.',
+                                  ),
+                            ),
                           for (final section
                               in (article['sections'] is List
                                       ? article['sections'] as List

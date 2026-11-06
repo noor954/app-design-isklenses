@@ -9,6 +9,7 @@ export default async function BlogArticlePage({ params }: { params: Promise<{ sl
   if (!article) notFound()
   return (
     <ContentPage title={article.title} intro={article.summary}>
+      <img src={article.image} alt={article.imageAlt} width={960} height={540} className="aspect-video w-full max-w-3xl object-cover" />
       <p>These general tips do not replace advice from your eye-care professional.</p>
       {article.sections.map((section) => (
         <section key={section.heading}>

@@ -150,7 +150,7 @@ export const storeProductRelations = pgTable('store_product_relations', {
 
 export const storeCustomers = pgTable('store_customers', {
   id: uuid('id').defaultRandom().primaryKey(),
-  email: text('email').notNull().unique(),
+  email: text('email').unique(),
   firstName: text('first_name'),
   lastName: text('last_name'),
   phone: text('phone'),

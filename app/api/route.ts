@@ -26,6 +26,9 @@ export async function GET() {
       assistantContact: {
         note: 'POST /api/chatbot returns a WhatsApp support link in data.links for messages mentioning WhatsApp. It remains read-only and retains medical and order-status safeguards.',
       },
+      checkout: {
+        note: 'Guest email and shipping last name, addressLine2 and province are optional. GET /api/storefront/session returns the latest account-owned shipping address for editable autofill; guests receive null.',
+      },
       endpoints: {
         catalog: [
           'GET /api/storefront/home',

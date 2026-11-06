@@ -1958,11 +1958,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _error;
   var _loadingRules = true;
   var _submitting = false;
+  final _editedAddressFields = <String>{};
+
+  Map<String, TextEditingController> get _addressFields => {
+    'firstName': _first,
+    'lastName': _last,
+    'phone': _phone,
+    'addressLine1': _address1,
+    'addressLine2': _address2,
+    'city': _city,
+    'province': _province,
+    'postalCode': _postal,
+  };
 
   @override
   void initState() {
     super.initState();
+    for (final entry in _addressFields.entries) {
+      entry.value.addListener(() => _editedAddressFields.add(entry.key));
+    }
     _loadRules();
+    if (widget.initialEmail != null) _loadSavedAddress();
+  }
+
+  Future<void> _loadSavedAddress() async {
+    try {
+      final session = await widget.api.getSession();
+      if (!mounted || session?.email != widget.initialEmail) return;
+      final address = session?.savedShippingAddress;
+      if (address == null) return;
+      for (final entry in _addressFields.entries) {
+        final value = address[entry.key];
+        if (entry.value.text.isEmpty &&
+            !_editedAddressFields.contains(entry.key) &&
+            value is String) {
+          entry.value.text = value;
+        }
+      }
+    } on StoreApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
   }
 
   @override
@@ -2039,14 +2074,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
             const SizedBox(height: 14),
+            if (widget.initialEmail != null)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Your latest account order can fill these details. You can edit them, and this order’s address will be available next time.',
+                ),
+              ),
             _field(
               _email,
-              'Email',
+              widget.initialEmail == null
+                  ? 'Email (optional)'
+                  : 'Account email',
               keyboardType: TextInputType.emailAddress,
               validator: _validateEmail,
+              readOnly: widget.initialEmail != null,
             ),
             _field(_first, 'First name', validator: _required),
-            _field(_last, 'Last name', validator: _required),
+            _field(_last, 'Last name (optional)'),
             _field(
               _phone,
               'Phone number',
@@ -2056,7 +2101,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _field(_address1, 'Street address', validator: _required),
             _field(_address2, 'Apartment, suite, etc. (optional)'),
             _field(_city, 'City', validator: _required),
-            _field(_province, 'Province or territory', validator: _required),
+            _field(_province, 'Province or territory (optional)'),
             _field(_postal, 'Postal code (optional)'),
             if (_giftEligible) ...[
               const SizedBox(height: 10),
@@ -2141,11 +2186,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     String label, {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    bool readOnly = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextFormField(
         controller: controller,
+        readOnly: readOnly,
         keyboardType: keyboardType,
         textCapitalization: keyboardType == TextInputType.emailAddress
             ? TextCapitalization.none
@@ -2160,7 +2207,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       value == null || value.trim().isEmpty ? 'This field is required.' : null;
 
   String? _validateEmail(String? value) {
-    if (value == null ||
+    if (value == null || value.trim().isEmpty) return null;
+    if (value.trim().length > 254 ||
         !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value.trim())) {
       return 'Enter a valid email address.';
     }

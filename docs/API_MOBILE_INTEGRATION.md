@@ -24,7 +24,7 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Catalog | `GET /api/storefront/home` | Public | Canonical home banners plus shared palette/control styles, ordered and visible homepage sections, hero layout/autoplay, site chrome, catalog directories/products, and approved reviews |
 | Catalog | `GET /api/products/{slug}` | Public | One active product with variants and media |
 | Catalog | `GET /api/blog-resources` | Public | Links to third-party lens-reading resources |
-| Catalog | `GET /api/blogs` | Public | Published ISK articles and sections |
+| Catalog | `GET /api/blogs` | Public | Published ISK articles, sections, and original illustration paths and alt text |
 | Catalog | `POST /api/products/{slug}/viewers` | Public, rate-limited | Record anonymous product viewing session and return recent count |
 | Catalog | `GET /api/product-categories` | Public | Active category hierarchy and product counts |
 | Catalog | `GET /api/brands` | Public | Active brands and product counts |
@@ -91,9 +91,11 @@ These REST handlers call the same permission-checked server operations used by t
 
 Order details are authorized by the shopper session for orders belonging to that account, or by the matching signed `isk-lenses-order-receipt` cookie. Send `receipt` as the order ID to read the most recently issued receipt. Native clients must store this cookie securely and send it alongside the shopper cookie; the Flutter app does so. New receipts last 90 days and are replaced by the next checkout on the same device; previously issued receipts keep their original expiry. Existing guest orders and statuses are unchanged, but old guest orders cannot be recovered from an order number alone. Guests without a valid receipt should contact the store. A status is the latest store-entered order status; there is no separate per-item tracking, courier integration, history, or independent shipment status. Never interpret `paid` or `refunded` as proof of transit or delivery. Expiry or sign-out does not delete orders.
 
+`GET /api/storefront/session` also returns `savedShippingAddress`, the shipping address from the most recent order explicitly associated with the authenticated account, or `null` for guests and accounts without orders. Use it only to prefill editable, untouched fields; clear account-derived values on sign-out. It is not a separately managed address book and guest orders are never used for account autofill. Checkout accepts optional guest email, last name, address line 2, and province; a supplied email must be valid. A guest without email receives a separate customer record with a null email, not a fabricated address or a shared anonymous identity. Apply migration `0025_optional_customer_email.sql` before deploying this checkout; existing records are not modified.
+
 Product reviews are genuine customer submissions or store-entered feedback, not fabricated content. The review GET response includes `settings.enabled`, `settings.allowSubmission`, and `settings.autoApprove` alongside approved reviews; show the review section and submission form according to those flags. Submissions follow the existing moderation setting.
 
-The blog resources endpoint lists external publishers, not hosted articles. Web and Flutter link to the Bella Lense archive on its own site; the archive and its articles are maintained independently. No third-party article text or images are copied. The separate `/api/blogs` endpoint provides original code-managed ISK articles; adding or editing them currently requires a code change and deployment. No blog database tables or admin editor exist.
+The blog resources endpoint lists external publishers, not hosted articles. Web and Flutter link to the Bella Lense archive on its own site; the archive and its articles are maintained independently. No third-party article text or images are copied. The separate `/api/blogs` endpoint provides original code-managed ISK articles; `image` is a same-origin path to an original illustration, and `imageAlt` describes it. These illustrations are not product photos. Adding or editing articles currently requires a code change and deployment. No blog database tables or admin editor exist.
 
 The home API is the canonical cross-platform design contract. Read `data.content.appearance` for the shared `palette`, `button`, `textbox`, `menu`, and `navigation` values. Read `data.content.configuration` for the visible/order-ranked sections plus `heroLayout` and `heroAutoplayMs`. The banner collection at `data.content.banners` is the same active hero set consumed by the website and mobile storefront. Native clients should treat these values as display settings, preserve API order, and ignore unknown enum values by falling back to the documented sky defaults. Admin clients save these through `PUT /api/admin/content/settings/appearance` or `/api/admin/content/settings/home_configuration`; the server validates every write and database migration `0021_home_and_appearance_settings.sql` must be applied before saving the new settings.
 
@@ -158,7 +160,7 @@ For guest or signed-in checkout, first load `/api/delivery-rules`. Compute the m
 }
 ```
 
-Use the same `checkoutKey` only when retrying the same checkout attempt; generate a new UUID for a new attempt. `email` is required for guests and should be omitted for an authenticated shopper. Payment is cash on delivery only; there is no online payment API. The cart is client-side state. Shopper order history currently returns summaries, not full order-line details.
+Use the same `checkoutKey` only when retrying the same checkout attempt; generate a new UUID for a new attempt. `email` is optional for guests and should be omitted for an authenticated shopper. Payment is cash on delivery only; there is no online payment API. The cart is client-side state. Shopper order history returns summaries; authorized order detail is available separately.
 
 The UUIDs in the JSON are illustrative: replace `productId` with an actual UUID returned by the catalog, and generate a fresh `checkoutKey` per checkout attempt.
 

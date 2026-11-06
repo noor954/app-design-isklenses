@@ -11,6 +11,9 @@ import {
 import { consumePublicRateLimit } from '@/lib/auth/public-rate-limit'
 import { isSameOriginOrNativeRequest } from '@/lib/http/api-origin'
 import { JsonBodyError, readJsonBody } from '@/lib/http/json-body'
+import { desc, eq } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { storeOrders } from '@/lib/db/schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +37,10 @@ function knownError(error: unknown) {
 export async function GET() {
   try {
     const customer = await getCustomerSession()
-    return response({ customer: customer ? { email: customer.email } : null })
+    const [order] = customer ? await db.select({ shippingAddress: storeOrders.shippingAddress })
+      .from(storeOrders).where(eq(storeOrders.accountId, customer.customerId))
+      .orderBy(desc(storeOrders.createdAt), desc(storeOrders.orderNumber)).limit(1) : []
+    return response({ customer: customer ? { email: customer.email } : null, savedShippingAddress: order?.shippingAddress ?? null })
   } catch (error) {
     return knownError(error)
   }

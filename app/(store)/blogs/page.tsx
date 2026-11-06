@@ -12,10 +12,14 @@ export default function Page() {
     <ContentPage title="Lens reading" intro="Guides to choosing and caring for contact lenses.">
       <section aria-label="ISK articles" className="divide-y divide-[#cfe2eb] border-y border-[#cfe2eb]">
         {blogArticles.map((article) => (
-          <article key={article.slug} className="py-6">
-            <h2><Link href={`/blogs/${article.slug}`}>{article.title}</Link></h2>
-            <p className="mt-1 text-sm text-[#526b7b]">{article.summary}</p>
-            <Link href={`/blogs/${article.slug}`} className="mt-3 inline-block">Read article</Link>
+          <article key={article.slug} className="grid gap-5 py-6 sm:grid-cols-[200px_1fr]">
+            {/* Original editorial illustration, not product photography. */}
+            <img src={article.image} alt={article.imageAlt} width={960} height={540} className="aspect-video w-full object-cover" />
+            <div>
+              <h2><Link href={`/blogs/${article.slug}`}>{article.title}</Link></h2>
+              <p className="mt-1 text-sm text-[#526b7b]">{article.summary}</p>
+              <Link href={`/blogs/${article.slug}`} className="mt-3 inline-block">Read article</Link>
+            </div>
           </article>
         ))}
       </section>

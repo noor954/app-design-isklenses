@@ -387,11 +387,13 @@
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "required": ["slug", "title", "summary", "sections", "source"],
+                        "required": ["slug", "title", "summary", "image", "imageAlt", "sections", "source"],
                         "properties": {
                           "slug": {"type": "string"},
                           "title": {"type": "string"},
                           "summary": {"type": "string"},
+                          "image": {"type": "string", "description": "Same-origin path to an original illustration, not product photography."},
+                          "imageAlt": {"type": "string"},
                           "source": {"type": "string", "format": "uri"},
                           "sections": {"type": "array", "items": {
                             "type": "object",
@@ -696,7 +698,19 @@
         "summary": "Read the current shopper session",
         "responses": {
           "200": {
-            "description": "Current shopper or null; no-store."
+            "description": "Current shopper and latest account-owned shipping address, or null values for a guest; no-store. Only account-owned orders are used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["customer", "savedShippingAddress"],
+                  "properties": {
+                    "customer": {"oneOf": [{"type": "null"}, {"type": "object", "required": ["email"], "properties": {"email": {"type": "string", "format": "email"}}}]},
+                    "savedShippingAddress": {"type": ["object", "null"], "additionalProperties": {"type": "string"}, "description": "Latest account-owned order's editable shipping address, or null."}
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -4060,18 +4074,15 @@
           },
           "email": {
             "type": "string",
-            "format": "email",
-            "description": "Required for guest checkout; omit for a signed-in shopper."
+            "description": "Optional for guests (empty string or valid email); ignored for signed-in shoppers."
           },
           "shippingAddress": {
             "type": "object",
             "required": [
               "firstName",
-              "lastName",
               "phone",
               "addressLine1",
-              "city",
-              "province"
+              "city"
             ],
             "properties": {
               "firstName": {

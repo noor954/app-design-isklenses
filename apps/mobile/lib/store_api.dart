@@ -281,7 +281,13 @@ class StoreApi {
       await clearSessionCookie();
       return null;
     }
-    return ShopperSession(email: customer['email'] as String);
+    final address = body['savedShippingAddress'];
+    return ShopperSession(
+      email: customer['email'] as String,
+      savedShippingAddress: address is Map
+          ? Map<String, dynamic>.from(address)
+          : null,
+    );
   }
 
   Future<ShopperSession> authenticate({
@@ -1300,8 +1306,9 @@ int? moneyToCents(String value) {
 }
 
 class ShopperSession {
-  const ShopperSession({required this.email});
+  const ShopperSession({required this.email, this.savedShippingAddress});
   final String email;
+  final Map<String, dynamic>? savedShippingAddress;
 }
 
 class ShopperOrder {

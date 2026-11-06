@@ -51,6 +51,8 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
   const [submitting, setSubmitting] = useState(false)
   const [orderError, setOrderError] = useState('')
   const checkoutKey = useRef<string | null>(null)
+  const deliveryForm = useRef<HTMLFormElement>(null)
+  const editedDeliveryFields = useRef(new Set<string>())
   const giftOffer = useFreeGiftOffer()
   const [giftChoice, setGiftChoice] = useGiftChoice()
   const [giftInvalid, setGiftInvalid] = useState(false)
@@ -68,6 +70,13 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
       const body = await response.json()
       if (!response.ok) throw new Error(body.error || 'Account status could not be checked.')
       setCustomer(body.customer && typeof body.customer.email === 'string' ? body.customer : null)
+      if (body.customer && body.savedShippingAddress && deliveryForm.current) {
+        for (const name of ['firstName', 'lastName', 'phone', 'addressLine1', 'addressLine2', 'city', 'province', 'postalCode']) {
+          const field = deliveryForm.current.elements.namedItem(name)
+          const value = body.savedShippingAddress[name]
+          if (field instanceof HTMLInputElement && !field.value && !editedDeliveryFields.current.has(name) && typeof value === 'string') field.value = value
+        }
+      }
       setAuthMode('guest')
     } catch (error) {
       setAuthError(reportError(error, 'Account status could not be checked.'))
@@ -111,7 +120,7 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
       })
       const body = await response.json()
       if (!response.ok) throw new Error(body.error || 'Account access could not be completed.')
-      setCustomer(body.customer)
+      await readCustomerSession()
       setAccountMessage(authMode === 'register' ? 'Account created. Your bag is ready for checkout.' : 'Signed in. Your bag is ready for checkout.')
       setAuthMode('guest')
       formElement.reset()
@@ -134,6 +143,8 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
       const body = await response.json()
       if (!response.ok) throw new Error(body.error || 'Sign out could not be completed.')
       setCustomer(null)
+      deliveryForm.current?.reset()
+      editedDeliveryFields.current.clear()
       setAccountMessage('')
       setAuthMode('guest')
     } catch (error) {
@@ -329,21 +340,25 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
             )}
           </section>
 
-          <form onSubmit={submitOrder}>
+          <form ref={deliveryForm} onSubmit={submitOrder} onInput={(event) => {
+            if (event.target instanceof HTMLInputElement) editedDeliveryFields.current.add(event.target.name)
+          }}>
           <section aria-labelledby="delivery-heading" className="border-b border-[#152a52]/20 py-7">
             <h2 id="delivery-heading" className="text-xl font-bold tracking-[-.035em]">Delivery details</h2>
-            <p className="mt-1 text-sm leading-6 text-[#314a63]">Enter where the order should be delivered in Pakistan.</p>
+            <p className="mt-1 text-sm leading-6 text-[#314a63]">
+              {customer ? 'Your latest account order can fill these details. Edit them as needed; this order’s address will be available next time.' : 'Enter where the order should be delivered in Pakistan.'}
+            </p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               {!customer && (
-                <label className="block text-xs font-semibold sm:col-span-2">Email
-                  <input name="email" type="email" required maxLength={254} autoComplete="email" className={`${inputClass} mt-1.5`} />
+                <label className="block text-xs font-semibold sm:col-span-2">Email (optional)
+                  <input name="email" type="email" maxLength={254} autoComplete="email" className={`${inputClass} mt-1.5`} />
                 </label>
               )}
               <label className="block text-xs font-semibold">First name
                 <input name="firstName" required maxLength={100} autoComplete="given-name" className={`${inputClass} mt-1.5`} />
               </label>
-              <label className="block text-xs font-semibold">Last name
-                <input name="lastName" required maxLength={100} autoComplete="family-name" className={`${inputClass} mt-1.5`} />
+              <label className="block text-xs font-semibold">Last name (optional)
+                <input name="lastName" maxLength={100} autoComplete="family-name" className={`${inputClass} mt-1.5`} />
               </label>
               <label className="block text-xs font-semibold sm:col-span-2">Phone number
                 <input name="phone" type="tel" required maxLength={30} autoComplete="tel" placeholder="+92 300 1234567" className={`${inputClass} mt-1.5`} />
@@ -357,8 +372,8 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
               <label className="block text-xs font-semibold">City
                 <input name="city" required maxLength={100} autoComplete="address-level2" className={`${inputClass} mt-1.5`} />
               </label>
-              <label className="block text-xs font-semibold">Province or territory
-                <input name="province" required maxLength={100} autoComplete="address-level1" className={`${inputClass} mt-1.5`} />
+              <label className="block text-xs font-semibold">Province or territory (optional)
+                <input name="province" maxLength={100} autoComplete="address-level1" className={`${inputClass} mt-1.5`} />
               </label>
               <label className="block text-xs font-semibold">Postal code <span className="font-normal text-[#314a63]">(optional)</span>
                 <input name="postalCode" maxLength={20} autoComplete="postal-code" className={`${inputClass} mt-1.5`} />

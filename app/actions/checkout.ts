@@ -76,11 +76,12 @@ function requiredText(value: unknown, field: string, maximum: number) {
 }
 
 function optionalText(value: unknown, field: string, maximum: number) {
-  if (value === undefined || value === null || value === '') return ''
+  if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) return ''
   return requiredText(value, field, maximum)
 }
 
 function normalizeEmail(value: unknown) {
+  if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) return null
   if (typeof value !== 'string') throw new CheckoutError('Enter a valid email address.')
   const email = value.trim().toLowerCase()
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -162,12 +163,12 @@ function parseOrderInput(value: unknown) {
   if (digitCount < 7 || digitCount > 15) throw new CheckoutError('Enter a phone number with 7 to 15 digits.')
   const shippingAddress: ShippingAddress = {
     firstName: requiredText(address.firstName, 'First name', 100),
-    lastName: requiredText(address.lastName, 'Last name', 100),
+    lastName: optionalText(address.lastName, 'Last name', 100),
     phone,
     addressLine1: requiredText(address.addressLine1, 'Street address', 250),
     addressLine2: optionalText(address.addressLine2, 'Address line 2', 250),
     city: requiredText(address.city, 'City', 100),
-    province: requiredText(address.province, 'Province or territory', 100),
+    province: optionalText(address.province, 'Province or territory', 100),
     postalCode: optionalText(address.postalCode, 'Postal code', 20),
     country: 'Pakistan',
   }
@@ -432,7 +433,7 @@ async function submitCodOrderImpl(value: unknown) {
           .limit(1)
           .for('update')
         if (
-          !customer?.passwordHash ||
+          !customer?.passwordHash || !customer.email ||
           customer.sessionVersion !== session.sessionVersion ||
           customer.email.toLowerCase() !== session.email.toLowerCase()
         ) {
@@ -441,13 +442,13 @@ async function submitCodOrderImpl(value: unknown) {
         customerId = customer.id
       } else {
         const email = normalizeEmail(input.email)
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${email}, 0))`)
-        const [existing] = await tx
+        if (email) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${email}, 0))`)
+        const [existing] = email ? await tx
           .select({ id: storeCustomers.id })
           .from(storeCustomers)
           .where(sql`lower(${storeCustomers.email}) = ${email}`)
           .limit(1)
-          .for('update')
+          .for('update') : []
         if (existing) {
           customerId = existing.id
         } else {

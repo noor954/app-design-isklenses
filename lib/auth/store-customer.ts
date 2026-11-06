@@ -139,7 +139,7 @@ export async function registerStoreCustomer(emailValue: unknown, passwordValue: 
       .insert(storeCustomers)
       .values({ email, passwordHash, sessionVersion: 1 })
       .returning({ id: storeCustomers.id, email: storeCustomers.email, sessionVersion: storeCustomers.sessionVersion })
-    if (!customer) throw new Error('The customer account was not created.')
+    if (!customer?.email) throw new Error('The customer account was not created.')
     return { customerId: customer.id, email: customer.email, sessionVersion: customer.sessionVersion }
   })
 }
@@ -159,7 +159,7 @@ export async function verifyStoreCustomerCredentials(emailValue: unknown, passwo
         .where(sql`lower(${storeCustomers.email}) = ${email}`)
         .limit(1)
     : []
-  if (!(await verifyPassword(passwordValue, customer?.passwordHash ?? null)) || !customer) return null
+  if (!(await verifyPassword(passwordValue, customer?.passwordHash ?? null)) || !customer?.email) return null
   return { customerId: customer.id, email: customer.email, sessionVersion: customer.sessionVersion }
 }
 
@@ -209,7 +209,7 @@ export async function getCustomerSession(): Promise<StoreCustomerSession | null>
     .where(eq(storeCustomers.id, session.customerId))
     .limit(1)
   if (
-    !customer?.passwordHash ||
+    !customer?.passwordHash || !customer.email ||
     customer.sessionVersion !== session.sessionVersion ||
     !constantTimeEqual(customer.email.toLowerCase(), session.email.toLowerCase())
   ) return null

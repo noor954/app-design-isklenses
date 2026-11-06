@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isk_lenses_mobile/admin_product_editor.dart';
 import 'package:isk_lenses_mobile/main.dart';
+import 'package:isk_lenses_mobile/free_gift_widgets.dart';
 import 'package:isk_lenses_mobile/store_api.dart';
 import 'package:isk_lenses_mobile/storefront_screens.dart';
 
@@ -172,7 +175,69 @@ class _FakeAdminApi extends AdminApi {
   }) async => {'data': []};
 }
 
+class _AddressStoreApi extends _FakeStoreApi {
+  final session = Completer<ShopperSession?>();
+
+  @override
+  Future<ShopperSession?> getSession() => session.future;
+}
+
 void main() {
+  testWidgets('checkout fills only untouched account address fields', (
+    tester,
+  ) async {
+    final api = _AddressStoreApi();
+    final gift = GiftSelectionState();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CheckoutScreen(
+          api: api,
+          cart: const [],
+          initialEmail: 'shopper@example.com',
+          giftSelection: gift,
+        ),
+      ),
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'First name'),
+      'Edited',
+    );
+    api.session.complete(
+      const ShopperSession(
+        email: 'shopper@example.com',
+        savedShippingAddress: {
+          'firstName': 'Saved',
+          'phone': '03001234567',
+          'addressLine1': 'Saved street',
+          'city': 'Lahore',
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.widgetWithText(TextFormField, 'First name'),
+          )
+          .controller!
+          .text,
+      'Edited',
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.widgetWithText(TextFormField, 'Street address'),
+          )
+          .controller!
+          .text,
+      'Saved street',
+    );
+    expect(find.text('Account email'), findsOneWidget);
+    expect(find.text('Last name (optional)'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    gift.dispose();
+  });
+
   testWidgets('journal identifies external reading resources', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
