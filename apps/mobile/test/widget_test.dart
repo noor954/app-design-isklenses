@@ -14,6 +14,9 @@ class _FakeStoreApi extends StoreApi {
   Future<ShopperSession?> getSession() async => null;
 
   @override
+  Future<int> recordProductViewer(String slug, String viewerId) async => 1;
+
+  @override
   Future<ProductPage> getProducts({
     int page = 1,
     String query = '',
@@ -126,6 +129,7 @@ void main() {
       ],
     }, Uri.parse('https://isklenses.com'));
     CartLine? added;
+    StoreProduct? compared;
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -138,6 +142,7 @@ void main() {
                     product: product,
                     onAdd: (line) => added = line,
                     onPage: (_) {},
+                    onCompare: (item) => compared = item,
                   ),
                 ),
               ),
@@ -171,6 +176,29 @@ void main() {
     await tester.tap(find.text('Plain lenses'));
     await tester.pumpAndSettle();
     expect(find.text('Left eye'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Compare'),
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(StoreProductDetailsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(
+      find.text('1 viewing session in the last 2 minutes'),
+      findsOneWidget,
+    );
+    expect(find.text('Ask a question'), findsOneWidget);
+    expect(find.text('Copy link'), findsOneWidget);
+    await Scrollable.ensureVisible(
+      tester.element(find.text('Compare')),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Compare'));
+    expect(compared?.id, product.id);
     await tester.scrollUntilVisible(
       find.text('Add to bag'),
       250,

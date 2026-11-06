@@ -560,6 +560,10 @@ async function submitCodOrderImpl(value: unknown) {
 export async function getOrderConfirmation() {
   const receipt = await getOrderReceipt()
   if (!receipt) return null
+  return getOrderDetail(receipt.orderId)
+}
+
+export async function getOrderDetail(orderId: string) {
   const [order] = await db
     .select({
       id: storeOrders.id,
@@ -573,9 +577,12 @@ export async function getOrderConfirmation() {
       total: storeOrders.total,
       currency: storeOrders.currency,
       shippingAddress: storeOrders.shippingAddress,
+      accountId: storeOrders.accountId,
+      createdAt: storeOrders.createdAt,
+      updatedAt: storeOrders.updatedAt,
     })
     .from(storeOrders)
-    .where(eq(storeOrders.id, receipt.orderId))
+    .where(eq(storeOrders.id, orderId))
     .limit(1)
   if (!order) return null
   const items = await db

@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 
 import 'isk_carousel.dart';
 import 'store_api.dart';
@@ -3153,6 +3155,7 @@ class StoreProductDetailsScreen extends StatefulWidget {
     required this.product,
     required this.onAdd,
     required this.onPage,
+    this.onCompare,
     super.key,
   });
 
@@ -3160,13 +3163,15 @@ class StoreProductDetailsScreen extends StatefulWidget {
   final StoreProduct product;
   final ValueChanged<CartLine> onAdd;
   final ValueChanged<String> onPage;
+  final ValueChanged<StoreProduct>? onCompare;
 
   @override
   State<StoreProductDetailsScreen> createState() =>
       _StoreProductDetailsScreenState();
 }
 
-class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
+class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen>
+    with WidgetsBindingObserver {
   ProductVariant? _variant;
   String? _lensChoice;
   String? _leftPower;
@@ -3174,6 +3179,106 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
   String? _error;
   var _imageIndex = 0;
   late Future<StoreHomeData> _footerData;
+  String _viewerId = const Uuid().v4();
+  Timer? _viewerTimer;
+  int? _viewerCount;
+  bool _viewerRequestPending = false;
+  bool _appIsResumed = true;
+
+  Future<void> _recordViewer() async {
+    if (!mounted ||
+        !_appIsResumed ||
+        ModalRoute.of(context)?.isCurrent == false ||
+        _viewerRequestPending) {
+      return;
+    }
+    _viewerRequestPending = true;
+    final slug = widget.product.slug;
+    try {
+      final count = await widget.api.recordProductViewer(slug, _viewerId);
+      if (mounted &&
+          widget.product.slug == slug &&
+          _appIsResumed &&
+          ModalRoute.of(context)?.isCurrent != false) {
+        setState(() => _viewerCount = count);
+      }
+    } catch (error) {
+      debugPrint('Viewer count unavailable: $error');
+      if (mounted && widget.product.slug == slug) {
+        setState(() => _viewerCount = null);
+      }
+    } finally {
+      _viewerRequestPending = false;
+      if (mounted && widget.product.slug != slug) unawaited(_recordViewer());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appIsResumed = state == AppLifecycleState.resumed;
+    if (_appIsResumed) {
+      unawaited(_recordViewer());
+    } else if (mounted) {
+      setState(() => _viewerCount = null);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant StoreProductDetailsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.slug != widget.product.slug) {
+      _viewerId = const Uuid().v4();
+      _viewerCount = null;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(_recordViewer()),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _viewerTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _askProductQuestion() async {
+    final uri = Uri.https('wa.me', '/923015740405', {
+      'text': 'Hello, I have a question about ${widget.product.name}:',
+    });
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (error) {
+      debugPrint('Product question link could not be opened: $error');
+    }
+    if (mounted) {
+      setState(() => _error = 'Could not open WhatsApp. Please try again.');
+    }
+  }
+
+  Future<void> _copyProductLink() async {
+    try {
+      await Clipboard.setData(
+        ClipboardData(
+          text: widget.api.assetUrl(
+            '/product/${Uri.encodeComponent(widget.product.slug)}',
+          ),
+        ),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Product link copied.')));
+      }
+    } catch (error) {
+      debugPrint('Product link could not be copied: $error');
+      if (mounted) {
+        setState(
+          () => _error = 'Could not copy the product link. Please try again.',
+        );
+      }
+    }
+  }
 
   Future<void> _confirmToricOrder() async {
     final link = widget.product.orderingPolicy?['whatsappUrl']?.toString();
@@ -3199,6 +3304,14 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
   void initState() {
     super.initState();
     _footerData = widget.api.getHomeData();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_recordViewer()),
+    );
+    _viewerTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => unawaited(_recordViewer()),
+    );
   }
 
   @override
@@ -3483,6 +3596,34 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
                     : 'Add to bag',
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(),
+          if (_viewerCount != null)
+            Text(
+              '$_viewerCount ${_viewerCount == 1 ? 'viewing session' : 'viewing sessions'} in the last 2 minutes',
+              style: const TextStyle(color: _ink),
+            ),
+          Wrap(
+            spacing: 8,
+            children: [
+              if (widget.onCompare != null)
+                TextButton.icon(
+                  onPressed: () => widget.onCompare!(product),
+                  icon: const Icon(Icons.compare_arrows),
+                  label: const Text('Compare'),
+                ),
+              TextButton.icon(
+                onPressed: _askProductQuestion,
+                icon: const Icon(Icons.help_outline),
+                label: const Text('Ask a question'),
+              ),
+              TextButton.icon(
+                onPressed: _copyProductLink,
+                icon: const Icon(Icons.share_outlined),
+                label: const Text('Copy link'),
+              ),
+            ],
           ),
           FutureBuilder<StoreHomeData>(
             future: _footerData,

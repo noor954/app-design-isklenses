@@ -32,7 +32,7 @@ function MyOrders() {
         : <ul className="mt-3 divide-y divide-[#033473]/10 rounded-2xl border border-[#033473]/15">
             {orders.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
-                <span className="font-semibold">Order #{o.orderNumber}</span>
+                <Link href={`/orders/${o.id}`} className="font-semibold text-[#006f9b] underline underline-offset-2">Order #{o.orderNumber}</Link>
                 <span className="capitalize text-[#4a5568]">{o.status}</span>
                 <span>{o.currency} {o.total}</span>
                 <span className="text-[#4a5568]">{new Date(o.createdAt).toLocaleDateString()}</span>

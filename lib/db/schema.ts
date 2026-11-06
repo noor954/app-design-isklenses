@@ -112,6 +112,15 @@ export const storeProducts = pgTable('store_products', {
   sourceProductUnique: uniqueIndex('store_products_source_product_id_unique').on(table.sourceProductId),
 }))
 
+export const storeProductViewers = pgTable('store_product_viewers', {
+  productId: uuid('product_id').notNull().references(() => storeProducts.id, { onDelete: 'cascade' }),
+  viewerHash: text('viewer_hash').notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.productId, table.viewerHash] }),
+  lastSeenIndex: index('store_product_viewers_last_seen_idx').on(table.lastSeenAt),
+}))
+
 export const storeProductCategories = pgTable('store_product_categories', {
   productId: uuid('product_id').notNull().references(() => storeProducts.id, { onDelete: 'cascade' }),
   categoryId: uuid('category_id').notNull().references(() => storeCategories.id, { onDelete: 'restrict' }),

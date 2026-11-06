@@ -41,11 +41,13 @@ export async function GET() {
           'GET /api/delivery-rules',
           'GET /api/products/{slug}/reviews',
           'POST /api/products/{slug}/reviews',
+          'POST /api/products/{slug}/viewers',
         ],
         shopper: [
           'GET, POST /api/storefront/session',
           'POST /api/orders',
           'GET /api/storefront/orders',
+          'GET /api/storefront/orders/{orderId}',
         ],
         integrations: [
           'GET /api/realtime/catalog',

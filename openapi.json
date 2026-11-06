@@ -320,6 +320,55 @@
         }
       }
     },
+    "/api/products/{slug}/viewers": {
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Record an anonymous product view and get recent viewer count",
+        "description": "Send a new random UUID v4 for each product-view session and repeat at most once per minute while visible. Count represents anonymous sessions seen in the preceding 120 seconds, not verified people or an instantaneous count. Stop heartbeats when hidden. The endpoint stores only a hash of the identifier and does not use customer identity. Responses are not cached.",
+        "parameters": [{"$ref": "#/components/parameters/Slug"}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["viewerId"],
+                "properties": {"viewerId": {"type": "string", "format": "uuid", "description": "Random UUID version 4, regenerated for each product-view session."}}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recent anonymous sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": ["count", "windowSeconds"],
+                      "properties": {
+                        "count": {"type": "integer", "minimum": 1},
+                        "windowSeconds": {"type": "integer", "const": 120}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "403": {"description": "Cross-origin browser requests are forbidden."},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "413": {"description": "Request body exceeds 512 bytes."},
+          "429": {"$ref": "#/components/responses/RateLimited"},
+          "500": {"description": "Viewer count unavailable."}
+        }
+      }
+    },
     "/api/product-categories": {
       "get": {
         "tags": [

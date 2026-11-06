@@ -252,6 +252,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
           product: product,
           onAdd: _addToCart,
           onPage: _openStorePage,
+          onCompare: _compareProduct,
         ),
       ),
     );

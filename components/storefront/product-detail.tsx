@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Star } from 'lucide-react'
 import { ProductCard } from '@/components/storefront/product-card'
+import { ProductActions } from '@/components/storefront/product-actions'
+import { ProductViewers } from '@/components/storefront/product-viewers'
 import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { useProduct, type Product, type ProductAsset } from '@/lib/hooks/use-storefront-data'
 import { getProductImageSources, StorefrontProductImage } from '@/components/storefront/product-image'
@@ -372,6 +374,8 @@ export function StorefrontProductDetail({
                 : 'Add selected option to bag'}
           </button>}
           {!isToric && <p className="mt-3 w-full text-center text-xs font-mono uppercase tracking-[.1em] text-[#314a63]">Cash on delivery · guest or account checkout</p>}
+          <ProductViewers key={product.slug} slug={product.slug} />
+          <ProductActions product={product} />
         </section>
       </div>
 

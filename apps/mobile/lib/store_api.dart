@@ -72,6 +72,18 @@ class StoreApi {
     _dio.options.baseUrl,
   ).resolve(path.startsWith('/') ? path.substring(1) : path).toString();
 
+  Future<int> recordProductViewer(String slug, String viewerId) async {
+    final body = await _postObject(
+      '/api/products/${Uri.encodeComponent(slug)}/viewers',
+      {'viewerId': viewerId},
+    );
+    final data = body['data'];
+    if (data is! Map || data['count'] is! int || (data['count'] as int) < 1) {
+      throw const StoreApiException('The viewer count response is invalid.');
+    }
+    return data['count'] as int;
+  }
+
   static String _normalizeOrigin(String value) {
     final uri = Uri.tryParse(value.trim());
     if (uri == null ||

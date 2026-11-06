@@ -10,7 +10,7 @@ import { storeCustomers } from '@/lib/db/schema'
 const COOKIE_NAME = 'isk-lenses-customer-session'
 const RECEIPT_COOKIE_NAME = 'isk-lenses-order-receipt'
 const SESSION_DURATION_SECONDS = 30 * 24 * 60 * 60
-const RECEIPT_DURATION_SECONDS = 48 * 60 * 60
+const RECEIPT_DURATION_SECONDS = 90 * 24 * 60 * 60
 const PASSWORD_HASH_SCHEME = 'scrypt'
 const DUMMY_PASSWORD_HASH = `scrypt$16384$8$1$${Buffer.alloc(16).toString('base64url')}$${Buffer.alloc(64).toString('base64url')}`
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
