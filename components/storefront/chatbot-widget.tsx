@@ -104,9 +104,15 @@ export function ChatbotWidget() {
                   <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 px-2">
                     {message.links.map((item) => (
                       <li key={`${message.id}-${item.href}`}>
-                        <Link href={item.href} className="text-xs font-semibold text-[#006f9b] underline underline-offset-2 hover:text-[#15384d]">
-                          {item.label}
-                        </Link>
+                        {item.href.startsWith('https://wa.me/') ? (
+                          <a href={item.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center rounded-full bg-[#087c47] px-3 text-xs font-semibold text-white hover:bg-[#06683b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#15384d]">
+                            {item.label}
+                          </a>
+                        ) : (
+                          <Link href={item.href} className="text-xs font-semibold text-[#006f9b] underline underline-offset-2 hover:text-[#15384d]">
+                            {item.label}
+                          </Link>
+                        )}
                       </li>
                     ))}
                   </ul>

@@ -2763,9 +2763,9 @@ class _InfoContent extends StatelessWidget {
       );
     }
     if (path == '/contact-us') {
+      final whatsapp = whatsappSupportUri(chrome.whatsappSupportUrl);
       final entries = [
         ('Call', chrome.contact['phone']?.toString()),
-        ('WhatsApp', chrome.contact['whatsapp']?.toString()),
         ('Email', chrome.contact['email']?.toString()),
         ('Address', chrome.contact['address']?.toString()),
       ].where((entry) => entry.$2?.isNotEmpty == true);
@@ -2773,10 +2773,39 @@ class _InfoContent extends StatelessWidget {
         title: 'Questions about a listing or an order?',
         paragraphs: [
           for (final entry in entries) '${entry.$1}: ${entry.$2}',
-          if (entries.isEmpty)
+          if (entries.isEmpty && whatsapp == null)
             'Store contact details have not been published yet. Please check back soon.',
           'Include your order reference and the phone number used at checkout when asking about an order.',
         ],
+        action: whatsapp == null
+            ? null
+            : FilledButton.icon(
+                onPressed: () async {
+                  try {
+                    if (await launchUrl(
+                      whatsapp,
+                      mode: LaunchMode.externalApplication,
+                    )) {
+                      return;
+                    }
+                  } catch (error) {
+                    debugPrint(
+                      'WhatsApp support link could not be opened: $error',
+                    );
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Could not open WhatsApp. Please try again.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.chat_outlined),
+                label: const Text('Connect on WhatsApp'),
+              ),
       );
     }
     final content = switch (path) {
@@ -2808,10 +2837,15 @@ class _InfoContent extends StatelessWidget {
 }
 
 class _InfoArticle extends StatelessWidget {
-  const _InfoArticle({required this.title, required this.paragraphs});
+  const _InfoArticle({
+    required this.title,
+    required this.paragraphs,
+    this.action,
+  });
 
   final String title;
   final List<String> paragraphs;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -2835,6 +2869,7 @@ class _InfoArticle extends StatelessWidget {
               style: const TextStyle(color: _ink, height: 1.5),
             ),
           ),
+        if (action != null) action!,
       ],
     ),
   );

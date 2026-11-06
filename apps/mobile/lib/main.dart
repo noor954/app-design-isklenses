@@ -80,14 +80,11 @@ class _IskLensesAppState extends State<IskLensesApp> {
   Future<void> _loadAppearance() async {
     try {
       final home = await _api.getHomeData();
-      final supportUri = Uri.tryParse(home.chrome.whatsappSupportUrl ?? '');
+      final supportUri = whatsappSupportUri(home.chrome.whatsappSupportUrl);
       if (mounted) {
         setState(() {
           _appearance = home.appearance;
-          _whatsappSupportUri =
-              supportUri?.scheme == 'https' && supportUri?.host == 'wa.me'
-              ? supportUri
-              : null;
+          _whatsappSupportUri = supportUri;
         });
       }
     } on StoreApiException catch (error) {
@@ -2184,10 +2181,11 @@ class AssistantScreen extends StatefulWidget {
 class _AssistantScreenState extends State<AssistantScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final List<(String, bool)> _messages = [
+  final List<(String, bool, List<({String label, String href})>)> _messages = [
     (
       'Hi! Ask me about products or store FAQs. Some replies may use an AI service; don’t share personal, order, payment, or health details. I can’t advise on lens fitting or eye health.',
       false,
+      [],
     ),
   ];
   var _sending = false;
@@ -2204,14 +2202,16 @@ class _AssistantScreenState extends State<AssistantScreen> {
     if (message.isEmpty || _sending) return;
     _controller.clear();
     setState(() {
-      _messages.add((message, true));
+      _messages.add((message, true, []));
       _sending = true;
     });
     try {
       final answer = await widget.api.askChatbot(message);
-      if (mounted) setState(() => _messages.add((answer, false)));
+      if (mounted) {
+        setState(() => _messages.add((answer.answer, false, answer.links)));
+      }
     } on StoreApiException catch (error) {
-      if (mounted) setState(() => _messages.add((error.message, false)));
+      if (mounted) setState(() => _messages.add((error.message, false, [])));
     } finally {
       if (mounted) {
         setState(() => _sending = false);
@@ -2228,6 +2228,21 @@ class _AssistantScreenState extends State<AssistantScreen> {
     }
   }
 
+  Future<void> _openWhatsApp(Uri uri) async {
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (error) {
+      debugPrint('WhatsApp support link could not be opened: $error');
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open WhatsApp. Please try again.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2239,7 +2254,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
               padding: const EdgeInsets.all(16),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
-                final (text, isUser) = _messages[index];
+                final (text, isUser, links) = _messages[index];
                 return Align(
                   alignment: isUser
                       ? Alignment.centerRight
@@ -2252,11 +2267,27 @@ class _AssistantScreenState extends State<AssistantScreen> {
                       color: isUser ? _controlBlue : _paleBlue,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Text(
-                      text,
-                      style: TextStyle(
-                        color: isUser ? Colors.white : Colors.black87,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          text,
+                          style: TextStyle(
+                            color: isUser ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        for (final link in links)
+                          if (whatsappSupportUri(link.href) case final uri?)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: FilledButton.icon(
+                                onPressed: () => _openWhatsApp(uri),
+                                icon: const Icon(Icons.chat_outlined),
+                                label: Text(link.label),
+                              ),
+                            ),
+                      ],
                     ),
                   ),
                 );

@@ -619,7 +619,7 @@
           "Integrations"
         ],
         "summary": "Ask the public store assistant",
-        "description": "Grounds answers in current published catalog listings and public FAQs. When configured, a stateless server-side Mastra agent uses Vercel AI Gateway; otherwise deterministic matching is used. Does not access orders or customer accounts, and redirects medical or lens-fitting questions to an eye-care professional. Rate limited to 20 requests per IP per 10 minutes.",
+        "description": "Grounds answers in current published catalog listings and public FAQs. Requests mentioning WhatsApp include an external wa.me support link in links, including when medical or order-status guidance takes priority. When configured, a stateless server-side Mastra agent uses Vercel AI Gateway; otherwise deterministic matching is used. Does not access orders or customer accounts, and redirects medical or lens-fitting questions to an eye-care professional. Rate limited to 20 requests per IP per 10 minutes.",
         "requestBody": {
           "required": true,
           "content": {
@@ -632,7 +632,7 @@
         },
         "responses": {
           "200": {
-            "description": "Grounded store answer and optional storefront links.",
+            "description": "Grounded store answer and links, which may include the external WhatsApp support URL.",
             "content": {
               "application/json": {
                 "schema": {

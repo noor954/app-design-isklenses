@@ -4,6 +4,7 @@ import { answerWithMastra } from '@/lib/data/mastra-chatbot'
 import { getSettings } from '@/lib/data/site-content'
 import { db } from '@/lib/db'
 import { storeCategories, storeProducts } from '@/lib/db/schema'
+import { asksForWhatsApp, WHATSAPP_SUPPORT_URL } from '@/lib/whatsapp'
 
 export type ChatbotSettings = {
   enabled: boolean
@@ -134,16 +135,27 @@ export async function getChatbotKnowledge(query: string): Promise<ChatbotKnowled
 
 export async function answerChatbotMessage(message: string): Promise<ChatbotAnswer> {
   const normalized = message.toLowerCase()
+  const whatsappRequested = asksForWhatsApp(message)
+  const contactLinks = whatsappRequested
+    ? [{ label: 'Connect on WhatsApp', href: WHATSAPP_SUPPORT_URL }]
+    : [{ label: 'Contact the store', href: '/contact-us' }]
   if (/\b(eye pain|red eye|redness|irritat|infection|allerg|symptom|prescription|fitting|fit me|medical advice|eye health)\b/.test(normalized)) {
     return {
       answer: 'I can help with store information, but I can’t advise on lens fitting, prescriptions, or eye symptoms. Please speak with an eye-care professional.',
-      links: [{ label: 'Contact the store', href: '/contact-us' }],
+      links: contactLinks,
     }
   }
   if (/\b(order status|track my|tracking|my order|where is my order)\b/.test(normalized)) {
     return {
       answer: 'I can’t access order or account details in this chat. Please contact the store directly for help with an order.',
-      links: [{ label: 'Contact the store', href: '/contact-us' }],
+      links: contactLinks,
+    }
+  }
+
+  if (whatsappRequested) {
+    return {
+      answer: 'You can contact the store on WhatsApp. Open the link below to start a chat.',
+      links: contactLinks,
     }
   }
 

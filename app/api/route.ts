@@ -23,6 +23,9 @@ export async function GET() {
       toricOrdering: {
         note: 'Toric products expose orderingPolicy.mode=whatsapp_advance_payment, a notice and a WhatsApp URL. They appear in the Toric category and cannot be submitted to the cash-on-delivery order endpoint.',
       },
+      assistantContact: {
+        note: 'POST /api/chatbot returns a WhatsApp support link in data.links for messages mentioning WhatsApp. It remains read-only and retains medical and order-status safeguards.',
+      },
       endpoints: {
         catalog: [
           'GET /api/storefront/home',

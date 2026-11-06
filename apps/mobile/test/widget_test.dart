@@ -78,6 +78,18 @@ class _FakeStoreApi extends StoreApi {
 
   @override
   Future<List<DeliveryRule>> getDeliveryRules() async => const [];
+
+  @override
+  Future<ChatbotAnswer> askChatbot(String message) async => const ChatbotAnswer(
+    answer: 'Open the link to start a chat.',
+    links: [
+      (
+        label: 'Connect on WhatsApp',
+        href: 'https://wa.me/923015740405?text=Hello',
+      ),
+      (label: 'Unsafe', href: 'https://wa.me.example.com/123'),
+    ],
+  );
 }
 
 class _FakeAdminApi extends AdminApi {
@@ -94,6 +106,67 @@ class _FakeAdminApi extends AdminApi {
 }
 
 void main() {
+  testWidgets('assistant offers the safe WhatsApp link and opens it', (
+    tester,
+  ) async {
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    String? openedUrl;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      if (call.method == 'launch') {
+        openedUrl = (call.arguments as Map)['url'] as String?;
+        return true;
+      }
+      return false;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: AssistantScreen(api: _FakeStoreApi())),
+    );
+    await tester.enterText(find.byType(TextField), 'Connect on WhatsApp');
+    await tester.tap(find.byTooltip('Send'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unsafe'), findsNothing);
+    await tester.tap(find.text('Connect on WhatsApp'));
+    await tester.pump();
+    expect(openedUrl, 'https://wa.me/923015740405?text=Hello');
+  });
+
+  testWidgets('contact page opens the shared WhatsApp link', (tester) async {
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    String? openedUrl;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      if (call.method == 'launch') {
+        openedUrl = (call.arguments as Map)['url'] as String?;
+        return true;
+      }
+      return false;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoreInformationScreen(api: _FakeStoreApi(), path: '/contact-us'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Connect on WhatsApp'));
+    await tester.pump();
+    expect(openedUrl, contains('https://wa.me/923015740405'));
+  });
+
   testWidgets('product card previews another gallery image on mouse hover', (
     tester,
   ) async {

@@ -360,7 +360,7 @@ class StoreApi {
     return body['orderNumber'].toString();
   }
 
-  Future<String> askChatbot(String message) async {
+  Future<ChatbotAnswer> askChatbot(String message) async {
     final body = await _postObject('/api/chatbot', {'message': message.trim()});
     final data = body['data'];
     if (data is! Map || data['answer'] is! String) {
@@ -368,10 +368,43 @@ class StoreApi {
         'The assistant returned an invalid response.',
       );
     }
-    return data['answer'] as String;
+    final links = data['links'];
+    if (links is! List) {
+      throw const StoreApiException(
+        'The assistant returned an invalid response.',
+      );
+    }
+    return ChatbotAnswer(
+      answer: data['answer'] as String,
+      links: links
+          .whereType<Map>()
+          .where((link) => link['label'] is String && link['href'] is String)
+          .map(
+            (link) =>
+                (label: link['label'] as String, href: link['href'] as String),
+          )
+          .toList(),
+    );
   }
 
   static String newCheckoutKey() => _uuid.v4();
+}
+
+class ChatbotAnswer {
+  const ChatbotAnswer({required this.answer, required this.links});
+
+  final String answer;
+  final List<({String label, String href})> links;
+}
+
+Uri? whatsappSupportUri(String? url) {
+  final uri = Uri.tryParse(url ?? '');
+  return uri?.scheme == 'https' &&
+          uri?.host == 'wa.me' &&
+          !uri!.hasPort &&
+          uri.userInfo.isEmpty
+      ? uri
+      : null;
 }
 
 class AdminSession {
