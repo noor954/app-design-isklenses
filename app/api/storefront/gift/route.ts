@@ -8,7 +8,7 @@ export async function GET() {
     const data = await getFreeGiftOffer()
     return NextResponse.json(
       { data, timestamp: new Date().toISOString() },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
     console.error('[storefront-gift-api] Request failed', error instanceof Error ? error.name : 'UnknownError')

@@ -11,7 +11,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     if (!product) return NextResponse.json({ error: 'Product not found.' }, { status: 404 })
     return NextResponse.json(
       { data: product, timestamp: new Date().toISOString() },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
     console.error('[products-api] Product request failed', error instanceof Error ? error.name : 'UnknownError')

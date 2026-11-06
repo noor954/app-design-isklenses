@@ -4,6 +4,8 @@ import { mediaPathFromOwnedUrl, readMedia } from '@/lib/server/media-storage.mjs
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const mediaCacheControl = 'public, no-cache, must-revalidate'
+
 async function serve(request: NextRequest, path: string[]) {
   const pathname = mediaPathFromOwnedUrl(`/api/media/${path.join('/')}`)
   if (!pathname) return new NextResponse(null, { status: 404 })
@@ -12,7 +14,7 @@ async function serve(request: NextRequest, path: string[]) {
     const media = await readMedia(pathname)
     if (!media) return new NextResponse(null, {
       status: 404,
-      headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300' },
+      headers: { 'Cache-Control': 'no-store' },
     })
 
     const etag = `"${media.etag}"`
@@ -21,7 +23,7 @@ async function serve(request: NextRequest, path: string[]) {
         status: 304,
         headers: {
           ETag: etag,
-          'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
+          'Cache-Control': mediaCacheControl,
         },
       })
     }
@@ -33,7 +35,7 @@ async function serve(request: NextRequest, path: string[]) {
         'Content-Disposition': 'inline',
         'X-Content-Type-Options': 'nosniff',
         ETag: etag,
-        'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
+        'Cache-Control': mediaCacheControl,
       },
     })
   } catch (error) {

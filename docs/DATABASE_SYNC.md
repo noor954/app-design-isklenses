@@ -48,7 +48,7 @@ For the public HTTP contract, mobile-client setup, Flutter/Dio cookie handling, 
 
 - Admin uploads accept JPEG, PNG, WebP, or AVIF images and MP4 or WebM video up to 4 MB through `POST /api/admin/products/[productId]/assets`.
 - Media bytes, MIME types, sizes, and SHA-256 digests are stored in `store_media_objects` in the same Neon database as the catalog. Asset metadata references same-origin `/api/media/...` URLs; no Blob token, external object-store account, or additional media environment variable is required.
-- `GET /api/media/[...path]` reads only normalized media paths and returns public image/video bytes with an ETag and CDN cache headers. Reordering remains database-only; `DELETE /api/admin/assets/[assetId]` removes the media object and its product metadata.
+- `GET /api/media/[...path]` reads only normalized media paths and returns public image/video bytes with an ETag. Stored responses must be revalidated before reuse because media paths can be overwritten; matching ETags return 304. Reordering remains database-only; `DELETE /api/admin/assets/[assetId]` removes the media object and its product metadata.
 - Migration `0016_database_media_store.sql` creates the media table and adjusts image URL constraints. Run `node --env-file=.env.local scripts/validate-schema.mjs` after applying it.
 - After switching from the former Vercel Blob URLs, run `node --env-file=.env.local scripts/rehost-source-product-images.mjs` to repopulate product photos from validated ISK source URLs, then `node --env-file=.env.local scripts/restore-content-images.mjs` to restore banner/footer images from their saved migration sources. Both scripts can be run again safely.
 
@@ -67,7 +67,7 @@ Shopper account ─> /api/storefront/session ──> signed session + shopper au
 Admin SWR ───────> /api/admin/* ──> session-checked reads ──> Neon
 Admin forms ─────> server actions ─> session + validation ──> Neon transaction + audit event
 Media upload ────> authenticated route ──> media bytes + metadata in Neon
-Media delivery ──> public /api/media path ──> CDN cache ──> Neon media object
+Media delivery ──> public /api/media path ──> ETag revalidation ──> Neon media object
 Catalog import ──> authenticated route ──> public ISK Store API ──> draft records + audit events
 ```
 

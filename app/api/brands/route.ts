@@ -7,7 +7,7 @@ export async function GET() {
   try {
     return NextResponse.json(
       { data: await getStorefrontBrands() },
-      { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
     console.error('[brands-api] Brand request failed', error instanceof Error ? error.name : 'UnknownError')

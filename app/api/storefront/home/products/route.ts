@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const data = await getHomeProductsPage(tab, Number(url.searchParams.get('page') ?? '1'))
     return NextResponse.json(
       { data, timestamp: new Date().toISOString() },
-      { headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' } },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
     console.error('[storefront-home-products-api] Request failed', error instanceof Error ? error.name : 'UnknownError')

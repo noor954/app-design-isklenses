@@ -1,8 +1,9 @@
 import { and, desc, eq, ilike, or } from 'drizzle-orm'
 import { storefrontFaqs } from '@/lib/data/storefront-faq'
 import { answerWithMastra } from '@/lib/data/mastra-chatbot'
+import { getSettings } from '@/lib/data/site-content'
 import { db } from '@/lib/db'
-import { storeCategories, storeProducts, storeSettings } from '@/lib/db/schema'
+import { storeCategories, storeProducts } from '@/lib/db/schema'
 
 export type ChatbotSettings = {
   enabled: boolean
@@ -67,14 +68,11 @@ function matchScore(queryTokens: string[], text: string) {
 }
 
 export async function getChatbotSettings(): Promise<ChatbotSettings> {
-  const [row] = await db.select({ value: storeSettings.value })
-    .from(storeSettings)
-    .where(eq(storeSettings.key, 'chatbot'))
-    .limit(1)
-  if (!row || typeof row.value !== 'object' || row.value === null || Array.isArray(row.value)) {
+  const { chatbot } = await getSettings()
+  if (typeof chatbot !== 'object' || chatbot === null || Array.isArray(chatbot)) {
     return DEFAULT_CHATBOT_SETTINGS
   }
-  const value = row.value as Record<string, unknown>
+  const value = chatbot as Record<string, unknown>
   return {
     enabled: typeof value.enabled === 'boolean' ? value.enabled : DEFAULT_CHATBOT_SETTINGS.enabled,
     welcomeMessage: typeof value.welcomeMessage === 'string' && value.welcomeMessage.trim()

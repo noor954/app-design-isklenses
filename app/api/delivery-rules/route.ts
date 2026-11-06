@@ -7,7 +7,7 @@ export async function GET() {
   try {
     return NextResponse.json(
       { data: await getStorefrontDeliveryRules() },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
     console.error('[delivery-rules-api] Rules request failed', error instanceof Error ? error.name : 'UnknownError')

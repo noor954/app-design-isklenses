@@ -42,11 +42,8 @@ type ProductImageCandidate = {
   imageUrl: string
 }
 
-let productImageCandidatesInFlight: Promise<ProductImageCandidate[]> | null = null
-
 function getProductImageCandidates() {
-  if (productImageCandidatesInFlight) return productImageCandidatesInFlight
-  const request = cached(CATALOG_NAMESPACE, 'product-image-candidates', 300, async () => {
+  return cached(CATALOG_NAMESPACE, 'product-image-candidates', 300, async (): Promise<ProductImageCandidate[]> => {
     const products = await db
       .select({
         id: storeProducts.id,
@@ -104,10 +101,6 @@ function getProductImageCandidates() {
       }] : []
     })
   })
-  productImageCandidatesInFlight = request.finally(() => {
-    productImageCandidatesInFlight = null
-  })
-  return productImageCandidatesInFlight
 }
 
 async function loadCategories(): Promise<CategoryNode[]> {
@@ -552,12 +545,15 @@ export async function getProductPageSettings(): Promise<ProductPageSettings> {
 }
 
 export async function getApprovedReviews(productId: string) {
-  return db
-    .select({ id: storeProductReviews.id, author: storeProductReviews.author, rating: storeProductReviews.rating, title: storeProductReviews.title, body: storeProductReviews.body, createdAt: storeProductReviews.createdAt })
-    .from(storeProductReviews)
-    .where(and(eq(storeProductReviews.productId, productId), eq(storeProductReviews.isApproved, true)))
-    .orderBy(desc(storeProductReviews.createdAt))
-    .limit(50)
+  return cached(CATALOG_NAMESPACE, `approved-reviews:${productId}`, 300, async () => {
+    const reviews = await db
+      .select({ id: storeProductReviews.id, author: storeProductReviews.author, rating: storeProductReviews.rating, title: storeProductReviews.title, body: storeProductReviews.body, createdAt: storeProductReviews.createdAt })
+      .from(storeProductReviews)
+      .where(and(eq(storeProductReviews.productId, productId), eq(storeProductReviews.isApproved, true)))
+      .orderBy(desc(storeProductReviews.createdAt))
+      .limit(50)
+    return reviews.map((review) => ({ ...review, createdAt: review.createdAt.toISOString() }))
+  })
 }
 
 async function activeByIds(ids: string[]) {

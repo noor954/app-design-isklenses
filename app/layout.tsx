@@ -8,6 +8,8 @@ import { APP_PALETTES } from '@/lib/home-configuration'
 import { StorefrontCartProvider } from '@/lib/hooks/use-storefront-cart'
 import './globals.css'
 
+export const dynamic = 'force-dynamic'
+
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit', display: 'swap' })
 
 export const metadata: Metadata = {

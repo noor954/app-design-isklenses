@@ -18,7 +18,7 @@ export async function GET(
     const data = await getHomeSectionPage(section, { page, query })
     return NextResponse.json(
       { data, timestamp: new Date().toISOString() },
-      { headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' } },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
     console.error('[storefront-home-sections-api] Request failed', error instanceof Error ? error.name : 'UnknownError')

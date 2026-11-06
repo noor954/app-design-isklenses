@@ -8,7 +8,7 @@ export async function GET() {
     const categories = await getCategories()
     return NextResponse.json(
       { data: categories },
-      { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
     console.error('[product-categories-api] Category request failed', error instanceof Error ? error.name : 'UnknownError')

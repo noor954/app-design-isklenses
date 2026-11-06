@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 import { consumePublicRateLimit } from '@/lib/auth/public-rate-limit'
+import { invalidateCache } from '@/lib/cache'
 import { getApprovedReviews, getProduct, getProductPageSettings } from '@/lib/data/catalog'
 import { db } from '@/lib/db'
 import { storeProductReviews, storeProducts } from '@/lib/db/schema'
@@ -15,7 +16,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     if (!product) return NextResponse.json({ error: 'Product not found.' }, { status: 404 })
     return NextResponse.json(
       { data: await getApprovedReviews(product.id) },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
     console.error('[product-reviews-api] Review request failed', error instanceof Error ? error.name : 'UnknownError')
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const [product] = await db.select({ id: storeProducts.id }).from(storeProducts).where(eq(storeProducts.slug, slug)).limit(1)
     if (!product) return NextResponse.json({ error: 'Product not found.' }, { status: 404 })
     await db.insert(storeProductReviews).values({ productId: product.id, author, rating, title: title || null, body: text, isApproved: settings.reviews.autoApprove })
+    if (settings.reviews.autoApprove) invalidateCache('catalog')
     return NextResponse.json({ ok: true, pending: !settings.reviews.autoApprove }, { status: 201 })
   } catch {
     return NextResponse.json({ error: 'Review could not be saved.' }, { status: 500 })

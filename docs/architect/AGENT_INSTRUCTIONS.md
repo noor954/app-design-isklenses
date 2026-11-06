@@ -61,3 +61,4 @@ If you are uncertain about an operation that touches DB, secrets, or deployment,
 
 - Gift flash bar + cart gift choice shared with checkout; homepage `showcase` section (config id `showcase`) with big spotlight images; default order puts brands 6th. Keep web and Flutter identical.
 - Bulk price/power product endpoints (`/api/admin/products/bulk-price|bulk-power`) must stay in parity with admin product list tools; default power values 0.00 to -14.00.
+- Cache public catalog and content through `lib/cache.ts`; cache keys use PostgreSQL MVCC snapshots to detect committed writes, including direct SQL, without write-side triggers. Snapshot reads add a database call and unrelated transactions can invalidate entries. Keep checkout validation and private data uncached; self-hosted multi-instance deployments need a shared Next.js cache handler and the same primary database.
