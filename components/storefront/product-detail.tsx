@@ -107,6 +107,7 @@ export function StorefrontProductDetail({
   )
   const [leftPowerRange, setLeftPowerRange] = useState('')
   const [rightPowerRange, setRightPowerRange] = useState('')
+  const [lensChoice, setLensChoice] = useState<'plain' | 'power' | null>(null)
   const [mediaIndex, setMediaIndex] = useState(0)
   const router = useRouter()
   const { add } = useStorefrontCart()
@@ -122,11 +123,11 @@ export function StorefrontProductDetail({
   const availablePowerRanges = product.availablePowerRanges ?? []
   const availablePowerOptions = product.availablePowerOptions ?? []
   const requiresPowerSelection = availablePowerRanges.length > 0
-  const powerSelectionReady = !requiresPowerSelection || (
+  const powerSelectionReady = !requiresPowerSelection || lensChoice === 'plain' || (lensChoice === 'power' &&
     availablePowerRanges.includes(leftPowerRange) && availablePowerRanges.includes(rightPowerRange)
   )
-  const price = priceWithPowerSurcharge(basePrice, availablePowerOptions, leftPowerRange, rightPowerRange) ?? basePrice
-  const selectedPowerSurcharge = powerSurchargeCents(availablePowerOptions, leftPowerRange, rightPowerRange)
+  const price = priceWithPowerSurcharge(basePrice, availablePowerOptions, lensChoice === 'power' ? leftPowerRange : null, lensChoice === 'power' ? rightPowerRange : null) ?? basePrice
+  const selectedPowerSurcharge = powerSurchargeCents(availablePowerOptions, lensChoice === 'power' ? leftPowerRange : null, lensChoice === 'power' ? rightPowerRange : null)
 
   function changeMedia(index: number) {
     setMediaIndex((index + media.length) % media.length)
@@ -257,7 +258,12 @@ export function StorefrontProductDetail({
 
           {!isToric && requiresPowerSelection && (
             <fieldset className="mt-7 w-full rounded-2xl border border-[#b8d4e0] bg-[#e8f6fb] p-5">
-              <legend className="px-1 text-base font-semibold text-[#15384d]">Choose lens power</legend>
+              <legend className="px-1 text-base font-semibold text-[#15384d]">Choose your lenses</legend>
+              <div className="flex flex-wrap gap-4 text-sm font-semibold text-[#15384d]">
+                <label className="flex min-h-11 items-center gap-2"><input type="radio" name="lens-choice" checked={lensChoice === 'plain'} onChange={() => { setLensChoice('plain'); setLeftPowerRange(''); setRightPowerRange('') }} /> Plain lenses</label>
+                <label className="flex min-h-11 items-center gap-2"><input type="radio" name="lens-choice" checked={lensChoice === 'power'} onChange={() => setLensChoice('power')} /> Power lenses</label>
+              </div>
+              {lensChoice === 'power' && <>
               <p className="text-sm leading-5 text-[#526b7b]">Choose a power for each eye. Each selected eye adds its listed surcharge to the lens price.</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-semibold text-[#15384d]">
@@ -298,6 +304,7 @@ export function StorefrontProductDetail({
               <p className="mt-3 text-sm font-medium tabular-nums text-[#15384d]">
                 Power surcharge: {formatPrice(String((selectedPowerSurcharge ?? 0) / 100), currency)} total for both eyes
               </p>
+              </>}
             </fieldset>
           )}
 
@@ -351,7 +358,7 @@ export function StorefrontProductDetail({
               add(
                 product,
                 selectedVariant,
-                requiresPowerSelection ? { left: leftPowerRange, right: rightPowerRange } : null,
+                requiresPowerSelection ? lensChoice === 'plain' ? { choice: 'plain' } : { choice: 'power', left: leftPowerRange, right: rightPowerRange } : null,
               )
               router.push('/cart')
             }}
@@ -361,7 +368,7 @@ export function StorefrontProductDetail({
             {stockQuantity < 1
               ? 'Currently unavailable'
               : requiresPowerSelection && !powerSelectionReady
-                ? 'Select power for both eyes'
+                ? lensChoice === 'power' ? 'Select power for both eyes' : 'Choose plain or power lenses'
                 : 'Add selected option to bag'}
           </button>}
           {!isToric && <p className="mt-3 w-full text-center text-xs font-mono uppercase tracking-[.1em] text-[#314a63]">Cash on delivery · guest or account checkout</p>}

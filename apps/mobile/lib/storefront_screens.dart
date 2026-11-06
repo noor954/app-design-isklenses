@@ -3168,6 +3168,7 @@ class StoreProductDetailsScreen extends StatefulWidget {
 
 class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
   ProductVariant? _variant;
+  String? _lensChoice;
   String? _leftPower;
   String? _rightPower;
   String? _error;
@@ -3349,12 +3350,45 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
               product.availablePowerRanges.isNotEmpty) ...[
             const SizedBox(height: 18),
             const Text(
+              'Choose your lenses',
+              style: TextStyle(color: _ink, fontWeight: FontWeight.w800),
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Plain lenses'),
+                  selected: _lensChoice == 'plain',
+                  onSelected: (_) => setState(() {
+                    _lensChoice = 'plain';
+                    _leftPower = null;
+                    _rightPower = null;
+                    _error = null;
+                  }),
+                ),
+                ChoiceChip(
+                  label: const Text('Power lenses'),
+                  selected: _lensChoice == 'power',
+                  onSelected: (_) => setState(() {
+                    _lensChoice = 'power';
+                    _error = null;
+                  }),
+                ),
+              ],
+            ),
+          ],
+          if (!product.requiresWhatsAppConfirmation &&
+              product.availablePowerRanges.isNotEmpty &&
+              _lensChoice == 'power') ...[
+            const SizedBox(height: 12),
+            const Text(
               'Power selection · surcharge per eye',
               style: TextStyle(color: _ink, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _leftPower,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Left eye'),
               items: product.availablePowerOptions
                   .where(
@@ -3366,6 +3400,7 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
                       value: option.value,
                       child: Text(
                         '${option.label} D · +Rs ${option.surcharge}',
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   )
@@ -3378,6 +3413,7 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _rightPower,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Right eye'),
               items: product.availablePowerOptions
                   .where(
@@ -3389,6 +3425,7 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
                       value: option.value,
                       child: Text(
                         '${option.label} D · +Rs ${option.surcharge}',
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   )
@@ -3493,8 +3530,14 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
       return;
     }
     if (product.availablePowerRanges.isNotEmpty &&
-        (_leftPower == null || _rightPower == null)) {
-      setState(() => _error = 'Select a power range for both eyes.');
+        (_lensChoice == null ||
+            (_lensChoice == 'power' &&
+                (_leftPower == null || _rightPower == null)))) {
+      setState(
+        () => _error = _lensChoice == null
+            ? 'Choose plain or power lenses.'
+            : 'Select a power range for both eyes.',
+      );
       return;
     }
     widget.onAdd(
@@ -3504,6 +3547,7 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
         leftPowerRange: _leftPower,
         rightPowerRange: _rightPower,
         quantity: 1,
+        lensChoice: _lensChoice,
       ),
     );
     Navigator.of(context).pop();

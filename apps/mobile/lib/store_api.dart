@@ -347,6 +347,7 @@ class StoreApi {
               'variantId': line.variant?.id,
               'leftPowerRange': line.leftPowerRange,
               'rightPowerRange': line.rightPowerRange,
+              'lensChoice': line.lensChoice,
               'quantity': line.quantity,
               'quotedUnitPrice': line.price,
               'quotedCurrency': line.currency,
@@ -1177,6 +1178,7 @@ class CartLine {
     required this.leftPowerRange,
     required this.rightPowerRange,
     required this.quantity,
+    this.lensChoice,
   });
 
   final StoreProduct product;
@@ -1184,6 +1186,7 @@ class CartLine {
   final String? leftPowerRange;
   final String? rightPowerRange;
   final int quantity;
+  final String? lensChoice;
 
   String get price {
     final basePrice = variant?.price ?? product.price;
@@ -1200,8 +1203,13 @@ class CartLine {
   }
 
   String get currency => variant?.currency ?? product.currency;
-  String get key =>
-      jsonEncode([product.id, variant?.id, leftPowerRange, rightPowerRange]);
+  String get key => jsonEncode([
+    product.id,
+    variant?.id,
+    lensChoice,
+    leftPowerRange,
+    rightPowerRange,
+  ]);
 
   CartLine withQuantity(int value) => CartLine(
     product: product,
@@ -1209,6 +1217,7 @@ class CartLine {
     leftPowerRange: leftPowerRange,
     rightPowerRange: rightPowerRange,
     quantity: value,
+    lensChoice: lensChoice,
   );
 }
 

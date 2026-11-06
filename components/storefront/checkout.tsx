@@ -202,6 +202,7 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
               variantId: line.variant?.id ?? null,
               leftPowerRange: line.leftPowerRange,
               rightPowerRange: line.rightPowerRange,
+              lensChoice: line.lensChoice,
               quantity: line.quantity,
               quotedUnitPrice: price,
               quotedCurrency: lineCurrency,

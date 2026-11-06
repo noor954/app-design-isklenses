@@ -18,7 +18,7 @@ export async function GET() {
         note: 'The website and mobile storefronts consume the same validated palette, control styles, hero slides, section order/visibility/copy, hero layout/autoplay, and chrome.whatsappSupportUrl.',
       },
       productSpecifications: {
-        note: 'Admin product create/update accepts scalar diameterMm values 14, 14.2, 14.5 and 14.8 mm as well as legacy values from 0 to 12 in 0.1 increments. Customer-selectable diameter lists are not yet supported.',
+        note: 'Admin product create/update accepts scalar diameterMm values 14, 14.2, 14.5 and 14.8 mm as well as legacy values from 0 to 12 in 0.1 increments. Customer-selectable diameter lists are not yet supported. Products with power options allow plain lenses via lensChoice=plain or power lenses with a value for each eye.',
       },
       toricOrdering: {
         note: 'Toric products expose orderingPolicy.mode=whatsapp_advance_payment, a notice and a WhatsApp URL. They appear in the Toric category and cannot be submitted to the cash-on-delivery order endpoint.',

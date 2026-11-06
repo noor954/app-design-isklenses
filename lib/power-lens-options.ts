@@ -38,6 +38,19 @@ export function isPowerLensValue(value: string) {
   return powerValuePattern.test(value)
 }
 
+export function isValidLensSelection(
+  available: readonly string[],
+  choice: 'plain' | 'power' | null,
+  left: string | null,
+  right: string | null,
+) {
+  if (choice === 'plain') return left === null && right === null && available.length > 0
+  if (choice === 'power' || left !== null || right !== null) {
+    return left !== null && right !== null && available.includes(left) && available.includes(right)
+  }
+  return available.length === 0
+}
+
 export function normalizePowerLensOptions(value: unknown): PowerLensOption[] {
   if (value === undefined || value === null) return DEFAULT_POWER_LENS_OPTIONS
   if (!Array.isArray(value)) return DEFAULT_POWER_LENS_OPTIONS

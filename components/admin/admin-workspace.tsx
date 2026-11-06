@@ -746,7 +746,7 @@ function OrderRow({
       <details className="mt-4 border-t border-[#1c1c1a]/10 pt-3">
         <summary className="cursor-pointer text-xs underline underline-offset-4">Items and shipping details</summary>
         <ul className="mt-3 space-y-2">
-          {order.items.map((item) => <li key={item.id} className="flex justify-between gap-3 text-xs"><span>{item.productName} × {item.quantity}{(item.powerLeft || item.powerRight) && <span className="mt-1 block text-[#526b7b]">Left eye: {item.powerLeft ?? '—'} D · Right eye: {item.powerRight ?? '—'} D</span>}</span><span>{currencyLabel(item.lineTotal, order.currency)}</span></li>)}
+          {order.items.map((item) => <li key={item.id} className="flex justify-between gap-3 text-xs"><span>{item.productName} × {item.quantity}{item.powerLeft === 'plain' && item.powerRight === 'plain' ? <span className="mt-1 block text-[#526b7b]">Plain lenses</span> : (item.powerLeft || item.powerRight) && <span className="mt-1 block text-[#526b7b]">Left eye: {item.powerLeft ?? '—'} D · Right eye: {item.powerRight ?? '—'} D</span>}</span><span>{currencyLabel(item.lineTotal, order.currency)}</span></li>)}
         </ul>
         <div className="mt-3 text-xs leading-5 text-[#68675f]">
           <p className="font-medium text-[#1c1c1a]">Shipping address</p>

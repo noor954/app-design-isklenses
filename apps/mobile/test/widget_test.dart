@@ -106,6 +106,90 @@ class _FakeAdminApi extends AdminApi {
 }
 
 void main() {
+  testWidgets('plain selection hides power controls and adds at base price', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final product = StoreProduct.fromJson({
+      'id': 'plain-test',
+      'name': 'Choice lens',
+      'slug': 'choice-lens',
+      'price': '1000.00',
+      'currency': 'PKR',
+      'stockQuantity': 5,
+      'availablePowerRanges': ['-0.50'],
+      'availablePowerOptions': [
+        {'value': '-0.50', 'label': '-0.50', 'surcharge': '150.00'},
+      ],
+    }, Uri.parse('https://isklenses.com'));
+    CartLine? added;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => StoreProductDetailsScreen(
+                    api: _FakeStoreApi(),
+                    product: product,
+                    onAdd: (line) => added = line,
+                    onPage: (_) {},
+                  ),
+                ),
+              ),
+              child: const Text('Open lens'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open lens'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Power lenses'),
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(StoreProductDetailsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.text('Left eye'), findsNothing);
+    await tester.tap(find.text('Power lenses'));
+    await tester.pumpAndSettle();
+    expect(find.text('Left eye'), findsOneWidget);
+    await Scrollable.ensureVisible(
+      tester.element(find.text('Plain lenses')),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plain lenses'));
+    await tester.pumpAndSettle();
+    expect(find.text('Left eye'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Add to bag'),
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(StoreProductDetailsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(find.text('Add to bag'));
+    await tester.pumpAndSettle();
+    expect(added?.lensChoice, 'plain');
+    expect(added?.leftPowerRange, isNull);
+    expect(added?.rightPowerRange, isNull);
+    expect(added?.price, '1000.00');
+    expect(added?.withQuantity(2).lensChoice, 'plain');
+  });
+
   testWidgets('assistant offers the safe WhatsApp link and opens it', (
     tester,
   ) async {

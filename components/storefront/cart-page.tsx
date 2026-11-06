@@ -55,6 +55,7 @@ export function CartPage() {
                 <div className="min-w-0">
                   <Link href={`/product/${line.product.slug}`} className="font-semibold hover:underline">{line.product.name}</Link>
                   {line.variant && <p className="mt-1 text-sm text-[#4a5568]">{line.variant.name}</p>}
+                  {line.lensChoice === 'plain' && <p className="mt-1 text-xs text-[#526b7b]">Plain lenses</p>}
                   {(line.leftPowerRange || line.rightPowerRange) && (
                     <p className="mt-1 text-xs text-[#526b7b]">Left eye: {line.leftPowerRange ?? '—'} D · Right eye: {line.rightPowerRange ?? '—'} D</p>
                   )}

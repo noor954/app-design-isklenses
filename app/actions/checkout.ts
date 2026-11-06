@@ -21,6 +21,7 @@ import { normalizeFreeGiftConfig, resolveGiftCategoryId } from '@/lib/free-gift'
 import { isToricLensType, TORIC_ORDER_NOTICE } from '@/lib/toric'
 import {
   isPowerLensValue,
+  isValidLensSelection,
   normalizePowerLensOptions,
   powerSurchargeCents,
   resolvePowerOptionValues,
@@ -35,6 +36,7 @@ type CheckoutLineInput = {
   variantId: string | null
   leftPowerRange: string | null
   rightPowerRange: string | null
+  lensChoice: 'plain' | 'power' | null
   quantity: number
   quotedUnitPrice: string
   quotedCurrency: string
@@ -130,6 +132,10 @@ function parseOrderInput(value: unknown) {
     }
     const leftPowerRange = optionalPowerRange(entry.leftPowerRange, 'left')
     const rightPowerRange = optionalPowerRange(entry.rightPowerRange, 'right')
+    const lensChoice = entry.lensChoice ?? null
+    if (lensChoice !== null && lensChoice !== 'plain' && lensChoice !== 'power') {
+      throw new CheckoutError('The selected lens choice is invalid.')
+    }
     const key = `${entry.productId}:${variantId ?? 'standard'}:${leftPowerRange ?? ''}:${rightPowerRange ?? ''}`
     if (seen.has(key)) throw new CheckoutError('The bag contains a duplicate item. Review it and try again.')
     seen.add(key)
@@ -143,6 +149,7 @@ function parseOrderInput(value: unknown) {
       variantId,
       leftPowerRange,
       rightPowerRange,
+      lensChoice,
       quantity: Number(entry.quantity),
       quotedUnitPrice: entry.quotedUnitPrice,
       quotedCurrency: entry.quotedCurrency,
@@ -278,7 +285,7 @@ async function submitCodOrderImpl(value: unknown) {
         if (product.lensTypeId && toricTypeIds.has(product.lensTypeId)) {
           throw new CheckoutError(TORIC_ORDER_NOTICE, 409)
         }
-        const variant = item.variantId ? variantById.get(item.variantId) : null
+        const variant = item.variantId ? variantById.get(item.variantId) ?? null : null
         if (item.variantId && (!variant || variant.productId !== product.id)) {
           throw new CheckoutError('A product option in your bag is no longer available. Review the catalogue.', 409)
         }
@@ -286,18 +293,8 @@ async function submitCodOrderImpl(value: unknown) {
           throw new CheckoutError('Choose an available listed option for each product.', 409)
         }
         const powerRanges = resolvePowerOptionValues(product.availablePowerRanges, powerOptions)
-        const hasPowerSelection = Boolean(item.leftPowerRange || item.rightPowerRange)
-        if (powerRanges.length) {
-          if (
-            !item.leftPowerRange ||
-            !item.rightPowerRange ||
-            !powerRanges.includes(item.leftPowerRange) ||
-            !powerRanges.includes(item.rightPowerRange)
-          ) {
-            throw new CheckoutError('Choose an available power range for each eye.', 409)
-          }
-        } else if (hasPowerSelection) {
-          throw new CheckoutError('This product does not offer customer-selected power ranges.', 409)
+        if (!isValidLensSelection(powerRanges, item.lensChoice, item.leftPowerRange, item.rightPowerRange)) {
+          throw new CheckoutError('Choose plain lenses or an available power for each eye.', 409)
         }
         const basePrice = variant?.price ?? product.price
         const surchargeCents = powerSurchargeCents(powerOptions, item.leftPowerRange, item.rightPowerRange)
@@ -326,6 +323,16 @@ async function submitCodOrderImpl(value: unknown) {
         }
         return { item, product, variant, unitPrice, lineTotalCents }
       })
+      const reservations = new Map<string, { product: typeof products[number]; variant: (typeof variants)[number] | null; quantity: number }>()
+      for (const { item, product, variant } of resolvedLines) {
+        const key = variant ? `variant:${variant.id}` : `product:${product.id}`
+        const reservation = reservations.get(key) ?? { product, variant, quantity: 0 }
+        reservation.quantity += item.quantity
+        if (reservation.quantity > (variant?.stockQuantity ?? product.stockQuantity)) {
+          throw new CheckoutError(`${product.name}${variant ? ` — ${variant.name}` : ''} does not have enough stock for that quantity.`, 409)
+        }
+        reservations.set(key, reservation)
+      }
 
       let giftLine: { product: typeof products[number]; variant: (typeof variants)[number] | null } | null = null
       if (input.giftProductId) {
@@ -372,11 +379,11 @@ async function submitCodOrderImpl(value: unknown) {
         giftLine = { product: giftProduct, variant: giftVariant }
       }
 
-      for (const { item, product, variant } of resolvedLines) {
+      for (const { quantity, product, variant } of reservations.values()) {
         if (variant) {
           await tx
             .update(storeProductVariants)
-            .set({ stockQuantity: variant.stockQuantity - item.quantity, updatedAt: new Date() })
+            .set({ stockQuantity: variant.stockQuantity - quantity, updatedAt: new Date() })
             .where(eq(storeProductVariants.id, variant.id))
           const remaining = await tx
             .select({ stockQuantity: storeProductVariants.stockQuantity })
@@ -390,7 +397,7 @@ async function submitCodOrderImpl(value: unknown) {
         } else {
           await tx
             .update(storeProducts)
-            .set({ stockQuantity: product.stockQuantity - item.quantity, updatedAt: new Date() })
+            .set({ stockQuantity: product.stockQuantity - quantity, updatedAt: new Date() })
             .where(eq(storeProducts.id, product.id))
         }
       }
@@ -501,8 +508,8 @@ async function submitCodOrderImpl(value: unknown) {
         orderId: order.id,
         productId: product.id,
         variantId: variant?.id ?? null,
-        powerLeft: item.leftPowerRange,
-        powerRight: item.rightPowerRange,
+        powerLeft: item.lensChoice === 'plain' ? 'plain' : item.leftPowerRange,
+        powerRight: item.lensChoice === 'plain' ? 'plain' : item.rightPowerRange,
         inventoryReserved: true,
         productName: variant ? `${product.name} — ${variant.name}` : product.name,
         unitPrice,

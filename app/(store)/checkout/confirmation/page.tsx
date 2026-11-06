@@ -41,7 +41,7 @@ export default async function CheckoutConfirmationPage() {
               <li key={`${item.productName}-${index}`} className="flex flex-wrap items-start justify-between gap-3 py-4">
                 <span className="max-w-[70%] text-sm leading-5">
                   {item.productName} × {item.quantity}
-                  {(item.powerLeft || item.powerRight) && <span className="mt-1 block text-xs text-[#526b7b]">Left eye: {item.powerLeft ?? '—'} D · Right eye: {item.powerRight ?? '—'} D</span>}
+                  {item.powerLeft === 'plain' && item.powerRight === 'plain' ? <span className="mt-1 block text-xs text-[#526b7b]">Plain lenses</span> : (item.powerLeft || item.powerRight) && <span className="mt-1 block text-xs text-[#526b7b]">Left eye: {item.powerLeft ?? '—'} D · Right eye: {item.powerRight ?? '—'} D</span>}
                 </span>
                 <span className="font-mono text-sm">{formatPrice(item.lineTotal, order.currency)}</span>
               </li>

@@ -1501,6 +1501,7 @@ class ProductSheet extends StatefulWidget {
 
 class _ProductSheetState extends State<ProductSheet> {
   ProductVariant? _variant;
+  String? _lensChoice;
   String? _leftPower;
   String? _rightPower;
   String? _error;
@@ -1549,7 +1550,14 @@ class _ProductSheetState extends State<ProductSheet> {
               ),
             Text(
               _money(
-                _variant?.price ?? product.price,
+                CartLine(
+                  product: product,
+                  variant: _variant,
+                  leftPowerRange: _leftPower,
+                  rightPowerRange: _rightPower,
+                  quantity: 1,
+                  lensChoice: _lensChoice,
+                ).price,
                 _variant?.currency ?? product.currency,
               ),
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
@@ -1579,8 +1587,41 @@ class _ProductSheetState extends State<ProductSheet> {
                 }),
               ),
             ],
-            if (product.availablePowerRanges.isNotEmpty) ...[
+            if (!product.requiresWhatsAppConfirmation &&
+                product.availablePowerRanges.isNotEmpty) ...[
               const SizedBox(height: 18),
+              const Text(
+                'Choose your lenses',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Plain lenses'),
+                    selected: _lensChoice == 'plain',
+                    onSelected: (_) => setState(() {
+                      _lensChoice = 'plain';
+                      _leftPower = null;
+                      _rightPower = null;
+                      _error = null;
+                    }),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Power lenses'),
+                    selected: _lensChoice == 'power',
+                    onSelected: (_) => setState(() {
+                      _lensChoice = 'power';
+                      _error = null;
+                    }),
+                  ),
+                ],
+              ),
+            ],
+            if (!product.requiresWhatsAppConfirmation &&
+                product.availablePowerRanges.isNotEmpty &&
+                _lensChoice == 'power') ...[
+              const SizedBox(height: 10),
               const Text(
                 'Select a power range for each eye',
                 style: TextStyle(fontWeight: FontWeight.w700),
@@ -1639,8 +1680,14 @@ class _ProductSheetState extends State<ProductSheet> {
       return;
     }
     if (widget.product.availablePowerRanges.isNotEmpty &&
-        (_leftPower == null || _rightPower == null)) {
-      setState(() => _error = 'Select a power range for both eyes.');
+        (_lensChoice == null ||
+            (_lensChoice == 'power' &&
+                (_leftPower == null || _rightPower == null)))) {
+      setState(
+        () => _error = _lensChoice == null
+            ? 'Choose plain or power lenses.'
+            : 'Select a power range for both eyes.',
+      );
       return;
     }
     Navigator.of(context).pop(
@@ -1650,6 +1697,7 @@ class _ProductSheetState extends State<ProductSheet> {
         leftPowerRange: _leftPower,
         rightPowerRange: _rightPower,
         quantity: 1,
+        lensChoice: _lensChoice,
       ),
     );
   }
@@ -1768,6 +1816,8 @@ class CartScreen extends StatelessWidget {
                                       color: Colors.black54,
                                     ),
                                   ),
+                                if (line.lensChoice == 'plain')
+                                  const Text('Plain lenses'),
                                 if (line.leftPowerRange != null)
                                   Text(
                                     'L ${line.leftPowerRange} · R ${line.rightPowerRange}',

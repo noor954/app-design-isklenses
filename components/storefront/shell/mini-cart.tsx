@@ -52,6 +52,7 @@ export function MiniCart({ open, onClose }: { open: boolean; onClose: () => void
                     <div className="min-w-0 flex-1">
                       <Link href={`/product/${line.product.slug}`} onClick={onClose} className="line-clamp-2 text-sm font-semibold hover:underline">{line.product.name}</Link>
                       {line.variant && <p className="mt-0.5 text-xs text-[#4a5568]">{line.variant.name}</p>}
+                      {line.lensChoice === 'plain' && <p className="mt-0.5 text-xs text-[#526b7b]">Plain lenses</p>}
                       {(line.leftPowerRange || line.rightPowerRange) && (
                         <p className="mt-0.5 text-xs text-[#526b7b]">L {line.leftPowerRange ?? '—'} D · R {line.rightPowerRange ?? '—'} D</p>
                       )}

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { Product, ProductVariant } from '@/lib/hooks/use-storefront-data'
-import { priceWithPowerSurcharge } from '@/lib/power-lens-options'
+import { isValidLensSelection, priceWithPowerSurcharge } from '@/lib/power-lens-options'
 
 export type CartLine = {
   product: Product
@@ -10,6 +10,7 @@ export type CartLine = {
   quantity: number
   leftPowerRange: string | null
   rightPowerRange: string | null
+  lensChoice: 'plain' | 'power' | null
 }
 
 export function getCartLinePrice(line: CartLine) {
@@ -25,7 +26,7 @@ export function getCartLinePrice(line: CartLine) {
   }
 }
 
-type PowerSelection = { left: string; right: string } | null
+type PowerSelection = { choice: 'plain' } | { choice: 'power'; left: string; right: string } | null
 
 type StorefrontCartValue = {
   lines: Array<CartLine & { key: string }>
@@ -42,7 +43,7 @@ const CartContext = createContext<StorefrontCartValue | null>(null)
 export function StorefrontCartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Record<string, CartLine>>({})
   const keyFor = useCallback((product: Product, variant?: ProductVariant | null, powerSelection?: PowerSelection) =>
-    `${product.id}:${variant?.id ?? 'standard'}:${powerSelection?.left ?? ''}:${powerSelection?.right ?? ''}`, [])
+    `${product.id}:${variant?.id ?? 'standard'}:${powerSelection?.choice === 'plain' ? 'plain' : powerSelection?.left ?? ''}:${powerSelection?.choice === 'power' ? powerSelection.right : ''}`, [])
 
   const add = useCallback((product: Product, variant: ProductVariant | null = null, powerSelection: PowerSelection = null) => {
     const key = keyFor(product, variant, powerSelection)
@@ -56,8 +57,9 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
           product,
           variant,
           quantity: quantity + 1,
-          leftPowerRange: powerSelection?.left ?? null,
-          rightPowerRange: powerSelection?.right ?? null,
+          leftPowerRange: powerSelection?.choice === 'power' ? powerSelection.left : null,
+          rightPowerRange: powerSelection?.choice === 'power' ? powerSelection.right : null,
+          lensChoice: powerSelection?.choice ?? null,
         },
       }
     })
@@ -95,15 +97,7 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
           continue
         }
         const powerRanges = product.availablePowerRanges ?? []
-        const hasPowerSelection = Boolean(line.leftPowerRange || line.rightPowerRange)
-        const validPowerSelection = powerRanges.length
-          ? Boolean(
-              line.leftPowerRange &&
-              line.rightPowerRange &&
-              powerRanges.includes(line.leftPowerRange) &&
-              powerRanges.includes(line.rightPowerRange),
-            )
-          : !hasPowerSelection
+        const validPowerSelection = isValidLensSelection(powerRanges, line.lensChoice, line.leftPowerRange, line.rightPowerRange)
         if (!validPowerSelection) {
           changed = true
           continue
@@ -116,6 +110,7 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
           quantity,
           leftPowerRange: line.leftPowerRange,
           rightPowerRange: line.rightPowerRange,
+          lensChoice: line.lensChoice,
         }
       }
       return changed ? next : current

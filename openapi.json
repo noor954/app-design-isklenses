@@ -3776,7 +3776,7 @@
                   "items": {
                     "$ref": "#/components/schemas/PowerLensOption"
                   },
-                  "description": "Configurable exact power options enabled for this product, each with a per-eye surcharge. If non-empty, shoppers must select one option for each eye; the surcharges are added to the unit price."
+                  "description": "Configurable exact power options enabled for this product, each with a per-eye surcharge. If non-empty, shoppers choose plain lenses at base price or select an option for each eye."
                 }
               },
               "additionalProperties": true
@@ -3948,6 +3948,11 @@
                   ],
                   "format": "uuid"
                 },
+                "lensChoice": {
+                  "type": ["string", "null"],
+                  "enum": ["plain", "power", null],
+                  "description": "For products with power options, explicitly send plain with both power values null or power with both values selected. Existing clients may omit this field when both valid power values are supplied. Omit for products without power options."
+                },
                 "leftPowerRange": {
                   "anyOf": [
                     {
@@ -3957,7 +3962,7 @@
                       "type": "null"
                     }
                   ],
-                  "description": "Exact power value chosen for the left eye. Must be one of the product's availablePowerOptions values; its configured surcharge is added to the server-computed unit price."
+                  "description": "For power lenses, an available exact value for the left eye. For plain lenses, omit or send null."
                 },
                 "rightPowerRange": {
                   "anyOf": [
@@ -3968,7 +3973,7 @@
                       "type": "null"
                     }
                   ],
-                  "description": "Exact power value chosen for the right eye. Must be one of the product's availablePowerOptions values; its configured surcharge is added to the server-computed unit price."
+                  "description": "For power lenses, an available exact value for the right eye. For plain lenses, omit or send null."
                 },
                 "quantity": {
                   "type": "integer",
