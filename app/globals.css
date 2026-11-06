@@ -249,6 +249,11 @@
   scroll-margin: 0;
 }
 
+/* Sections must never shrink below their content inside the fixed-height flex scroller, or they overlap. */
+.isk-home > * {
+  flex-shrink: 0;
+}
+
 @media (max-width: 639px) {
   .isk-home {
     scroll-snap-type: y proximity;

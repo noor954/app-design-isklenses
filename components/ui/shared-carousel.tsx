@@ -164,13 +164,14 @@ export function SharedCarousel<T>({
           if (offset > count / 2) offset -= count
           if (offset < -count / 2) offset += count
           const abs = Math.abs(offset)
+          const compact = per <= 2
           const style: CSSProperties = {
             gridArea: '1 / 1',
             justifySelf: 'center',
-            width: 'clamp(13rem, min(24vw, 36vh), 26rem)',
+            width: compact ? 'min(78%, 18rem)' : 'clamp(13rem, min(24vw, 36vh), 26rem)',
             transition: reduced ? 'none' : 'transform 650ms cubic-bezier(.22,1,.36,1), opacity 650ms',
             transform: `translateX(${offset * 82}%) translateZ(${-abs * 140}px) rotateY(${offset * -34}deg) scale(${abs === 0 ? 1.06 : 0.84})`,
-            opacity: abs > 3 ? 0 : 1 - abs * 0.22,
+            opacity: compact ? (abs === 0 ? 1 : 0) : abs > 3 ? 0 : 1 - abs * 0.22,
             zIndex: 10 - abs,
             pointerEvents: abs === 0 ? 'auto' : 'none',
           }
