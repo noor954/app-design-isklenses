@@ -281,8 +281,11 @@ function lensMeasurement(value: unknown, label: string) {
   const result = decimal(value, label)
   if (!result) throw new Error(`${label} is required.`)
   const number = Number(result)
-  if (number < 0 || number > 12 || Math.round(number * 10) !== number * 10) {
-    throw new Error(`${label} must be between 0.00 and 12.00 in 0.10 increments.`)
+  const allowedDiameter = label === 'Diameter' && [14, 14.2, 14.5, 14.8].includes(number)
+  if ((!allowedDiameter && (number < 0 || number > 12)) || Math.abs(Math.round(number * 10) - number * 10) > 1e-8) {
+    throw new Error(label === 'Diameter'
+      ? 'Diameter must be a supported value in 0.10 increments.'
+      : `${label} must be between 0.00 and 12.00 in 0.10 increments.`)
   }
   return result
 }

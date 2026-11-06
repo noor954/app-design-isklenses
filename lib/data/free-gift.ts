@@ -2,7 +2,7 @@ import 'server-only'
 
 import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { storeCategories, storeProductCategories, storeProducts } from '@/lib/db/schema'
+import { storeCategories, storeLensTypes, storeProductCategories, storeProducts } from '@/lib/db/schema'
 import { getSettings } from '@/lib/data/site-content'
 import {
   normalizeFreeGiftConfig,
@@ -37,10 +37,12 @@ export async function getFreeGiftOffer(): Promise<FreeGiftOffer> {
       sourceImageUrl: storeProducts.sourceImageUrl,
     })
     .from(storeProducts)
+    .leftJoin(storeLensTypes, eq(storeProducts.lensTypeId, storeLensTypes.id))
     .where(and(
       eq(storeProducts.status, 'active'),
       gt(storeProducts.stockQuantity, 0),
       sql`(${storeProducts.categoryId} = ${categoryId} OR ${storeProducts.id} IN (${memberships}))`,
+      sql`(${storeLensTypes.name} IS NULL OR lower(btrim(${storeLensTypes.name})) <> 'toric')`,
     ))
     .orderBy(asc(storeProducts.name))
     .limit(40)

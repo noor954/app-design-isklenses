@@ -15,7 +15,13 @@ export async function GET() {
         read: 'GET /api/storefront/home',
         updateAppearance: 'PUT /api/admin/content/settings/appearance',
         updateHomepage: 'PUT /api/admin/content/settings/home_configuration',
-        note: 'The website and mobile storefronts consume the same validated palette, control styles, hero slides, section order/visibility/copy, and hero layout/autoplay.',
+        note: 'The website and mobile storefronts consume the same validated palette, control styles, hero slides, section order/visibility/copy, hero layout/autoplay, and chrome.whatsappSupportUrl.',
+      },
+      productSpecifications: {
+        note: 'Admin product create/update accepts scalar diameterMm values 14, 14.2, 14.5 and 14.8 mm as well as legacy values from 0 to 12 in 0.1 increments. Customer-selectable diameter lists are not yet supported.',
+      },
+      toricOrdering: {
+        note: 'Toric products expose orderingPolicy.mode=whatsapp_advance_payment, a notice and a WhatsApp URL. They appear in the Toric category and cannot be submitted to the cash-on-delivery order endpoint.',
       },
       endpoints: {
         catalog: [

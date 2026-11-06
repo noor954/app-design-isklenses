@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { ArrowRight, ShoppingBag, Star } from 'lucide-react'
 import { SharedCarousel } from '@/components/ui/shared-carousel'
 import type { CarouselVariant } from '@/lib/carousel-variants'
-import { StorefrontProductImage, getProductImageSources } from '@/components/storefront/product-image'
+import { ProductHoverImage } from '@/components/storefront/product-hover-image'
 import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import type { Product } from '@/lib/hooks/use-storefront-data'
 import { formatPrice, isAvailable, lowestPrice } from '@/lib/store-config'
+import { isToricLensType } from '@/lib/toric'
 
 type Filter = 'catalog' | 'featured' | 'new' | 'reduced'
 type TabState = { items: Product[]; page: number; hasMore: boolean; loaded: boolean }
@@ -134,17 +135,9 @@ function CatalogProduct({ product }: { product: Product }) {
 
   return (
     <div className="group min-w-0">
-      <Link href={href} aria-label={`View ${product.name}`} className="isk-trending-image relative block overflow-hidden rounded-2xl bg-[#e8f6fb]">
-        <StorefrontProductImage
-          sources={getProductImageSources(product)}
-          alt={product.name}
-          fdaApproved={product.fdaApproved}
-          className="isk-trending-image-inner aspect-square"
-          imageClassName="size-full object-contain transition-transform duration-500 group-hover:scale-[1.03]"
-          fallback={<div role="img" aria-label={`No product image is available for ${product.name}`} className="product-placeholder size-full" />}
-        />
+      <ProductHoverImage product={product} className="isk-trending-image rounded-2xl bg-[#e8f6fb]" imageClassName="isk-trending-image-inner aspect-square">
         {!available && <span className="absolute left-3 top-3 rounded-full bg-[#15384d] px-3 py-1.5 text-xs font-semibold text-white">Unavailable</span>}
-      </Link>
+      </ProductHoverImage>
       <div className="pt-4">
         {product.brand && <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#006f9b]">{product.brand}</p>}
         <h3 className="mt-2 min-h-12 text-lg font-bold leading-6 tracking-[-0.03em] text-[#15384d]">
@@ -161,7 +154,7 @@ function CatalogProduct({ product }: { product: Product }) {
           {product.compareAtPrice && Number(product.compareAtPrice) > Number(price) && <s className="ml-2 text-sm font-normal text-[#526b7b]">{formatPrice(product.compareAtPrice, currency)}</s>}
         </p>
         <div className="mt-4">
-          {hasOptions || requiresPowerSelection || !available ? (
+          {hasOptions || requiresPowerSelection || !available || isToricLensType(product.lensType?.name) ? (
             <Link href={href} className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#15384d]/25 px-4 text-sm font-semibold text-[#15384d] transition-colors hover:border-[#006f9b] hover:bg-[#006f9b] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ba5]">
               {available ? 'Choose options' : 'View details'}
             </Link>

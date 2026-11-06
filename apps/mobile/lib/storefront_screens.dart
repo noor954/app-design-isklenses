@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'isk_carousel.dart';
 import 'store_api.dart';
@@ -226,7 +227,8 @@ class _StorefrontHomeScreenState extends State<StorefrontHomeScreen>
                         ),
                         products: data.products,
                         onProduct: widget.onProduct,
-                        onBrowse: () => widget.onBrowse(const StoreBrowseFilter()),
+                        onBrowse: () =>
+                            widget.onBrowse(const StoreBrowseFilter()),
                       ),
                     ),
                   ],
@@ -524,7 +526,7 @@ class _HeroCarouselState extends State<_HeroCarousel> {
         ? Duration.zero
         : const Duration(milliseconds: 360);
     final wide = MediaQuery.sizeOf(context).width >= 760;
-    final height = wide ? 390.0 : 340.0;
+    const height = 390.0;
     final centered = widget.layout == 'centered';
     final split = widget.layout == 'split';
     final editorial = widget.layout == 'editorial';
@@ -595,89 +597,90 @@ class _HeroCarouselState extends State<_HeroCarousel> {
                 : wide
                 ? 42
                 : 24,
-            top: centered ? 0 : null,
-            bottom: centered
-                ? 0
-                : wide
-                ? 52
-                : 42,
+            top: 60,
+            bottom: wide ? 40 : 24,
             child: Align(
               alignment: centered ? Alignment.center : Alignment.bottomLeft,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: editorial ? 760 : 700),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: centered
-                      ? CrossAxisAlignment.center
-                      : CrossAxisAlignment.start,
-                  children: [
-                    IgnorePointer(
-                      child: AnimatedSwitcher(
-                        duration: motionDuration,
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: animation.drive(
-                              Tween(
-                                begin: const Offset(0.06, 0),
-                                end: Offset.zero,
-                              ).chain(CurveTween(curve: Curves.easeOutCubic)),
-                            ),
-                            child: child,
-                          ),
-                        ),
-                        child: Column(
-                          key: ValueKey(activeSlide.id),
-                          crossAxisAlignment: centered
-                              ? CrossAxisAlignment.center
-                              : CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              activeSlide.title.isEmpty
-                                  ? widget.sectionTitle
-                                  : activeSlide.title,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.headlineLarge
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    height: 1,
-                                    fontWeight: editorial
-                                        ? FontWeight.w600
-                                        : FontWeight.w900,
+              child: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: editorial ? 760 : 700),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: centered
+                        ? CrossAxisAlignment.center
+                        : CrossAxisAlignment.start,
+                    children: [
+                      IgnorePointer(
+                        child: AnimatedSwitcher(
+                          duration: motionDuration,
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: animation.drive(
+                                    Tween(
+                                      begin: const Offset(0.06, 0),
+                                      end: Offset.zero,
+                                    ).chain(
+                                      CurveTween(curve: Curves.easeOutCubic),
+                                    ),
                                   ),
-                            ),
-                            if (activeSlide.body?.isNotEmpty == true) ...[
-                              const SizedBox(height: 10),
+                                  child: child,
+                                ),
+                              ),
+                          child: Column(
+                            key: ValueKey(activeSlide.id),
+                            crossAxisAlignment: centered
+                                ? CrossAxisAlignment.center
+                                : CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                activeSlide.body!,
+                                activeSlide.title.isEmpty
+                                    ? widget.sectionTitle
+                                    : activeSlide.title,
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodyLarge
+                                style: Theme.of(context).textTheme.headlineLarge
                                     ?.copyWith(
-                                      color: Colors.white.withAlpha(225),
+                                      color: Colors.white,
+                                      height: 1,
+                                      fontWeight: editorial
+                                          ? FontWeight.w600
+                                          : FontWeight.w900,
                                     ),
                               ),
+                              if (activeSlide.body?.isNotEmpty == true) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  activeSlide.body!,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(
+                                        color: Colors.white.withAlpha(225),
+                                      ),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    Align(
-                      alignment: centered
-                          ? Alignment.center
-                          : Alignment.centerLeft,
-                      child: FilledButton.icon(
-                        onPressed: () =>
-                            widget.onPage(activeSlide.href ?? '/shop'),
-                        icon: const Icon(Icons.arrow_forward_rounded),
-                        label: const Text('Explore the collection'),
+                      const SizedBox(height: 18),
+                      Align(
+                        alignment: centered
+                            ? Alignment.center
+                            : Alignment.centerLeft,
+                        child: FilledButton.icon(
+                          onPressed: () =>
+                              widget.onPage(activeSlide.href ?? '/shop'),
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                          label: const Text('Explore the collection'),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -966,7 +969,10 @@ class _ShowcaseSection extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xffd3ff48),
                   borderRadius: BorderRadius.circular(99),
@@ -1138,7 +1144,10 @@ class _ShowcaseSection extends StatelessWidget {
             )
           else ...[
             spotlightCard(),
-            for (final item in tiles) ...[const SizedBox(height: 12), tile(item)],
+            for (final item in tiles) ...[
+              const SizedBox(height: 12),
+              tile(item),
+            ],
           ],
           const SizedBox(height: 14),
           Wrap(
@@ -1380,7 +1389,7 @@ class _HomeProductTabsState extends State<_HomeProductTabs> {
   }
 }
 
-class StoreProductCard extends StatelessWidget {
+class StoreProductCard extends StatefulWidget {
   const StoreProductCard({
     required this.product,
     required this.onTap,
@@ -1393,8 +1402,17 @@ class StoreProductCard extends StatelessWidget {
   final VoidCallback? onCompare;
 
   @override
+  State<StoreProductCard> createState() => _StoreProductCardState();
+}
+
+class _StoreProductCardState extends State<StoreProductCard> {
+  bool _hoveringImage = false;
+
+  @override
   Widget build(BuildContext context) {
+    final product = widget.product;
     final image = product.imageUrl;
+    final alternate = product.images.where((url) => url != image).firstOrNull;
     final onSale =
         product.compareAtPrice != null &&
         (double.tryParse(product.compareAtPrice!) ?? 0) >
@@ -1404,62 +1422,74 @@ class StoreProductCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (image != null)
-                    Image.network(
-                      image,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const _ProductPlaceholder(),
-                    )
-                  else
-                    const _ProductPlaceholder(),
-                  if (onSale)
-                    Positioned(
-                      left: 10,
-                      top: 10,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: _blue,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
+              child: MouseRegion(
+                onEnter: (_) => setState(() => _hoveringImage = true),
+                onExit: (_) => setState(() => _hoveringImage = false),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (image != null)
+                      Image.network(
+                        image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const _ProductPlaceholder(),
+                      )
+                    else
+                      const _ProductPlaceholder(),
+                    if (_hoveringImage && alternate != null)
+                      Image.network(
+                        alternate,
+                        fit: BoxFit.contain,
+                        excludeFromSemantics: true,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    if (onSale)
+                      Positioned(
+                        left: 10,
+                        top: 10,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: _blue,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text(
-                            'On sale',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            child: Text(
+                              'On sale',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  if (onCompare != null)
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: IconButton(
-                        tooltip: 'Add to compare',
-                        onPressed: onCompare,
-                        icon: const Icon(Icons.compare_arrows_rounded),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.white.withAlpha(230),
-                          foregroundColor: _navy,
+                    if (widget.onCompare != null)
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: IconButton(
+                          tooltip: 'Add to compare',
+                          onPressed: widget.onCompare,
+                          icon: const Icon(Icons.compare_arrows_rounded),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white.withAlpha(230),
+                            foregroundColor: _navy,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
             Padding(
@@ -3109,6 +3139,26 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
   var _imageIndex = 0;
   late Future<StoreHomeData> _footerData;
 
+  Future<void> _confirmToricOrder() async {
+    final link = widget.product.orderingPolicy?['whatsappUrl']?.toString();
+    final uri = Uri.tryParse(link ?? '');
+    if (uri == null || uri.scheme != 'https' || uri.host != 'wa.me') {
+      setState(
+        () => _error =
+            'The WhatsApp contact link is unavailable. Please contact the store.',
+      );
+      return;
+    }
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (error) {
+      debugPrint('Toric WhatsApp link could not be opened: $error');
+    }
+    if (mounted) {
+      setState(() => _error = 'Could not open WhatsApp. Please try again.');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -3211,6 +3261,26 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
               fontWeight: FontWeight.w900,
             ),
           ),
+          if (product.requiresWhatsAppConfirmation) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _pale,
+                border: Border.all(color: _blue),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Toric lenses are ordered only after confirmation on WhatsApp. Full payment in advance is required. Discuss spherical power, cylinder and axis with the store.',
+                style: TextStyle(
+                  color: _ink,
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
           if (product.description?.isNotEmpty == true) ...[
             const SizedBox(height: 16),
             Text(
@@ -3218,7 +3288,8 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
               style: const TextStyle(color: _ink, height: 1.5),
             ),
           ],
-          if (product.variants.isNotEmpty) ...[
+          if (!product.requiresWhatsAppConfirmation &&
+              product.variants.isNotEmpty) ...[
             const SizedBox(height: 18),
             DropdownButtonFormField<String>(
               initialValue: _variant?.id,
@@ -3239,7 +3310,8 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
               }),
             ),
           ],
-          if (product.availablePowerRanges.isNotEmpty) ...[
+          if (!product.requiresWhatsAppConfirmation &&
+              product.availablePowerRanges.isNotEmpty) ...[
             const SizedBox(height: 18),
             const Text(
               'Power selection · surcharge per eye',
@@ -3308,7 +3380,7 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
           ],
-          if (!available) ...[
+          if (!available && !product.requiresWhatsAppConfirmation) ...[
             const SizedBox(height: 12),
             const Text(
               'Currently unavailable',
@@ -3323,9 +3395,21 @@ class _StoreProductDetailsScreenState extends State<StoreProductDetailsScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: available ? _add : null,
-              icon: const Icon(Icons.shopping_bag_outlined),
-              label: const Text('Add to bag'),
+              onPressed: product.requiresWhatsAppConfirmation
+                  ? _confirmToricOrder
+                  : available
+                  ? _add
+                  : null,
+              icon: Icon(
+                product.requiresWhatsAppConfirmation
+                    ? Icons.chat_outlined
+                    : Icons.shopping_bag_outlined,
+              ),
+              label: Text(
+                product.requiresWhatsAppConfirmation
+                    ? 'Confirm this order on WhatsApp'
+                    : 'Add to bag',
+              ),
             ),
           ),
           FutureBuilder<StoreHomeData>(

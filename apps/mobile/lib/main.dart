@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'admin_free_gift_settings.dart';
 import 'free_gift_widgets.dart';
@@ -41,6 +42,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
   final List<StoreProduct> _comparison = [];
   ShopperSession? _session;
   Map<String, dynamic> _appearance = const {};
+  Uri? _whatsappSupportUri;
   var _tab = 0;
   StoreBrowseFilter _browseFilter = const StoreBrowseFilter();
 
@@ -78,9 +80,35 @@ class _IskLensesAppState extends State<IskLensesApp> {
   Future<void> _loadAppearance() async {
     try {
       final home = await _api.getHomeData();
-      if (mounted) setState(() => _appearance = home.appearance);
+      final supportUri = Uri.tryParse(home.chrome.whatsappSupportUrl ?? '');
+      if (mounted) {
+        setState(() {
+          _appearance = home.appearance;
+          _whatsappSupportUri =
+              supportUri?.scheme == 'https' && supportUri?.host == 'wa.me'
+              ? supportUri
+              : null;
+        });
+      }
     } on StoreApiException catch (error) {
       debugPrint('Shared storefront appearance unavailable: ${error.message}');
+    }
+  }
+
+  Future<void> _openWhatsApp() async {
+    final uri = _whatsappSupportUri;
+    if (uri == null) return;
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (error) {
+      debugPrint('WhatsApp support link could not be opened: $error');
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(_navigatorContext).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open WhatsApp. Please try again.'),
+        ),
+      );
     }
   }
 
@@ -155,6 +183,16 @@ class _IskLensesAppState extends State<IskLensesApp> {
   }
 
   void _addToCart(CartLine line) {
+    if (line.product.requiresWhatsAppConfirmation) {
+      ScaffoldMessenger.of(_navigatorContext).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Toric lenses require WhatsApp confirmation and full advance payment.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() {
       final index = _cart.indexWhere((item) => item.key == line.key);
       if (index < 0) {
@@ -709,9 +747,12 @@ class _IskLensesAppState extends State<IskLensesApp> {
                               const Icon(Icons.remove_red_eye_outlined),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
-                          'ISK Lenses',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                        const Flexible(
+                          child: Text(
+                            'ISK Lenses',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
                         ),
                       ],
                     )
@@ -720,6 +761,12 @@ class _IskLensesAppState extends State<IskLensesApp> {
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
               actions: [
+                if (_whatsappSupportUri != null)
+                  IconButton(
+                    onPressed: _openWhatsApp,
+                    tooltip: 'Connect on WhatsApp',
+                    icon: const Icon(Icons.chat_outlined),
+                  ),
                 IconButton(
                   onPressed: _openCart,
                   tooltip: 'Open your bag',
@@ -1499,6 +1546,10 @@ class _ProductSheetState extends State<ProductSheet> {
               ),
             ),
             const SizedBox(height: 6),
+            if (product.requiresWhatsAppConfirmation)
+              const Text(
+                'Toric orders require WhatsApp confirmation and full advance payment. Open the product details to contact the store.',
+              ),
             Text(
               _money(
                 _variant?.price ?? product.price,
@@ -1573,7 +1624,9 @@ class _ProductSheetState extends State<ProductSheet> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: available ? _add : null,
+                onPressed: available && !product.requiresWhatsAppConfirmation
+                    ? _add
+                    : null,
                 child: const Text('Add to bag'),
               ),
             ),

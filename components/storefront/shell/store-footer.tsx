@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { MessageCircle } from 'lucide-react'
 import type { SiteChrome } from '@/lib/content-types'
 import type { CategoryNode } from '@/lib/catalog-types'
 import { STORE_NAME } from '@/lib/store-config'
@@ -22,7 +21,6 @@ export function StoreFooter({ chrome, homepage = false, brands = [], categories 
   const phone = contact.phone ?? ''
   const email = contact.email ?? ''
   const facebook = contact.facebook ?? ''
-  const whatsapp = contact.whatsapp?.replace(/[^\d]/g, '') ?? ''
   const instagram = contact.instagram ?? ''
   if (homepage) {
     const shop = categories
@@ -89,17 +87,6 @@ export function StoreFooter({ chrome, homepage = false, brands = [], categories 
           Copyright {new Date().getFullYear()} © {STORE_NAME} All Rights Reserved. Contact lenses are medical devices; follow the guidance of your eye-care professional.
         </p>
       </div>
-      {whatsapp && (
-        <a
-          href={`https://wa.me/${whatsapp}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Chat on WhatsApp"
-          className="fixed bottom-5 right-5 z-30 grid size-14 place-items-center rounded-full bg-[#25d366] text-white shadow-lg hover:scale-105"
-        >
-          <MessageCircle size={26} aria-hidden="true" />
-        </a>
-      )}
     </footer>
   )
 }

@@ -253,3 +253,6 @@ Admin and customer credentials live in `store_admin_users` / `store_customers`. 
 - Gift flash bar + cart gift choice shared with checkout; homepage `showcase` section (config id `showcase`) with big spotlight images; default order puts brands 6th. Keep web and Flutter identical.
 
 - Bulk price/power product actions: `bulkUpdateProductPrices`, `bulkUpdateProductPowerOptions` (catalog-admin.ts), REST `/api/admin/products/bulk-price|bulk-power`. Power defaults extend to -14.00. Mobile admin bulk UI not implemented.
+# Toric ordering
+
+Toric lens types use a derived storefront category and must be confirmed on WhatsApp with full advance payment; cash-on-delivery checkout rejects them server-side. No prescription combinations, pricing or payment verification are inferred or implemented; consult `docs/API_MOBILE_INTEGRATION.md` before extending this workflow.

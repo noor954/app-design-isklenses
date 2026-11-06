@@ -69,7 +69,7 @@
           "Catalog"
         ],
         "summary": "List active products",
-        "description": "Without pagination parameters, returns the full legacy catalog list. Send page to use bounded pagination; page size defaults to 24 and limit is capped at 100.",
+        "description": "Without pagination parameters, returns the full legacy catalog list. Send page to use bounded pagination; page size defaults to 24 and limit is capped at 100. Toric lens types are included in the Toric category and expose orderingPolicy requiring WhatsApp confirmation and advance payment.",
         "parameters": [
           {
             "name": "page",
@@ -256,6 +256,7 @@
           "Catalog"
         ],
         "summary": "Get a published product",
+        "description": "Toric products expose orderingPolicy with mode whatsapp_advance_payment, notice and whatsappUrl. Non-Toric products have a null orderingPolicy.",
         "parameters": [
           {
             "$ref": "#/components/parameters/Slug"
@@ -523,7 +524,7 @@
           "Shopper"
         ],
         "summary": "Place a cash-on-delivery order",
-        "description": "Prices, stock, and delivery fees are revalidated on the server. checkoutKey must be a UUID and should remain unchanged across retries of the same checkout attempt. Native clients may omit Origin. Rate limited.",
+        "description": "Prices, stock, and delivery fees are revalidated on the server. Toric products cannot be ordered via cash on delivery and return 409; confirm them through WhatsApp and arrange full advance payment. checkoutKey must be a UUID and should remain unchanged across retries of the same checkout attempt. Native clients may omit Origin. Rate limited.",
         "requestBody": {
           "required": true,
           "content": {
@@ -542,7 +543,7 @@
             "$ref": "#/components/responses/BadRequest"
           },
           "409": {
-            "description": "Price, stock, or idempotency conflict."
+            "description": "Price, stock, idempotency or Toric ordering policy conflict."
           },
           "413": {
             "description": "Request too large."
@@ -1078,6 +1079,7 @@
           "Admin"
         ],
         "summary": "Create a product",
+        "description": "diameterMm is a single value: 14, 14.2, 14.5, or 14.8 mm, or a legacy value from 0 to 12 in 0.1 increments. Customer-selectable diameter lists are not supported.",
         "security": [
           {
             "adminCookie": []
@@ -1129,6 +1131,7 @@
           "Admin"
         ],
         "summary": "Replace editable product fields",
+        "description": "diameterMm is a single value: 14, 14.2, 14.5, or 14.8 mm, or a legacy value from 0 to 12 in 0.1 increments. Customer-selectable diameter lists are not supported.",
         "security": [
           {
             "adminCookie": []
@@ -3314,6 +3317,14 @@
               },
               "chrome": {
                 "type": "object",
+                "required": ["whatsappSupportUrl"],
+                "properties": {
+                  "whatsappSupportUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "WhatsApp support chat link with a suggested message. The shopper confirms sending in WhatsApp."
+                  }
+                },
                 "additionalProperties": true
               },
               "products": {
@@ -3698,6 +3709,12 @@
           "data"
         ],
         "properties": {
+          "orderingPolicy": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/ToricOrderingPolicy" },
+              { "type": "null" }
+            ]
+          },
           "data": {
             "type": "array",
             "items": {
@@ -3745,6 +3762,15 @@
             "type": "string",
             "format": "date-time"
           }
+        }
+      },
+      "ToricOrderingPolicy": {
+        "type": "object",
+        "required": ["mode", "notice", "whatsappUrl"],
+        "properties": {
+          "mode": { "type": "string", "enum": ["whatsapp_advance_payment"] },
+          "notice": { "type": "string" },
+          "whatsappUrl": { "type": "string", "format": "uri" }
         }
       },
       "ShopperSessionInput": {

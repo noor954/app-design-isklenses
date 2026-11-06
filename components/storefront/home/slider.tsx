@@ -99,10 +99,10 @@ export function Slider({ label, children, autoPlayMs = 0, dots = false, arrows =
         )
       )}
       {dots && count > 1 && (
-        <div className={editorialControls ? 'absolute bottom-6 left-5 flex gap-4 sm:bottom-8 sm:left-8' : 'absolute inset-x-0 bottom-3 flex justify-center gap-2'}>
+        <div className={editorialControls ? 'absolute bottom-6 left-5 flex gap-1 sm:bottom-8 sm:left-8 sm:gap-4' : 'absolute inset-x-0 bottom-3 flex justify-center gap-2'}>
           {children.map((_, i) => editorialControls ? (
             <button key={i} type="button" aria-label={`Show slide ${i + 1}`} aria-current={i === index} onClick={() => go(i)} className="group flex flex-col items-start gap-2 py-1">
-              <span className={`relative block h-0.5 w-12 overflow-hidden rounded-full sm:w-16 ${i === index ? 'bg-[#b8e8f5]' : 'bg-white/45'}`} />
+              <span className={`relative block h-0.5 w-3 overflow-hidden rounded-full sm:w-16 ${i === index ? 'bg-[#b8e8f5]' : 'bg-white/45'}`} />
               <span className="text-xs font-medium text-white/85">{String(i + 1).padStart(2, '0')}</span>
             </button>
           ) : (

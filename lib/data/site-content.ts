@@ -23,6 +23,7 @@ import type { AppearanceConfiguration } from '@/lib/home-configuration'
 import { db } from '@/lib/db'
 import { getDeliveryAnnouncement, parseDeliveryRules } from '@/lib/delivery'
 import { storeBanners, storeReviews, storeSettings } from '@/lib/db/schema'
+import { WHATSAPP_SUPPORT_URL } from '@/lib/whatsapp'
 
 export const CONTENT_NAMESPACE = 'content'
 const TTL_SECONDS = 300
@@ -164,6 +165,7 @@ export async function getSiteChrome(): Promise<SiteChrome> {
     return {
       announcements: asStrings(settings.announcements).filter((item) => !LEGACY_ANNOUNCEMENTS.includes(item)),
       deliveryNotice: getDeliveryAnnouncement(deliveryRules),
+      whatsappSupportUrl: WHATSAPP_SUPPORT_URL,
       contact: (settings.contact ?? {}) as ContactSettings,
       footer: storefrontFooter(settings.footer),
     }
@@ -172,6 +174,7 @@ export async function getSiteChrome(): Promise<SiteChrome> {
     return {
       announcements: [],
       deliveryNotice: null,
+      whatsappSupportUrl: WHATSAPP_SUPPORT_URL,
       contact: {},
       footer: {},
       loadError: 'Store announcements and contact details could not be loaded.',

@@ -27,6 +27,7 @@ export interface Product {
   lensShade?: { id: string; name: string; hex: string | null; imageUrl?: string | null; fallbackImageUrl?: string | null } | null
   lensTypeId?: string | null
   lensType?: { id: string; name: string } | null
+  orderingPolicy?: { mode: 'whatsapp_advance_payment'; notice: string; whatsappUrl: string } | null
   sku?: string | null
   price: string
   compareAtPrice?: string | null

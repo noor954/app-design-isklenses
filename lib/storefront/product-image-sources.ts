@@ -16,3 +16,8 @@ export function getProductImageSources(product: ProductImageData) {
       .map((asset) => isManagedMediaUrl(asset.blobUrl) ? asset.blobUrl : null),
   ].filter((source): source is string => Boolean(source)))]
 }
+
+export function getProductAlternateImageSource(product: ProductImageData) {
+  const [primary, ...alternates] = getProductImageSources(product)
+  return primary ? alternates[0] ?? null : null
+}

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isk_lenses_mobile/admin_product_editor.dart';
 import 'package:isk_lenses_mobile/main.dart';
 import 'package:isk_lenses_mobile/store_api.dart';
+import 'package:isk_lenses_mobile/storefront_screens.dart';
 
 class _FakeStoreApi extends StoreApi {
   _FakeStoreApi() : super(apiOrigin: 'https://isklenses.com');
@@ -55,7 +58,12 @@ class _FakeStoreApi extends StoreApi {
     shades: [],
     lensTypes: [],
     reviews: [],
-    chrome: StoreChrome(contact: {}, footer: {}),
+    chrome: StoreChrome(
+      contact: {},
+      footer: {},
+      whatsappSupportUrl:
+          'https://wa.me/923015740405?text=Hello%2C%20I%20have%20a%20question%20about%20ISK%20Lenses.',
+    ),
     headings: {},
     appearance: {'palette': 'sky'},
     origin: 'https://isklenses.com',
@@ -86,6 +94,114 @@ class _FakeAdminApi extends AdminApi {
 }
 
 void main() {
+  testWidgets('product card previews another gallery image on mouse hover', (
+    tester,
+  ) async {
+    final product = StoreProduct.fromJson({
+      'id': 'preview-product',
+      'name': 'Preview lens',
+      'slug': 'preview-lens',
+      'price': '100',
+      'currency': 'PKR',
+      'stockQuantity': 1,
+      'heroImageUrl': '/api/media/first.webp',
+      'assets': [
+        {'mediaType': 'image', 'blobUrl': '/api/media/first.webp'},
+        {'mediaType': 'image', 'blobUrl': '/api/media/second.webp'},
+      ],
+    }, Uri.parse('https://isklenses.com'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 200,
+              height: 300,
+              child: StoreProductCard(product: product, onTap: () {}),
+            ),
+          ),
+        ),
+      ),
+    );
+    final alternate = find.byWidgetPredicate(
+      (widget) =>
+          widget is Image &&
+          widget.image is NetworkImage &&
+          (widget.image as NetworkImage).url.endsWith('/second.webp'),
+    );
+    expect(alternate, findsNothing);
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(
+      location:
+          tester.getTopLeft(find.byType(StoreProductCard)) +
+          const Offset(50, 50),
+    );
+    await tester.pump();
+    expect(alternate, findsOneWidget);
+    await gesture.moveTo(Offset.zero);
+    await tester.pump();
+    expect(alternate, findsNothing);
+    await gesture.removePointer();
+  });
+
+  testWidgets('Toric details require WhatsApp and advance payment', (
+    tester,
+  ) async {
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    String? openedUrl;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      if (call.method == 'launch') {
+        openedUrl = (call.arguments as Map)['url'] as String?;
+        return true;
+      }
+      return false;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+    final product = StoreProduct.fromJson({
+      'id': 'product-1',
+      'name': 'Toric sample',
+      'slug': 'toric-sample',
+      'price': '100',
+      'currency': 'PKR',
+      'stockQuantity': 1,
+      'lensType': {'name': 'Toric'},
+      'orderingPolicy': {
+        'mode': 'whatsapp_advance_payment',
+        'whatsappUrl': 'https://wa.me/923015740405?text=Toric',
+      },
+    }, Uri.parse('https://isklenses.com'));
+    var added = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StoreProductDetailsScreen(
+          api: _FakeStoreApi(),
+          product: product,
+          onAdd: (_) => added = true,
+          onPage: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Full payment in advance is required'),
+      findsOneWidget,
+    );
+    final action = find.text('Confirm this order on WhatsApp');
+    await tester.ensureVisible(action);
+    await tester.tap(action);
+    await tester.pump();
+    expect(openedUrl, 'https://wa.me/923015740405?text=Toric');
+    expect(added, isFalse);
+    expect(find.text('Add to bag'), findsNothing);
+  });
+
   testWidgets('renders the ISK Lenses shopper navigation', (tester) async {
     await tester.pumpWidget(
       IskLensesApp(api: _FakeStoreApi(), adminApi: _FakeAdminApi()),
@@ -97,6 +213,76 @@ void main() {
     expect(find.byTooltip('Open your bag'), findsOneWidget);
     expect(find.text('Help'), findsOneWidget);
     expect(find.text('Account'), findsOneWidget);
+    expect(find.byTooltip('Connect on WhatsApp'), findsOneWidget);
+  });
+
+  testWidgets('home fits a narrow phone with larger text', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(
+      IskLensesApp(api: _FakeStoreApi(), adminApi: _FakeAdminApi()),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Connect on WhatsApp'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('WhatsApp button opens the shared support link', (tester) async {
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    String? openedUrl;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      if (call.method == 'launch') {
+        openedUrl = (call.arguments as Map)['url'] as String?;
+        return true;
+      }
+      return false;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      IskLensesApp(api: _FakeStoreApi(), adminApi: _FakeAdminApi()),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Connect on WhatsApp'));
+    await tester.pump();
+    expect(
+      openedUrl,
+      'https://wa.me/923015740405?text=Hello%2C%20I%20have%20a%20question%20about%20ISK%20Lenses.',
+    );
+  });
+
+  testWidgets('WhatsApp launch failure is visible', (tester) async {
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (_) async => false,
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      IskLensesApp(api: _FakeStoreApi(), adminApi: _FakeAdminApi()),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Connect on WhatsApp'));
+    await tester.pump();
+    expect(
+      find.text('Could not open WhatsApp. Please try again.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('animates configured slides on autoplay and swipe', (
@@ -184,5 +370,11 @@ void main() {
     expect(find.text('Water content (%)'), findsOneWidget);
     expect(find.text('0.00'), findsNothing);
     expect(find.text('0%'), findsNothing);
+    await tester.tap(find.text('Diameter (mm)'));
+    await tester.pumpAndSettle();
+    expect(find.text('14.00'), findsOneWidget);
+    expect(find.text('14.20'), findsOneWidget);
+    expect(find.text('14.50'), findsOneWidget);
+    expect(find.text('14.80'), findsOneWidget);
   });
 }

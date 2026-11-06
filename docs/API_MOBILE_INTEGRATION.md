@@ -156,6 +156,7 @@ The UUIDs in the JSON are illustrative: replace `productId` with an actual UUID 
 - JSON success responses generally use `{ "data": ... }`; errors use `{ "error": "..." }`. Checkout returns `orderNumber` and `reused`. The paginated product response includes `{ data, pagination: { page, limit, total, totalPages }, timestamp }`.
 - `GET /api/products` retains the legacy unbounded response when called without `page`; mobile clients should always pass `page` and may pass `limit` (1–100, default 24). Filters are `category`, `brand`, `shadeId`, `lensTypeId`, and `q`; supported sort orders are `newest`, `price_asc`, `price_desc`, `name_asc`, and `featured`.
 - Public catalog and settings responses use `no-store` HTTP headers so clients and CDNs do not bypass server-side invalidation. The server caches shared catalog and content reads. Media responses may be stored but require revalidation on every reuse; clients should send the returned ETag in `If-None-Match` to avoid retransmitting unchanged images. Account, order, and admin responses are `no-store`. Honor HTTP cache headers and do not persist stale inventory or prices.
+- `GET /api/storefront/home` returns `data.chrome.whatsappSupportUrl`, the shared WhatsApp support link for the web and mobile apps. It opens a prefilled message; the shopper must send it in WhatsApp. This support number is currently application-configured and separate from admin-editable general contact details.
 - Expect `400` validation errors, `401` unauthenticated/invalid credentials, `403` forbidden/origin rejection, `404` missing resources, `409` checkout conflicts, `413` oversized bodies, `415` unsupported content types, `429` rate limits, and `5xx` service failures. Retry transient failures with bounded backoff; for checkout always reuse its idempotency key.
 - Current public throttling is best-effort per process, not distributed. Configure edge-level rate limits before broad production traffic.
 - The Meta webhook is server-to-server only and verifies `X-Hub-Signature-256`; it is not a mobile client endpoint.
@@ -191,3 +192,18 @@ The independent scaffold at [`services/fastapi/README.md`](../services/fastapi/R
 - `PATCH /api/admin/products/bulk-price` `{ ids (1-100), mode: set|percent|amount, value, includeCompareAt }` updates product and variant prices.
 - `PATCH /api/admin/products/bulk-power` `{ ids (1-100), mode: replace|add|remove, values[] }` edits available power values.
 - Default power values are now 0.00 and -0.25 to -14.00 (0.25 steps); the admin power manager has an "Add missing values" button. Flutter has no bulk product list yet (web/REST only).
+
+## Diameter editing
+
+- The web and Flutter product editors offer diameter values 14, 14.2, 14.5 and 14.8 mm and display existing saved values. Product create/update APIs accept these values in `diameterMm`; legacy values from 0 to 12 in 0.1 increments remain supported. Other previously saved values may require correction before a product can be saved. Diameter is still a single product specification, not a customer-selectable list.
+
+## Toric ordering
+
+- Products whose lens type is named `Toric` appear automatically in the storefront Toric category, including `/api/product-categories` and the `category` filter of `/api/products`. This is a derived storefront category, not a change to the product's administrative category assignments.
+- Public product records include `orderingPolicy: { mode: "whatsapp_advance_payment", notice, whatsappUrl }` for Toric products and `null` otherwise. Clients must direct shoppers to the provided WhatsApp URL, explain that confirmation and full advance payment are required, and not offer cash-on-delivery checkout. `POST /api/orders` rejects Toric items and gifts with HTTP 409, including from older clients.
+- Prescription parameters and advance payment are confirmed with the store through WhatsApp. No payment is collected or verified by the API, and no Toric prescription ranges, combinations, prices or per-eye quantities are inferred from another retailer.
+
+## Product carousel image previews
+
+- Product records already provide `heroImageUrl` and ordered `assets`. On hover, the web product cards preview the first distinct managed gallery image after the primary image; pointer-enabled Flutter clients do the same. Touch clients continue to open the product gallery normally. A missing or failed alternate leaves the primary visible.
+- Gallery order is not a classification of photo content: an administrator must place the intended full-person photograph first among images other than the primary using product media ordering. If the gallery has no such photograph, no accurate full-person preview is guaranteed.

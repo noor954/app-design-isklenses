@@ -887,14 +887,20 @@ class StoreReview {
 }
 
 class StoreChrome {
-  const StoreChrome({required this.contact, required this.footer});
+  const StoreChrome({
+    required this.contact,
+    required this.footer,
+    this.whatsappSupportUrl,
+  });
 
   final Map<String, dynamic> contact;
   final Map<String, dynamic> footer;
+  final String? whatsappSupportUrl;
 
   factory StoreChrome.fromJson(Map value) => StoreChrome(
     contact: _asMap(value['contact']),
     footer: _asMap(value['footer']),
+    whatsappSupportUrl: value['whatsappSupportUrl'] as String?,
   );
 }
 
@@ -935,6 +941,7 @@ class StoreProduct {
     required this.categoryIds,
     required this.shade,
     required this.lensType,
+    required this.orderingPolicy,
     required this.compareAtPrice,
     required this.diameterMm,
     required this.baseCurve,
@@ -969,6 +976,10 @@ class StoreProduct {
   final List<String> categoryIds;
   final Map<String, dynamic>? shade;
   final Map<String, dynamic>? lensType;
+  final Map<String, dynamic>? orderingPolicy;
+  bool get requiresWhatsAppConfirmation =>
+      orderingPolicy?['mode'] == 'whatsapp_advance_payment' ||
+      lensType?['name']?.toString().trim().toLowerCase() == 'toric';
   final String? compareAtPrice;
   final String? diameterMm;
   final String? baseCurve;
@@ -1050,6 +1061,9 @@ class StoreProduct {
       }.toList(growable: false),
       shade: shade is Map ? Map<String, dynamic>.from(shade) : null,
       lensType: lensType is Map ? Map<String, dynamic>.from(lensType) : null,
+      orderingPolicy: value['orderingPolicy'] is Map
+          ? Map<String, dynamic>.from(value['orderingPolicy'] as Map)
+          : null,
       compareAtPrice: value['compareAtPrice']?.toString(),
       diameterMm: value['diameterMm']?.toString(),
       baseCurve: value['baseCurve']?.toString(),

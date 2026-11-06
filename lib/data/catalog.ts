@@ -31,6 +31,7 @@ import {
   normalizePowerLensOptions,
   resolvePowerOptionValues,
 } from '@/lib/power-lens-options'
+import { isToricLensType, TORIC_ORDER_NOTICE, toricWhatsAppUrl } from '@/lib/toric'
 
 export const CATALOG_NAMESPACE = 'catalog'
 
@@ -104,7 +105,7 @@ function getProductImageCandidates() {
 }
 
 async function loadCategories(): Promise<CategoryNode[]> {
-  const [rows, counts, imageCandidates] = await Promise.all([
+  const [rows, counts, imageCandidates, types] = await Promise.all([
     db.select().from(storeCategories).where(eq(storeCategories.isActive, true)).orderBy(asc(storeCategories.sortOrder), asc(storeCategories.name)),
     db
       .select({ categoryId: storeProductCategories.categoryId, count: sql<number>`count(distinct ${storeProducts.id})::int` })
@@ -113,18 +114,35 @@ async function loadCategories(): Promise<CategoryNode[]> {
       .where(eq(storeProducts.status, 'active'))
       .groupBy(storeProductCategories.categoryId),
     getProductImageCandidates(),
+    db.select({ id: storeLensTypes.id, name: storeLensTypes.name }).from(storeLensTypes),
   ])
+  const toricType = types.find((type) => isToricLensType(type.name))
+  const toricCategory = rows.find((category) => category.slug === 'toric' || isToricLensType(category.name))
+  const toricId = toricCategory?.id ?? toricType?.id
+  const toricProducts = toricType && toricId
+    ? await db.select({ id: storeProducts.id }).from(storeProducts)
+      .where(and(eq(storeProducts.status, 'active'), or(
+        eq(storeProducts.lensTypeId, toricType.id),
+        inArray(storeProducts.id, db.select({ productId: storeProductCategories.productId }).from(storeProductCategories).where(eq(storeProductCategories.categoryId, toricId))),
+      )))
+    : []
   const direct = new Map(counts.map((row) => [row.categoryId, row.count]))
-  const nodes = buildCategoryPaths(rows.map((row) => ({
+  const categoryRows = rows.map((row) => ({
     id: row.id, parentId: row.parentId, name: row.name, slug: row.slug, description: row.description,
     imageUrl: row.imageUrl, sortOrder: row.sortOrder, isActive: row.isActive, showInMenu: row.showInMenu,
-  })))
+  }))
+  if (!toricCategory && toricType) categoryRows.push({
+    id: toricType.id, parentId: null, name: 'Toric', slug: 'toric',
+    description: 'Toric lenses', imageUrl: null, sortOrder: 0, isActive: true, showInMenu: true,
+  })
+  const nodes = buildCategoryPaths(categoryRows)
   return nodes.map((node) => {
     const branch = descendantIds(nodes, node.id)
     let productCount = 0
     for (const id of branch) productCount += direct.get(id) ?? 0
-    const fallbackImageUrl = imageCandidates.find((product) => product.categoryIds.some((id) => branch.has(id)))?.imageUrl ?? null
-    return { ...node, fallbackImageUrl, productCount }
+    if (toricId && branch.has(toricId)) productCount += toricProducts.length - (direct.get(toricId) ?? 0)
+    const fallbackImageUrl = imageCandidates.find((product) => product.categoryIds.some((id) => branch.has(id)) || (toricType && branch.has(toricId!) && product.lensTypeId === toricType.id))?.imageUrl ?? null
+    return { ...node, showInMenu: node.id === toricId ? true : node.showInMenu, fallbackImageUrl, productCount }
   })
 }
 
@@ -175,7 +193,7 @@ const productColumns = {
   updatedAt: storeProducts.updatedAt,
 }
 
-async function enrich<T extends { id: string; availablePowerRanges: string[] | null; categoryId: string | null; lensShadeId: string | null; lensTypeId: string | null }>(products: T[]) {
+async function enrich<T extends { id: string; name: string; availablePowerRanges: string[] | null; categoryId: string | null; lensShadeId: string | null; lensTypeId: string | null }>(products: T[]) {
   const ids = products.map((product) => product.id)
   if (!ids.length) return []
   const [assets, variants, ratings, categories, assignments, shades, types, imageCandidates, settings] = await Promise.all([
@@ -213,17 +231,25 @@ async function enrich<T extends { id: string; availablePowerRanges: string[] | n
     fallbackImageUrl: imageCandidates.find((candidate) => candidate.lensShadeId === shade.id)?.imageUrl ?? null,
   }]))
   const typesById = new Map(types.map((type) => [type.id, type]))
+  const toricCategory = categories.find((category) => category.slug === 'toric' || isToricLensType(category.name))
   return products.map((product) => {
     const availablePowerRanges = resolvePowerOptionValues(product.availablePowerRanges, powerOptions)
+    const lensType = product.lensTypeId ? typesById.get(product.lensTypeId) ?? null : null
+    const toric = isToricLensType(lensType?.name)
+    const productCategories = [...(assigned.get(product.id) ?? [])]
+    if (toric && toricCategory && !productCategories.some((category) => category.id === toricCategory.id)) {
+      productCategories.push({ id: toricCategory.id, name: toricCategory.name })
+    }
     return {
       ...product,
       availablePowerRanges,
       availablePowerOptions: powerOptions.filter((option) => availablePowerRanges.includes(option.value)),
       categoryPath: product.categoryId ? pathMap.get(product.categoryId) ?? '' : '',
-      categoryIds: assigned.get(product.id)?.map((category) => category.id) ?? (product.categoryId ? [product.categoryId] : []),
-      categories: assigned.get(product.id) ?? [],
+      categoryIds: [...new Set([...productCategories.map((category) => category.id), ...(product.categoryId ? [product.categoryId] : [])])],
+      categories: productCategories,
       lensShade: product.lensShadeId ? shadesById.get(product.lensShadeId) ?? null : null,
-      lensType: product.lensTypeId ? typesById.get(product.lensTypeId) ?? null : null,
+      lensType,
+      orderingPolicy: toric ? { mode: 'whatsapp_advance_payment' as const, notice: TORIC_ORDER_NOTICE, whatsappUrl: toricWhatsAppUrl(product.name) } : null,
       assets: assetMap.get(product.id) ?? [],
       variants: variantMap.get(product.id) ?? [],
       ratingAvg: ratingMap.get(product.id) ? Math.round(Number(ratingMap.get(product.id)!.avg) * 10) / 10 : null,
@@ -247,7 +273,13 @@ async function buildCatalogConditions(
     const target = all.find((category) => category.slug === categorySlug)
     if (!target) return null
     const matchingCategoryIds = [...descendantIds(all, target.id)]
-    conditions.push(inArray(storeProducts.id, db.select({ productId: storeProductCategories.productId }).from(storeProductCategories).where(inArray(storeProductCategories.categoryId, matchingCategoryIds))))
+    const assigned = inArray(storeProducts.id, db.select({ productId: storeProductCategories.productId }).from(storeProductCategories).where(inArray(storeProductCategories.categoryId, matchingCategoryIds)))
+    const toricCategory = all.find((category) => category.slug === 'toric' || isToricLensType(category.name))
+    if (toricCategory && matchingCategoryIds.includes(toricCategory.id)) {
+      conditions.push(or(assigned, sql`lower(btrim(${storeLensTypes.name})) = 'toric'`)!)
+    } else {
+      conditions.push(assigned)
+    }
   }
   if (query) {
     const like = `%${query.replace(/[%_\\]/g, '\\$&')}%`

@@ -11,6 +11,7 @@ import { getProductImageSources, StorefrontProductImage } from '@/components/sto
 import { StorefrontFallbackImage } from '@/components/storefront/fallback-image'
 import { reportError } from '@/lib/ui/notifications'
 import { powerSurchargeCents, priceWithPowerSurcharge } from '@/lib/power-lens-options'
+import { isToricLensType, TORIC_ORDER_NOTICE, toricWhatsAppUrl } from '@/lib/toric'
 
 function formatPrice(value: string, currency: string) {
   const amount = Number(value)
@@ -97,6 +98,7 @@ export function StorefrontProductDetail({
   const [tab, setTab] = useState<'description' | 'specs' | 'reviews'>('description')
   const { product: refreshedProduct, isError, error } = useProduct(initialProduct.slug, initialProduct)
   const product = refreshedProduct ?? initialProduct
+  const isToric = isToricLensType(product.lensType?.name)
   const variants = product.variants ?? []
   const [selectedVariantId, setSelectedVariantId] = useState(
     initialOptionId && variants.some((variant) => variant.id === initialOptionId)
@@ -227,6 +229,13 @@ export function StorefrontProductDetail({
               <span className="font-semibold text-[#15384d]">Lens type:</span> {product.lensType.name}
             </p>
           )}
+          {isToric && (
+            <div className="mt-5 w-full rounded-xl border border-[#006f9b] bg-[#e8f6fb] p-4 text-sm leading-6 text-[#15384d]">
+              <p className="font-bold">Toric orders require confirmation</p>
+              <p>{TORIC_ORDER_NOTICE}</p>
+              <p>Discuss your prescription, including spherical power, cylinder and axis, with the store.</p>
+            </div>
+          )}
           {product.lensShade && (
             <div className="mt-6">
               <p className="font-mono text-xs font-bold uppercase tracking-[.15em]">Lens shade</p>
@@ -246,7 +255,7 @@ export function StorefrontProductDetail({
             </div>
           )}
 
-          {requiresPowerSelection && (
+          {!isToric && requiresPowerSelection && (
             <fieldset className="mt-7 w-full rounded-2xl border border-[#b8d4e0] bg-[#e8f6fb] p-5">
               <legend className="px-1 text-base font-semibold text-[#15384d]">Choose lens power</legend>
               <p className="text-sm leading-5 text-[#526b7b]">Choose a power for each eye. Each selected eye adds its listed surcharge to the lens price.</p>
@@ -292,7 +301,7 @@ export function StorefrontProductDetail({
             </fieldset>
           )}
 
-          {variants.length > 0 && (
+          {!isToric && variants.length > 0 && (
             <div id="listed-options" className="mt-8 w-full scroll-mt-8">
               <label htmlFor="product-variant" className="mb-2 block font-mono text-xs font-bold uppercase tracking-[.15em]">Choose a listed option</label>
               <select
@@ -332,7 +341,11 @@ export function StorefrontProductDetail({
           <p className="mt-4 text-xs leading-5 text-[#314a63]">
             Only specifications entered for this product are displayed. Confirm product details with the store before purchase.
           </p>
-          <button
+          {isToric ? (
+            <a href={toricWhatsAppUrl(product.name)} target="_blank" rel="noopener noreferrer" className="mt-8 w-full bg-[#152a52] px-5 py-4 text-center text-sm font-bold text-white hover:bg-[#16468a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16468a]">
+              Confirm this order on WhatsApp
+            </a>
+          ) : <button
             type="button"
             onClick={() => {
               add(
@@ -350,8 +363,8 @@ export function StorefrontProductDetail({
               : requiresPowerSelection && !powerSelectionReady
                 ? 'Select power for both eyes'
                 : 'Add selected option to bag'}
-          </button>
-          <p className="mt-3 w-full text-center text-xs font-mono uppercase tracking-[.1em] text-[#314a63]">Cash on delivery · guest or account checkout</p>
+          </button>}
+          {!isToric && <p className="mt-3 w-full text-center text-xs font-mono uppercase tracking-[.1em] text-[#314a63]">Cash on delivery · guest or account checkout</p>}
         </section>
       </div>
 

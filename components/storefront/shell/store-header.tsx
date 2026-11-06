@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ChevronDown, Menu, Phone, Search, ShoppingBag, Truck, User, X } from 'lucide-react'
+import { ChevronDown, Menu, MessageCircle, Phone, Search, ShoppingBag, Truck, User, X } from 'lucide-react'
 import { GiftFlashBar } from '@/components/storefront/shell/gift-flash-bar'
 import { MiniCart } from '@/components/storefront/shell/mini-cart'
 import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
@@ -125,7 +125,7 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
     <header ref={headerRef} className="sticky top-0 z-40 border-b border-[#e6dce1] bg-[#f7fcff]/95 shadow-[0_8px_30px_rgba(21,56,77,0.08)] backdrop-blur-xl">
       <GiftFlashBar />
       <div className="bg-[#087ba5] text-white">
-        <div className="mx-auto flex h-9 max-w-[1440px] items-center justify-between gap-3 px-4 text-xs sm:px-6">
+        <div className="mx-auto flex min-h-11 max-w-[1440px] items-center justify-between gap-3 px-4 text-xs sm:px-6">
           <p className="hidden min-w-0 flex-1 items-center gap-3 truncate text-white/90 lg:flex" aria-live="off">
             {headerPhone && <a href={`tel:${headerPhone.replace(/[^\d+]/g, '')}`} className="inline-flex shrink-0 items-center gap-1.5 hover:underline"><Phone size={12} aria-hidden="true" />{headerPhone}</a>}
             {headerEmail && <a href={`mailto:${headerEmail}`} className="truncate hover:underline">{headerEmail}</a>}
@@ -134,6 +134,9 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
             <Truck size={14} className="shrink-0 text-white/85" aria-hidden="true" />
             <span className="truncate">{announcementText}</span>
           </p>
+          <a href={chrome.whatsappSupportUrl} target="_blank" rel="noopener noreferrer" aria-label="Connect on WhatsApp" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 font-semibold text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+            <MessageCircle size={16} aria-hidden="true" /> WhatsApp
+          </a>
           <Link href="/contact-us" className="hidden shrink-0 text-white/90 hover:text-white hover:underline sm:inline">Contact us</Link>
         </div>
       </div>

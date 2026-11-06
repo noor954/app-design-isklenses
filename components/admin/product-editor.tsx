@@ -15,6 +15,7 @@ import { normalizePowerLensOptions, resolvePowerOptionValues } from '@/lib/power
 type SpecRow = { label: string; value: string }
 
 const diameterAndCurveOptions = Array.from({ length: 121 }, (_, index) => (index / 10).toFixed(2))
+const diameterChoices = ['14.00', '14.20', '14.50', '14.80']
 const waterContentOptions = Array.from({ length: 101 }, (_, index) => `${index}%`)
 const sectionClass = 'grid gap-4 rounded-xl border border-[#cfe2eb] bg-[#f7fcff] p-4 sm:grid-cols-2 sm:p-5'
 
@@ -112,7 +113,7 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
   const candidates = products
     .filter((item) => item.id !== product?.id && !related.includes(item.id) && item.name.toLowerCase().includes(relatedQuery.toLowerCase()))
     .slice(0, 6)
-  const diameterOptions = optionsWithSavedValue(diameterAndCurveOptions, diameterMm)
+  const diameterOptions = optionsWithSavedValue(diameterChoices, diameterMm)
   const baseCurveOptions = optionsWithSavedValue(diameterAndCurveOptions, baseCurve)
   const waterOptions = optionsWithSavedValue(waterContentOptions, waterContent)
 
@@ -268,7 +269,7 @@ export function ProductEditor({ product, onSaved, onCancel }: { product?: AdminP
           <Field label="Diameter (DIA) · mm" required>
             <select name="diameterMm" required value={diameterMm} onChange={(event) => setDiameterMm(event.target.value)} className={inputClass}>
               <option value="" disabled>Select diameter</option>
-              {diameterOptions.map((value) => <option key={value} value={value}>{value}{!diameterAndCurveOptions.includes(value) ? ' (saved value)' : ''}</option>)}
+              {diameterOptions.map((value) => <option key={value} value={value}>{value}{!diameterChoices.includes(value) ? ' (saved value)' : ''}</option>)}
             </select>
           </Field>
           <Field label="Base curve (BC) · mm" required>

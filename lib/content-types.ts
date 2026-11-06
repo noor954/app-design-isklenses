@@ -76,6 +76,7 @@ export interface SeoSection {
 export interface SiteChrome {
   announcements: string[]
   deliveryNotice: string | null
+  whatsappSupportUrl: string
   contact: ContactSettings
   footer: FooterSettings
   loadError?: string

@@ -412,7 +412,7 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
                           child: _measurementDropdown(
                             label: 'Diameter (mm)',
                             value: _diameter,
-                            options: _lensMeasurements,
+                            options: _diameterChoices,
                             onChanged: (value) =>
                                 setState(() => _diameter = value),
                           ),
@@ -550,6 +550,7 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
     (index) => (index / 10).toStringAsFixed(2),
     growable: false,
   );
+  static const _diameterChoices = ['14.00', '14.20', '14.50', '14.80'];
   static final _waterContents = List<String>.generate(
     101,
     (index) => '$index%',
@@ -562,7 +563,11 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
     required List<String> options,
     required ValueChanged<String?> onChanged,
   }) {
-    final selected = options.contains(value) ? value : null;
+    final choices =
+        value != null && value.isNotEmpty && !options.contains(value)
+        ? [...options, value]
+        : options;
+    final selected = choices.contains(value) ? value : null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: IskDropdownField<String>(
@@ -570,7 +575,7 @@ class _AdminProductEditorScreenState extends State<AdminProductEditorScreen> {
         validator: (value) =>
             value == null ? 'Select $label before saving.' : null,
         decoration: InputDecoration(labelText: label),
-        items: options
+        items: choices
             .map(
               (option) => DropdownMenuItem(value: option, child: Text(option)),
             )

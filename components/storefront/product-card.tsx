@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { ShoppingBag, Star } from 'lucide-react'
-import { getProductImageSources, StorefrontProductImage } from '@/components/storefront/product-image'
+import { ProductHoverImage } from '@/components/storefront/product-hover-image'
 import { useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import type { Product } from '@/lib/hooks/use-storefront-data'
 import { formatPrice, isAvailable, lowestPrice } from '@/lib/store-config'
+import { isToricLensType } from '@/lib/toric'
 
 export function ProductCard({ product }: { product: Product }) {
   const { add } = useStorefrontCart()
@@ -16,17 +17,9 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <article className="group flex min-w-0 flex-col rounded-2xl border border-[#080b10]/10 bg-white p-2 shadow-[0_10px_30px_rgba(8,11,16,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(8,11,16,0.12)]">
-      <Link href={href} aria-label={`View ${product.name}`} className="relative block overflow-hidden rounded-xl bg-[#eef3fa]">
-        <StorefrontProductImage
-          sources={getProductImageSources(product)}
-          alt={product.name}
-          fdaApproved={product.fdaApproved}
-          className="relative aspect-square overflow-hidden"
-          imageClassName="size-full object-contain transition-transform duration-500 group-hover:scale-105"
-          fallback={<div role="img" aria-label={`No product image is available for ${product.name}`} className="product-placeholder size-full" />}
-        />
+      <ProductHoverImage product={product} className="rounded-xl bg-[#eef3fa]" imageClassName="aspect-square overflow-hidden">
         {!available && <span className="absolute left-2 top-2 rounded-full bg-[#b20000] px-3 py-1 text-xs font-semibold text-white">Sold out</span>}
-      </Link>
+      </ProductHoverImage>
       <div className="flex flex-1 flex-col pt-3">
         <p className="truncate text-xs font-medium uppercase tracking-wide text-[#4a5568]">{product.category}</p>
         <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-5">
@@ -35,7 +28,7 @@ export function ProductCard({ product }: { product: Product }) {
         {product.ratingCount ? <p className="mt-1 flex items-center gap-1 text-xs text-[#4a5568]"><Star size={13} className="fill-[#f5a623] text-[#f5a623]" aria-hidden="true" />{product.ratingAvg?.toFixed(1)} ({product.ratingCount})</p> : null}
         <p className="mt-1.5 text-base font-bold text-[#033473]">{hasOptions && 'From '}{formatPrice(price, currency)}{product.compareAtPrice && Number(product.compareAtPrice) > Number(price) && <s className="ml-2 text-sm font-normal text-[#6b7a90]">{formatPrice(product.compareAtPrice, currency)}</s>}</p>
         <div className="mt-auto pt-3">
-          {hasOptions || requiresPowerSelection || !available ? (
+          {hasOptions || requiresPowerSelection || !available || isToricLensType(product.lensType?.name) ? (
             <Link href={href} className="block rounded-full border border-[#033473] py-2.5 text-center text-sm font-semibold text-[#033473] hover:bg-[#033473] hover:text-white">
               {available ? 'Select options' : 'View details'}
             </Link>

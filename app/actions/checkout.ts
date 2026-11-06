@@ -11,12 +11,14 @@ import {
   storeCustomers,
   storeOrderItems,
   storeOrders,
+  storeLensTypes,
   storeProductVariants,
   storeProducts,
   storeSettings,
 } from '@/lib/db/schema'
 import { CustomerAuthError, getCustomerSession, getOrderReceipt, type StoreCustomerSession } from '@/lib/auth/store-customer'
 import { normalizeFreeGiftConfig, resolveGiftCategoryId } from '@/lib/free-gift'
+import { isToricLensType, TORIC_ORDER_NOTICE } from '@/lib/toric'
 import {
   isPowerLensValue,
   normalizePowerLensOptions,
@@ -234,6 +236,8 @@ async function submitCodOrderImpl(value: unknown) {
         .orderBy(storeProductVariants.id)
         .for('update')
       const productById = new Map(products.map((product) => [product.id, product]))
+      const lensTypes = await tx.select({ id: storeLensTypes.id, name: storeLensTypes.name }).from(storeLensTypes)
+      const toricTypeIds = new Set(lensTypes.filter((type) => isToricLensType(type.name)).map((type) => type.id))
       const variantById = new Map(variants.map((variant) => [variant.id, variant]))
       const activeVariantsByProduct = new Map<string, typeof variants>()
       for (const variant of variants) {
@@ -270,6 +274,9 @@ async function submitCodOrderImpl(value: unknown) {
         const product = productById.get(item.productId)
         if (!product || product.status !== 'active') {
           throw new CheckoutError('A product in your bag is no longer available. Review the catalogue.', 409)
+        }
+        if (product.lensTypeId && toricTypeIds.has(product.lensTypeId)) {
+          throw new CheckoutError(TORIC_ORDER_NOTICE, 409)
         }
         const variant = item.variantId ? variantById.get(item.variantId) : null
         if (item.variantId && (!variant || variant.productId !== product.id)) {
@@ -345,6 +352,9 @@ async function submitCodOrderImpl(value: unknown) {
         const [giftProduct] = await tx.select().from(storeProducts).where(eq(storeProducts.id, input.giftProductId)).for('update')
         if (!giftProduct || giftProduct.status !== 'active' || !isGift(giftProduct)) {
           throw new CheckoutError('The selected free gift is no longer available. Choose another gift.', 409)
+        }
+        if (giftProduct.lensTypeId && toricTypeIds.has(giftProduct.lensTypeId)) {
+          throw new CheckoutError(TORIC_ORDER_NOTICE, 409)
         }
         const giftVariants = await tx
           .select()
