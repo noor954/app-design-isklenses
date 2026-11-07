@@ -26,6 +26,8 @@ This document is the operational handoff for continuing the ecommerce storefront
 - **Checkout autofill:** `GET /api/storefront/session` exposes the latest account-owned order's shipping address for editable web/mobile autofill, never a guest address. Guest email, last name, apartment and province are optional; guest customers without email are separate records. Apply `0025_optional_customer_email.sql` to each target before deployment; authoring the migration does not apply it. Additional original articles include original illustrations, not product photographs.
 - **Brand assets:** the supplied ISK eye/lettermark is used in web navigation, admin, footer and browser icons, and bundled in Flutter navigation and Android/iOS launcher icons. Web assets are static (`/isk-logo.png`, `/isk-logo-detailed.png`); this visual change does not add or change API fields. Updating installed mobile icons requires a new signed app release.
 - **Android APK hosting:** `/mobile-app` and `GET /api/mobile/android` link to the same-origin static `/isklenses.apk`. Replace it only with an APK signed using the original keystore, verify the signing certificate and increment its build number. The release certificate SHA-256 is `e23755e31e662dd90fc3defdab4e30171b5ab7a2ba3da0b9d0c6278d58e02f8f`; never generate a replacement signing key for normal updates.
+- **Database read routing:** setting `DATABASE_READ_URL` routes catalog, site-content, public chatbot, and gift-offer reads (plus public cache snapshot keys) through a separate reader pool; writes, authentication, checkout, order lookups, media, and admin mutations continue using `DATABASE_URL`. Unset it until a dedicated read-only Neon endpoint and role are available; do not use an owner connection string as the reader.
+- **Reader endpoint check (2026-11-07):** the candidate endpoint supplied for `DATABASE_READ_URL` connected but did not contain `store_products`; it is not the production catalog replica. The variable was removed and production reads were verified back on the primary. Do not configure a reader until its database contains the production schema/data and its connection is confirmed read-only.
 - **Homepage design contract:** `GET /api/storefront/home` is the canonical source for shared hero slides, appearance palette/control styles, ordered/visible homepage sections and copy, plus hero layout/autoplay. Web and Flutter read the same normalized `data.content.appearance` and `data.content.configuration` values; admin writes use the validated settings API.
 - **Homepage migration:** migration `0021_home_and_appearance_settings.sql` extends the allowed `store_settings` keys for `appearance` and `home_configuration`. It has been applied to the configured Neon database and verified by reading the live constraint and running `node --env-file-if-exists=.env.local scripts/validate-schema.mjs`. Apply it separately to any other target database before saving these settings there.
 - **Cross-platform direction:** retain Next.js as the web and API backend; the Flutter shopper app lives in `apps/mobile` and consumes the existing API/OpenAPI contract. TanStack DB and a sealed public-catalog Neon Realtime path are implemented; the optional Mastra chatbot reads the same current FAQ/catalog facts on every turn. See `docs/architect/ARCHITECTURE_OVERVIEW.md` for security boundaries. Do not introduce TanStack Start as a parallel backend or replace application-owned auth without an explicitly reviewed migration.
@@ -58,6 +60,7 @@ The variables are managed by the Vercel/v0 project environment and mirrored into
 | Variable | Source | Usage |
 |---|---|---|
 | `DATABASE_URL` | Neon | Primary pooled Postgres connection used by `lib/db/index.ts`. |
+| `DATABASE_READ_URL` | Neon read-only endpoint (optional) | Read-only catalog, content, chatbot, and public-data queries; falls back to `DATABASE_URL` when unset. Must use a dedicated read-only role/endpoint. |
 | `ADMIN_SESSION_SECRET` | Project environment | HMAC key for signed admin session cookies; set a cryptographically random value of at least 32 characters in each environment. |
 | `CUSTOMER_SESSION_SECRET` | Project environment (optional) | Separate shopper-session HMAC source; if unset, the app derives a domain-separated shopper key from `ADMIN_SESSION_SECRET`. |
 
@@ -70,6 +73,7 @@ The initial owner currently uses the provisional address `owner@localhost.invali
 These are available from the Neon integration and may be useful for tooling or migrations. Prefer `DATABASE_URL` in application code unless a specific script needs another connection mode.
 
 - `DATABASE_URL_UNPOOLED`
+- `DATABASE_READ_URL` (application-configured reader; not supplied by the Neon integration)
 - `NEON_PROJECT_ID`
 - `PGDATABASE`
 - `PGHOST`

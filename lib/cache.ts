@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { revalidateTag, unstable_cache } from 'next/cache'
-import { pool } from './db'
+import { readPool } from './db'
 
 const cacheTag = (namespace: string) => `isk:${namespace}`
 
@@ -14,7 +14,7 @@ export async function cached<T>(namespace: string, key: string, ttlSeconds: numb
   try {
     // MVCC snapshots change when transactions become visible, including writes
     // outside this app, without introducing write-side locks.
-    const result = await pool.query<{ revision: string }>(
+    const result = await readPool.query<{ revision: string }>(
       'SELECT pg_current_snapshot()::text AS revision',
     )
     if (!result.rows[0]) throw new Error('Database snapshot is missing')

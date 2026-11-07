@@ -20,7 +20,7 @@ import {
 } from '@/lib/home-configuration'
 import { normalizePowerLensOptions } from '@/lib/power-lens-options'
 import type { AppearanceConfiguration } from '@/lib/home-configuration'
-import { db } from '@/lib/db'
+import { readDb as db } from '@/lib/db'
 import { getDeliveryAnnouncement, parseDeliveryRules } from '@/lib/delivery'
 import { storeBanners, storeReviews, storeSettings } from '@/lib/db/schema'
 import { WHATSAPP_SUPPORT_URL } from '@/lib/whatsapp'

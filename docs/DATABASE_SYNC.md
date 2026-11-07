@@ -60,8 +60,10 @@ The latest complete import contains 495 distinct source listings; on 2026-10-10 
 
 ## Data flow
 
+An optional `DATABASE_READ_URL` provides a separate Neon reader pool for public catalog, content, chatbot, and gift-offer reads. The primary `DATABASE_URL` remains authoritative for writes, authentication, checkout, orders, media, and administrative work. The reader cache snapshot follows the reader's visible state so replica lag does not produce cache keys ahead of replicated data. Configure this variable only with a dedicated read-only Neon endpoint/role; without it, reads use the primary pool.
+
 ```text
-Storefront SWR ──> /api/products ──> public catalog reads ──> Neon
+Storefront SWR ──> /api/products ──> public catalog reads ──> Neon reader (optional)
 Checkout ────────> /api/orders ────> reprice + reserve stock ──> Neon transaction + audit
 Shopper account ─> /api/storefront/session ──> signed session + shopper auth ──> Neon
 Admin SWR ───────> /api/admin/* ──> session-checked reads ──> Neon

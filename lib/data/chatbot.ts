@@ -2,7 +2,7 @@ import { and, desc, eq, ilike, or } from 'drizzle-orm'
 import { storefrontFaqs } from '@/lib/data/storefront-faq'
 import { answerWithMastra } from '@/lib/data/mastra-chatbot'
 import { getSettings } from '@/lib/data/site-content'
-import { db } from '@/lib/db'
+import { readDb as db } from '@/lib/db'
 import { storeCategories, storeProducts } from '@/lib/db/schema'
 import { asksForWhatsApp, WHATSAPP_SUPPORT_URL } from '@/lib/whatsapp'
 

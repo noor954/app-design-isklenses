@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, readDb } from '@/lib/db'
 import { storeCategories, storeLensTypes, storeProductCategories, storeProducts } from '@/lib/db/schema'
 import { getSettings } from '@/lib/data/site-content'
 import {
@@ -15,18 +15,18 @@ export async function getFreeGiftOffer(): Promise<FreeGiftOffer> {
   const config = normalizeFreeGiftConfig(settings.free_gift)
   if (!config.enabled) return { config, categoryId: null, products: [] }
 
-  const categories = await db
+  const categories = await readDb
     .select({ id: storeCategories.id, name: storeCategories.name, slug: storeCategories.slug })
     .from(storeCategories)
     .where(eq(storeCategories.isActive, true))
   const categoryId = resolveGiftCategoryId(config, categories)
   if (!categoryId) return { config, categoryId: null, products: [] }
 
-  const memberships = db
+  const memberships = readDb
     .select({ id: storeProductCategories.productId })
     .from(storeProductCategories)
     .where(eq(storeProductCategories.categoryId, categoryId))
-  const rows = await db
+  const rows = await readDb
     .select({
       id: storeProducts.id,
       name: storeProducts.name,

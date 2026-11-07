@@ -2,7 +2,7 @@ import 'server-only'
 
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from 'drizzle-orm'
 import { cached } from '@/lib/cache'
-import { db } from '@/lib/db'
+import { readDb as db } from '@/lib/db'
 import {
   storeBrands,
   storeCategories,
