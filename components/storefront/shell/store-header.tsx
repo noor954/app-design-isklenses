@@ -147,7 +147,7 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
           <Menu size={22} aria-hidden="true" />
         </button>
         <Link href="/" className="flex min-w-0 items-center gap-1.5 sm:shrink-0 sm:gap-2.5" aria-label={`${STORE_NAME} home`}>
-          <img src="/icon.svg" alt="" aria-hidden="true" className="size-8 shrink-0 sm:size-10" />
+          <img src="/isk-logo.png" alt="" aria-hidden="true" className="size-10 shrink-0 object-contain sm:size-12" />
           <span className="flex items-baseline gap-1 truncate leading-none">
             <span className="text-base font-extrabold tracking-[-0.055em] text-[#15384d] sm:text-2xl">ISK</span>
             <span className="isk-reference-brand truncate text-base font-semibold sm:text-2xl"><em>Lenses</em></span>
@@ -196,7 +196,7 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
           <div id="mobile-store-menu" ref={mobileMenuRef} className="absolute inset-y-0 left-0 flex h-[100dvh] w-[min(88vw,24rem)] max-w-[calc(100vw-1rem)] flex-col bg-[#fffaf8] shadow-2xl">
             <div className="flex h-16 items-center justify-between bg-[#201b35] px-4 text-white">
               <Link href="/" className="flex items-center gap-2" aria-label={`${STORE_NAME} home`}>
-                <img src="/icon.svg" alt="" aria-hidden="true" className="size-9" />
+                <img src="/isk-logo.png" alt="" aria-hidden="true" className="size-10 rounded-md bg-white p-1 object-contain" />
                 <span className="flex items-baseline gap-1 text-lg font-bold text-white">ISK <span className="isk-reference-brand-on-dark font-serif font-normal italic text-[#b8e8f5]">Lenses</span></span>
               </Link>
               <button type="button" aria-label="Close menu" onClick={() => setMobileOpen(false)} className="grid size-11 place-items-center"><X size={22} /></button>

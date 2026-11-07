@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: { default: 'ISK Lenses — Contact lenses in Pakistan', template: '%s — ISK Lenses' },
   description: 'Shop contact lenses online in Pakistan. Browse brands, colors and collections and order with cash on delivery.',
   icons: {
-    icon: '/icon.svg',
+    icon: '/isk-favicon.png',
     apple: '/apple-icon.png',
   },
 }

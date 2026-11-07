@@ -1792,12 +1792,12 @@ class StoreSiteFooter extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.network(
-                '${data.origin}/icon-light-32x32.png',
+              Image.asset(
+                'assets/isk-logo.png',
                 width: 38,
                 height: 38,
-                errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.remove_red_eye_outlined, size: 32),
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
               ),
               const SizedBox(width: 8),
               Text(

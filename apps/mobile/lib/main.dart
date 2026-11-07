@@ -407,15 +407,29 @@ class _IskLensesAppState extends State<IskLensesApp> {
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 10),
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 18),
-            child: Text(
-              'ISK Lenses',
-              style: TextStyle(
-                color: _navy,
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/isk-logo.png',
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.contain,
+                  excludeFromSemantics: true,
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'ISK Lenses',
+                    style: TextStyle(
+                      color: _navy,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           _drawerItem(Icons.home_outlined, 'Home', '/'),
@@ -732,32 +746,34 @@ class _IskLensesAppState extends State<IskLensesApp> {
             key: _scaffoldKey,
             drawer: _pageDrawer(),
             appBar: AppBar(
-              title: _tab == 0
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.network(
-                          _api.assetUrl('/icon-light-32x32.png'),
-                          width: 34,
-                          height: 34,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.remove_red_eye_outlined),
-                        ),
-                        const SizedBox(width: 8),
-                        const Flexible(
-                          child: Text(
-                            'ISK Lenses',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Text(
-                      ['Home', 'Shop', 'Compare', 'Help', 'Account'][_tab],
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/isk-logo.png',
+                    width: 34,
+                    height: 34,
+                    fit: BoxFit.contain,
+                    excludeFromSemantics: true,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      _tab == 0
+                          ? 'ISK Lenses'
+                          : [
+                              'Home',
+                              'Shop',
+                              'Compare',
+                              'Help',
+                              'Account',
+                            ][_tab],
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
+                  ),
+                ],
+              ),
               actions: [
                 if (_whatsappSupportUri != null)
                   IconButton(

@@ -38,7 +38,7 @@ export function StoreFooter({ chrome, homepage = false, brands = [], categories 
         <div className="grid gap-7 py-6 sm:grid-cols-2 md:grid-cols-4">
           <div className="sm:col-span-2 md:col-span-1">
             <Link href="/" aria-label={`${STORE_NAME} home`} className="inline-flex">
-              <img src="/isk-lenses-portrait.svg" alt={`${STORE_NAME} logo`} width="160" height="220" className="w-28 rounded-xl" />
+              <img src="/isk-logo-detailed.png" alt={`${STORE_NAME} logo`} width="160" height="224" className="w-28 object-contain" />
             </Link>
             {footer.about && <p className="mt-3 max-w-xs text-sm leading-6 text-[#686371]">{footer.about}</p>}
             <ul className="mt-3 space-y-1.5 text-xs text-[#686371]">
@@ -71,7 +71,7 @@ export function StoreFooter({ chrome, homepage = false, brands = [], categories 
         {footer.information?.length ? <LinkColumn title="Information" links={footer.information} /> : null}
         <div>
           <Link href="/" aria-label={`${STORE_NAME} home`} className="inline-flex">
-            <img src="/isk-lenses-portrait.svg" alt={`${STORE_NAME} logo`} width="160" height="220" className="w-32 rounded-xl" />
+            <img src="/isk-logo-detailed.png" alt={`${STORE_NAME} logo`} width="160" height="224" className="w-32 rounded-xl bg-white p-2 object-contain" />
           </Link>
           {footer.about && <p className="mt-4 max-w-sm text-sm leading-6 text-white/75">{footer.about}</p>}
           <ul className="mt-5 space-y-2 text-sm text-white/90">
