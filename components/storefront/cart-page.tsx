@@ -7,8 +7,6 @@ import { cartTotals } from '@/components/storefront/shell/mini-cart'
 import { getProductImageSources, StorefrontProductImage } from '@/components/storefront/product-image'
 import { getCartLinePrice, useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { useProducts } from '@/lib/hooks/use-storefront-data'
-import { FreeGiftPicker } from '@/components/storefront/free-gift-picker'
-import { useFreeGiftOffer, useGiftChoice, useGiftEligibility } from '@/lib/hooks/use-free-gift'
 import { formatPrice } from '@/lib/store-config'
 import { usePromotions } from '@/lib/hooks/use-promotions'
 import { calculateBestPromotion } from '@/lib/promotions'
@@ -33,11 +31,7 @@ export function CartPage() {
     : null
   const discountCents = promotionResult?.discountCents ?? 0
   const subtotalCents = Math.max(0, originalSubtotalCents - discountCents)
-  const giftOffer = useFreeGiftOffer()
-  const [giftChoice, setGiftChoice] = useGiftChoice()
   const promotionUnavailable = promotions.isLoading || promotions.isError
-  const { eligible: giftEligible } = useGiftEligibility(giftOffer, lines, subtotalCents, Boolean(promotionResult) || promotionUnavailable)
-
   useEffect(() => {
     if (!isLoading && !isError) syncProducts(products)
   }, [isError, isLoading, products, syncProducts])
@@ -101,20 +95,6 @@ export function CartPage() {
             )
           })}
         </ul>
-        {giftEligible && giftOffer && (
-          <div className="lg:col-start-1">
-            <FreeGiftPicker offer={giftOffer} choice={giftChoice} invalid={false} onChange={setGiftChoice} />
-          </div>
-        )}
-        {giftOffer?.config.enabled && !giftEligible && (
-          <p className="border-y border-[#cfe2eb] py-3 text-sm leading-6 text-[#15384d]">
-            {promotionUnavailable
-              ? 'Deal eligibility is being verified. Free gifts are hidden until current promotions load.'
-              : promotionResult
-              ? 'A lens deal is applied. Free gifts cannot be combined with a deal.'
-              : 'Choose a free gift when your discounted cart reaches PKR 2,500 and includes the required lens quantity.'}
-          </p>
-        )}
         <aside className="lg:col-start-2 lg:row-start-1 lg:row-span-2 rounded-2xl border border-[#080b10]/10 bg-[#edf8fc] p-6 shadow-[var(--storefront-shadow)] lg:sticky lg:top-32">
           <h2 className="text-lg font-bold text-[#033473]">Cart totals</h2>
           <dl className="mt-5 space-y-3 text-sm">

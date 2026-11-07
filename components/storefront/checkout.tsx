@@ -110,7 +110,8 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
   const freeShippingThreshold = getFreeShippingThreshold(deliveryRules)
   const orderTotalCents = deliveryFeeCents === null ? null : subtotalCents + deliveryFeeCents
 
-  const { eligible: giftEligible } = useGiftEligibility(giftOffer, lines, subtotalCents, Boolean(promotionResult))
+  const { eligible: giftConditionsMet } = useGiftEligibility(giftOffer, lines, subtotalCents, Boolean(promotionResult))
+  const giftEligible = !promotionState.isLoading && !promotionState.isError && giftConditionsMet
   const selectedGift = giftEligible ? giftOffer?.products.find((product) => product.id === giftChoice?.productId) ?? null : null
 
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
@@ -315,7 +316,11 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
             )}
             {giftOffer?.config.enabled && !giftEligible && (
               <p className="border-y border-[#152a52]/20 py-4 text-sm leading-6 text-[#314a63]">
-                {promotionResult
+                {promotionState.isLoading
+                  ? 'Checking current deal eligibility before offering a gift.'
+                  : promotionState.isError
+                    ? 'Deal eligibility could not be verified, so a gift cannot be selected right now.'
+                    : promotionResult
                   ? 'A lens deal is applied. Free gifts cannot be combined with a deal.'
                   : 'A free gift is available on eligible lens orders of at least PKR 2,500 after discounts.'}
               </p>

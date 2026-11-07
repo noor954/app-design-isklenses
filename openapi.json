@@ -3342,7 +3342,7 @@
           "Storefront"
         ],
         "summary": "Free Cosmetic gift offer for checkout",
-        "description": "Returns whether the free gift is enabled, its rules (maxItems, minLensQuantity, badge, title, message), eligible in-stock gift products and minimumSubtotalCents=250000. The discounted merchandise subtotal must be at least PKR 2,500 and no lens deal may apply.",
+        "description": "Returns whether the free gift is enabled, its rules (maxItems, minLensQuantity, badge, title, message), eligible in-stock gift products and minimumSubtotalCents=250000. Clients should offer gift choice only during checkout, when the discounted merchandise subtotal is at least PKR 2,500, no deal applies, and the required non-gift lens quantity is met; POST /api/orders revalidates the choice.",
         "responses": {
           "200": {
             "description": "Gift offer wrapped in data.",

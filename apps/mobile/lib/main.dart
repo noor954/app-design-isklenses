@@ -1884,9 +1884,6 @@ class CartScreen extends StatelessWidget {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                FreeGiftChooser(state: giftSelection, cart: cart),
-                if (giftSelection.isEligible(cart)) const SizedBox(height: 14),
-                FreeGiftSummaryLine(state: giftSelection),
                 for (var lineIndex = 0; lineIndex < cart.length; lineIndex++)
                   Builder(
                     builder: (context) {
@@ -2004,29 +2001,11 @@ class CartScreen extends StatelessWidget {
                     },
                   ),
                 const SizedBox(height: 10),
-                if (promotion != null) ...[
+                if (promotion != null)
                   _SummaryRow(
                     label: promotion.promotion.name,
                     value:
                         '−${_money(_amount(promotion.discountCents), 'PKR')}',
-                  ),
-                  Text(
-                    'Best qualifying deal applied. A separate free gift cannot be combined.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: _navy),
-                  ),
-                ],
-                if (giftSelection.offer case final offer?
-                    when offer.config.enabled &&
-                        !giftSelection.isEligible(cart))
-                  Text(
-                    promotion != null
-                        ? 'Free gifts are not available with a lens deal.'
-                        : 'Free gifts require a discounted merchandise subtotal of at least PKR 2,500.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: _navy),
                   ),
                 _SummaryRow(
                   label: 'Products',
@@ -2042,15 +2021,9 @@ class CartScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.red),
                   ),
                 const SizedBox(height: 16),
-                if (giftSelection.loading)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 10),
-                    child: Text('Checking free-gift availability…'),
-                  ),
                 FilledButton(
                   onPressed:
-                      giftSelection.loading ||
-                          !giftSelection.promotionsAvailable
+                      !giftSelection.promotionsAvailable
                       ? null
                       : () async {
                           final result = await Navigator.of(context)
@@ -2295,6 +2268,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _field(_city, 'City', validator: _required),
             _field(_province, 'Province or territory (optional)'),
             _field(_postal, 'Postal code (optional)'),
+            if (widget.giftSelection.loading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 10),
+                child: Text('Checking gift eligibility for this checkout…'),
+              ),
             if (_giftEligible) ...[
               const SizedBox(height: 10),
               FreeGiftChooser(state: widget.giftSelection, cart: widget.cart),
@@ -2437,6 +2415,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _submit() async {
+    if (widget.giftSelection.loading) {
+      setState(() => _error = 'Gift eligibility is still being checked. Try again in a moment.');
+      return;
+    }
     if (!widget.giftSelection.promotionsAvailable) {
       setState(
         () => _error =

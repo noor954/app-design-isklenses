@@ -196,7 +196,7 @@ export function DealsManager({ canEdit }: { canEdit: boolean }) {
         <button type="button" disabled={!canEdit || loading || saving || categories.length === 0 || promotions.some((promotion) => promotion.categoryIds.length > promotion.buyQuantity + (promotion.type === 'buy_get_free' ? promotion.freeQuantity : 0))} onClick={() => void save()} className={primaryButton}>
           <Save size={16} aria-hidden="true" /> {saving ? 'Saving…' : 'Save deal rules'}
         </button>
-        <p className="max-w-2xl text-xs leading-5 text-[#526b7b]">Checkout recalculates eligibility and discounts from current product categories and prices. Deals do not combine with the separate free gift, and gifts require at least PKR 2,500 after discounts.</p>
+        <p className="max-w-2xl text-xs leading-5 text-[#526b7b]">Checkout recalculates deal eligibility and discounts from current product categories and prices. Gift eligibility is handled separately during checkout.</p>
       </div>
     </section>
   )

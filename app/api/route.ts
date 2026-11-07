@@ -18,7 +18,7 @@ export async function GET() {
         updateAppearance: 'PUT /api/admin/content/settings/appearance',
         updateHomepage: 'PUT /api/admin/content/settings/home_configuration',
         updateDeals: 'PUT /api/admin/content/settings/deals',
-        giftEligibility: 'GET /api/storefront/gift returns minimumSubtotalCents=250000. POST /api/orders rejects a separate gift when any lens deal applies or the discounted merchandise subtotal is below PKR 2,500.',
+        giftEligibility: 'Offer gift choice only during checkout when the discounted merchandise subtotal is at least PKR 2,500, no deal applies, and the required non-gift lens quantity is met. POST /api/orders revalidates the gift and rejects ineligible selections.',
         note: 'The website and mobile storefronts consume the same validated palette, control styles, hero slides, section order/visibility/copy, hero layout/autoplay, store notices, and eligible lens deals.',
       },
       productSpecifications: {
