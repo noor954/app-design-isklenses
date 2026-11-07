@@ -14,11 +14,7 @@ export default async function MobileAppPage() {
           <div>
             <h1 className="max-w-2xl text-4xl font-bold leading-[1.05] tracking-tight text-[#15384d] sm:text-6xl">ISK Lenses, wherever you go.</h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[#526b7b]">Explore lenses, find your shade, and shop the ISK collection from your Android phone.</p>
-            {release.status === 'available' ? (
-              <a href={release.downloadUrl} className="mt-8 inline-flex min-h-12 items-center gap-3 rounded-full bg-[#006f9b] px-6 py-3 font-semibold text-white hover:bg-[#15384d] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#006f9b]"><ArrowDownToLine size={20} aria-hidden="true" /> Download Android APK</a>
-            ) : (
-              <p role="status" className="mt-8 max-w-lg rounded-2xl border border-[#b8d4e0] bg-white px-5 py-4 text-sm leading-6 text-[#15384d]">{release.status === 'error' ? 'The download is temporarily unavailable. Please try again later.' : 'The Android app is not available for download yet. Please check back soon.'}</p>
-            )}
+            <a href={release.downloadUrl} className="mt-8 inline-flex min-h-12 items-center gap-3 rounded-full bg-[#006f9b] px-6 py-3 font-semibold text-white hover:bg-[#15384d] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#006f9b]"><ArrowDownToLine size={20} aria-hidden="true" /> Download Android APK</a>
             <p className="mt-3 text-sm text-[#526b7b]">For Android devices. The APK is installed outside Google Play.</p>
           </div>
           <figure className="mx-auto w-full max-w-[230px] sm:max-w-[260px]">

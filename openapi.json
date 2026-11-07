@@ -67,10 +67,10 @@
       "get": {
         "tags": ["Integrations"],
         "summary": "Find the latest available Android app",
-        "description": "Returns the public Android APK release when available. The release lookup is cached for up to 60 seconds; errors are not reported as absence.",
+        "description": "Returns the Android APK hosted at the production website's /isklenses.apk path.",
         "responses": {
           "200": {
-            "description": "The Android release is available or has not been published.",
+            "description": "The website-hosted Android APK is available for download.",
             "content": {
               "application/json": {
                 "schema": {
@@ -78,29 +78,19 @@
                   "required": ["data"],
                   "properties": {
                     "data": {
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "required": ["status", "downloadUrl", "publishedAt"],
-                          "properties": {
-                            "status": { "const": "available" },
-                            "downloadUrl": { "type": "string", "format": "uri" },
-                            "publishedAt": { "type": "string", "format": "date-time", "description": "Publication time of the release container, not the APK replacement time." }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "required": ["status"],
-                          "properties": { "status": { "const": "unavailable" } }
-                        }
-                      ]
+                      "type": "object",
+                      "required": ["status", "downloadUrl", "publishedAt"],
+                      "properties": {
+                        "status": { "const": "available" },
+                        "downloadUrl": { "type": "string", "format": "uri" },
+                        "publishedAt": { "type": ["string", "null"], "format": "date-time", "description": "Null for the website-hosted APK." }
+                      }
                     }
                   }
                 }
               }
             }
-          },
-          "503": { "$ref": "#/components/responses/ServerError" }
+          }
         }
       }
     },
