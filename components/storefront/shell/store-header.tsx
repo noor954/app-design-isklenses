@@ -12,7 +12,7 @@ import type { SiteChrome } from '@/lib/content-types'
 import { categoryHref, categoryTree, STORE_NAME } from '@/lib/store-config'
 
 export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
-  const announcements = [chrome.deliveryNotice, ...chrome.announcements]
+  const announcements = [chrome.deliveryNotice, ...chrome.announcements, chrome.trustNotice]
     .filter((item): item is string => Boolean(item?.trim()))
   const headerPhone = chrome.contact.phone ?? ''
   const headerEmail = chrome.contact.email ?? ''
@@ -26,10 +26,8 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [announcement, setAnnouncement] = useState(0)
   const headerRef = useRef<HTMLElement>(null)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
-  const announcementText = announcements[announcement % Math.max(announcements.length, 1)] ?? 'Welcome to ISK Lenses'
 
   const tree = useMemo(() => categoryTree(categories), [categories])
   const roots = tree.get('root') ?? []
@@ -74,12 +72,6 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
       previousFocus?.focus()
     }
   }, [mobileOpen])
-
-  useEffect(() => {
-    if (announcements.length < 2) return
-    const id = window.setInterval(() => setAnnouncement((value) => (value + 1) % announcements.length), 4000)
-    return () => window.clearInterval(id)
-  }, [announcements.length])
 
   useEffect(() => {
     const header = headerRef.current
@@ -130,10 +122,20 @@ export function StoreHeader({ chrome }: { chrome: SiteChrome }) {
             {headerPhone && <a href={`tel:${headerPhone.replace(/[^\d+]/g, '')}`} className="inline-flex shrink-0 items-center gap-1.5 hover:underline"><Phone size={12} aria-hidden="true" />{headerPhone}</a>}
             {headerEmail && <a href={`mailto:${headerEmail}`} className="truncate hover:underline">{headerEmail}</a>}
           </p>
-          <p className="flex min-w-0 flex-1 items-center justify-center gap-2 text-center font-semibold tracking-wide lg:flex-[2]" aria-live="off">
-            <Truck size={14} className="shrink-0 text-white/85" aria-hidden="true" />
-            <span className="truncate">{announcementText}</span>
-          </p>
+          <div className="isk-announcement-viewport min-w-0 flex-1 lg:flex-[2]" aria-label="Store announcements">
+            <div className="isk-marquee isk-announcement-track flex w-max items-center" aria-live="off">
+              {Array.from({ length: 3 }, (_, copy) => (
+                <p key={copy} aria-hidden={copy > 0} className="flex shrink-0 items-center gap-8 whitespace-nowrap px-4 text-xs font-semibold tracking-wide">
+                  {announcements.map((item, index) => (
+                    <span key={`${index}-${item}`} className="inline-flex items-center gap-2">
+                      {index === 0 && <Truck size={14} className="shrink-0 text-white/85" aria-hidden="true" />}
+                      {item}
+                    </span>
+                  ))}
+                </p>
+              ))}
+            </div>
+          </div>
           <a href={chrome.whatsappSupportUrl} target="_blank" rel="noopener noreferrer" aria-label="Connect on WhatsApp" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 font-semibold text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
             <MessageCircle size={16} aria-hidden="true" /> WhatsApp
           </a>

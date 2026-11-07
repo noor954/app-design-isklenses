@@ -71,5 +71,6 @@ export type FreeGiftProduct = {
 export type FreeGiftOffer = {
   config: FreeGiftConfig
   categoryId: string | null
+  minimumSubtotalCents: number
   products: FreeGiftProduct[]
 }

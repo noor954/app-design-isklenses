@@ -64,6 +64,8 @@ export function useGiftChoice() {
 export function useGiftEligibility(
   offer: FreeGiftOffer | null,
   lines: { quantity: number; product: { categoryId?: string | null; categoryIds?: string[] | null } }[],
+  subtotalCents: number,
+  hasAppliedDeal: boolean,
 ) {
   return useMemo(() => {
     const lensUnits = offer?.categoryId
@@ -72,7 +74,13 @@ export function useGiftEligibility(
           return sum + (ids.includes(offer.categoryId as string) ? 0 : line.quantity)
         }, 0)
       : 0
-    const eligible = Boolean(offer?.config.enabled && offer.products.length && lensUnits >= offer.config.minLensQuantity)
+    const eligible = Boolean(
+      offer?.config.enabled &&
+      offer.products.length &&
+      !hasAppliedDeal &&
+      subtotalCents >= offer.minimumSubtotalCents &&
+      lensUnits >= offer.config.minLensQuantity,
+    )
     return { lensUnits, eligible }
-  }, [offer, lines])
+  }, [hasAppliedDeal, offer, lines, subtotalCents])
 }

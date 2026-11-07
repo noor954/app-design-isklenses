@@ -47,6 +47,7 @@ const LEGACY_FOOTER_EXPLORE = [
 ]
 const LEGACY_HERO_TITLES = new Set(['10.10 sale', 'Sunglasses collection', 'Shop now', 'Deals on contact lenses'])
 const MIN_HERO_SLIDES = 5
+const FDA_TRUST_NOTICE = 'All Eligible Lense Products are FDA Approved'
 const DEFAULT_HERO_BANNERS: BannerContent[] = [
   {
     id: 'default-hero-1',
@@ -165,6 +166,7 @@ export async function getSiteChrome(): Promise<SiteChrome> {
     return {
       announcements: asStrings(settings.announcements).filter((item) => !LEGACY_ANNOUNCEMENTS.includes(item)),
       deliveryNotice: getDeliveryAnnouncement(deliveryRules),
+      trustNotice: FDA_TRUST_NOTICE,
       whatsappSupportUrl: WHATSAPP_SUPPORT_URL,
       contact: (settings.contact ?? {}) as ContactSettings,
       footer: storefrontFooter(settings.footer),
@@ -174,6 +176,7 @@ export async function getSiteChrome(): Promise<SiteChrome> {
     return {
       announcements: [],
       deliveryNotice: null,
+      trustNotice: FDA_TRUST_NOTICE,
       whatsappSupportUrl: WHATSAPP_SUPPORT_URL,
       contact: {},
       footer: {},

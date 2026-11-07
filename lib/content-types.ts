@@ -15,6 +15,7 @@ export const SETTING_KEYS = [
   'home_configuration',
   'power_options',
   'free_gift',
+  'deals',
 ] as const
 export type SettingKey = (typeof SETTING_KEYS)[number]
 
@@ -76,6 +77,7 @@ export interface SeoSection {
 export interface SiteChrome {
   announcements: string[]
   deliveryNotice: string | null
+  trustNotice: string
   whatsappSupportUrl: string
   contact: ContactSettings
   footer: FooterSettings

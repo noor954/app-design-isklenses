@@ -5,6 +5,9 @@ import { X } from 'lucide-react'
 import { getCartLinePrice, useStorefrontCart } from '@/lib/hooks/use-storefront-cart'
 import { StorefrontProductImage, getProductImageSources } from '@/components/storefront/product-image'
 import { formatPrice } from '@/lib/store-config'
+import { usePromotions } from '@/lib/hooks/use-promotions'
+import { calculateBestPromotion } from '@/lib/promotions'
+import { moneyToCents } from '@/lib/delivery'
 
 export function cartTotals(lines: ReturnType<typeof useStorefrontCart>['lines']) {
   const totals: Record<string, number> = {}
@@ -17,8 +20,21 @@ export function cartTotals(lines: ReturnType<typeof useStorefrontCart>['lines'])
 
 export function MiniCart({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { lines, setQuantity, count } = useStorefrontCart()
-  if (!open) return null
   const totals = cartTotals(lines)
+  const promotions = usePromotions()
+  const currencies = new Set(lines.map((line) => getCartLinePrice(line).currency))
+  const promotion = currencies.size === 1 && !promotions.isError
+    ? calculateBestPromotion(lines.map((line) => ({
+        quantity: line.quantity,
+        unitPriceCents: moneyToCents(getCartLinePrice(line).price) ?? 0,
+        categoryIds: line.product.categoryIds?.length ? line.product.categoryIds : line.product.categoryId ? [line.product.categoryId] : [],
+      })), promotions.promotions)
+    : null
+  const displayTotals = totals.map((total) => ({
+    ...total,
+    amount: total.amount - (promotion && total.currency === [...currencies][0] ? promotion.discountCents / 100 : 0),
+  }))
+  if (!open) return null
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Shopping cart">
@@ -72,8 +88,9 @@ export function MiniCart({ open, onClose }: { open: boolean; onClose: () => void
             <div className="space-y-3 border-t border-[#033473]/15 p-5">
               <div className="flex items-center justify-between text-sm font-semibold">
                 <span>Subtotal</span>
-                <span>{totals.map((total) => formatPrice(total.amount, total.currency)).join(' + ')}</span>
+                <span>{displayTotals.map((total) => formatPrice(total.amount, total.currency)).join(' + ')}</span>
               </div>
+              {promotion && <p className="text-xs font-semibold text-[#075f7f]">{promotion.promotion.name} · You save {formatPrice(promotion.discountCents / 100, [...currencies][0])}</p>}
               <p className="text-xs text-[#4a5568]">Cash on delivery. Delivery charge is confirmed before dispatch.</p>
               <Link href="/cart" onClick={onClose} className="block rounded-full border border-[#033473] py-3 text-center text-sm font-semibold text-[#033473] hover:bg-[#eef3fa]">View cart</Link>
               <Link href="/checkout" onClick={onClose} className="block rounded-full bg-[#033473] py-3 text-center text-sm font-semibold text-white hover:bg-[#0a4fa3]">Checkout</Link>

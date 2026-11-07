@@ -57,7 +57,7 @@ export function FreeGiftManager({ canEdit }: { canEdit: boolean }) {
       <header>
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-[-.035em]"><Gift size={22} aria-hidden="true" /> Free gift at checkout</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[#526b7b]">
-          When an order contains lenses, customers can pick free items from the gift category. They must confirm the choice before placing the order.
+          On qualifying lens orders, customers can choose and confirm a gift when the discounted merchandise subtotal is at least PKR 2,500. A separate gift cannot be combined with a lens deal.
         </p>
       </header>
       {error && <Alert>{error}</Alert>}

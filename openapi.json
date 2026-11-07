@@ -43,6 +43,49 @@
         }
       }
     },
+    "/api/storefront/deals": {
+      "get": {
+        "tags": [
+          "Storefront"
+        ],
+        "summary": "List active lens deals",
+        "description": "Returns active Buy X Get Y Free and percentage bundle offers. Every selected category must be represented in each qualifying bundle. Only the single best qualifying offer applies; offers do not stack.",
+        "responses": {
+          "200": {
+            "description": "Active offers, including category labels.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "promotions"
+                      ],
+                      "properties": {
+                        "promotions": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PromotionOffer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/openapi.json": {
       "get": {
         "tags": [
@@ -263,7 +306,7 @@
           "Catalog"
         ],
         "summary": "Get aggregated storefront home content",
-        "description": "Returns the shared storefront home data used by web and mobile clients, including canonical hero banners, normalized appearance and palette settings, ordered/visible homepage sections, hero layout/autoplay, site chrome, active catalog directories/products, and approved reviews.",
+        "description": "Returns the shared storefront home data used by web and mobile clients, including canonical hero banners, normalized appearance and palette settings, ordered/visible homepage sections, hero layout/autoplay, site chrome with configured delivery announcements and the trustNotice text, active catalog directories/products, and approved reviews.",
         "responses": {
           "200": {
             "description": "Storefront home content.",
@@ -2666,6 +2709,7 @@
           "Admin"
         ],
         "summary": "Read storefront banners, reviews, and editable settings",
+        "description": "Authenticated admins and staff can read the validated content settings. The deals setting is editable by admins and owners and is also exposed publicly through GET /api/storefront/deals.",
         "security": [
           {
             "adminCookie": []
@@ -2810,7 +2854,10 @@
                 "footer",
                 "chatbot",
                 "appearance",
-                "home_configuration"
+                "home_configuration",
+                "power_options",
+                "free_gift",
+                "deals"
               ]
             }
           }
@@ -2825,7 +2872,9 @@
                   "value"
                 ],
                 "properties": {
-                  "value": {}
+                  "value": {
+                    "description": "For key=deals, submit an array of at most 30 PromotionConfiguration objects. All fields are validated server-side."
+                  }
                 }
               }
             }
@@ -3293,10 +3342,56 @@
           "Storefront"
         ],
         "summary": "Free Cosmetic gift offer for checkout",
-        "description": "Returns whether the free gift is enabled, its rules (maxItems, minLensQuantity, badge, title, message) and eligible in-stock gift products.",
+        "description": "Returns whether the free gift is enabled, its rules (maxItems, minLensQuantity, badge, title, message), eligible in-stock gift products and minimumSubtotalCents=250000. The discounted merchandise subtotal must be at least PKR 2,500 and no lens deal may apply.",
         "responses": {
           "200": {
-            "description": "Gift offer wrapped in data."
+            "description": "Gift offer wrapped in data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "config",
+                        "categoryId",
+                        "minimumSubtotalCents",
+                        "products"
+                      ],
+                      "properties": {
+                        "config": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "categoryId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "uuid"
+                        },
+                        "minimumSubtotalCents": {
+                          "type": "integer",
+                          "const": 250000,
+                          "description": "The minimum discounted merchandise subtotal for gift eligibility, in PKR cents."
+                        },
+                        "products": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -3486,6 +3581,156 @@
       }
     },
     "schemas": {
+      "PromotionConfiguration": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "enabled",
+          "type",
+          "categoryIds",
+          "buyQuantity",
+          "freeQuantity",
+          "discountPercent",
+          "priority"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "buy_get_free",
+              "bundle_discount"
+            ]
+          },
+          "categoryIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true,
+            "description": "Every selected category must have a distinct item in each bundle; the category count cannot exceed the bundle size.",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "buyQuantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "freeQuantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "discountPercent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      },
+      "PromotionOffer": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "enabled",
+          "type",
+          "categoryIds",
+          "buyQuantity",
+          "freeQuantity",
+          "discountPercent",
+          "priority",
+          "categories"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "buy_get_free",
+              "bundle_discount"
+            ]
+          },
+          "categoryIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "buyQuantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "freeQuantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "discountPercent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "name"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
       "DataResponse": {
         "type": "object",
         "required": [
@@ -3538,12 +3783,34 @@
               },
               "chrome": {
                 "type": "object",
-                "required": ["whatsappSupportUrl"],
+                "required": [
+                  "whatsappSupportUrl",
+                  "announcements",
+                  "deliveryNotice",
+                  "trustNotice"
+                ],
                 "properties": {
                   "whatsappSupportUrl": {
                     "type": "string",
                     "format": "uri",
                     "description": "WhatsApp support chat link with a suggested message. The shopper confirms sending in WhatsApp."
+                  },
+                  "announcements": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "deliveryNotice": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Configured delivery fee or free-delivery threshold announcement."
+                  },
+                  "trustNotice": {
+                    "type": "string",
+                    "description": "FDA notice text displayed in the persistent storefront announcement ticker."
                   }
                 },
                 "additionalProperties": true
@@ -4174,7 +4441,7 @@
           },
           "giftProductId": {
             "type": "string",
-            "description": "Optional free gift product id from GET /api/storefront/gift. Requires giftConfirmed=true and at least minLensQuantity non-gift units in the order."
+            "description": "Optional free gift product id from GET /api/storefront/gift. Requires giftConfirmed=true, at least minLensQuantity non-gift units, a discounted merchandise subtotal of at least PKR 2,500, and no applied lens deal. The server recomputes all deal eligibility and pricing."
           },
           "giftConfirmed": {
             "type": "boolean",

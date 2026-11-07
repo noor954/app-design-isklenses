@@ -22,6 +22,8 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Catalog | `GET /api/storefront/home/products?tab=catalog\|featured\|new\|reduced&page=` | Public | Paginated homepage product tabs, 15 per page; `hasMore` drives the next call. Carousels: categories coverflow, brands fade-slide (6th section), shades infinite-loop; tabs smooth-slide/coverflow/fade-slide/infinite-loop |
 | Catalog | `GET /api/storefront/home/sections/{section}?page=&q=` | Public | Paginated homepage carousels (`categories`, `brands`, `shades`, `lens-types`); max 15 items per page, `hasMore` drives the next call, search (`q`) is uncapped |
 | Catalog | `GET /api/storefront/home` | Public | Canonical home banners plus shared palette/control styles, ordered and visible homepage sections, hero layout/autoplay, site chrome, catalog directories/products, and approved reviews |
+| Catalog | `GET /api/storefront/deals` | Public | Active category-based lens offers; clients may preview the best offer, while checkout recalculates it server-side |
+| Catalog | `GET /api/storefront/gift` | Public | Free-gift rules, product choices, and the PKR 2,500 discounted-subtotal threshold |
 | Catalog | `GET /api/products/{slug}` | Public | One active product with variants and media |
 | Catalog | `GET /api/blog-resources` | Public | Links to third-party lens-reading resources |
 | Catalog | `GET /api/blogs` | Public | Published ISK articles, sections, and original illustration paths and alt text |
@@ -34,7 +36,7 @@ The Realtime endpoint `GET /api/realtime/catalog` returns a short-lived sealed p
 | Reviews | `GET /api/products/{slug}/reviews` | Public | Up to 50 approved reviews |
 | Reviews | `POST /api/products/{slug}/reviews` | Public, rate-limited | Submit a review, if review submission is enabled |
 | Shopper | `GET, POST /api/storefront/session` | Public / shopper cookie | Read session; register, log in, or log out |
-| Shopper | `POST /api/orders` | Public / optional shopper cookie | Place a COD order; server reprices, reserves inventory, and validates delivery |
+| Shopper | `POST /api/orders` | Public / optional shopper cookie | Place a COD order; server reprices, applies the best eligible lens deal, reserves inventory, and validates delivery and gift eligibility |
 | Shopper | `GET /api/storefront/orders` | Shopper cookie | Up to 50 summaries for the signed-in shopper |
 | Shopper | `GET /api/storefront/orders/{orderId}` | Shopper cookie or matching receipt cookie | Current order status, items, totals and delivery address |
 | Integration | `GET /api/chatbot/knowledge?q=...` | Public | FAQ and up to eight matching published products for grounding |
@@ -194,14 +196,18 @@ The independent scaffold at [`services/fastapi/README.md`](../services/fastapi/R
 
 ## Free Cosmetic gift and full-width homepage carousels
 
-- `GET /api/storefront/gift` returns the offer: `enabled`, `maxItems`, `minLensQuantity`, `badge`, `title`, `message` and eligible in-stock gift products. Admin config is the `free_gift` settings key (`/api/admin/settings`, Admin > Free gift).
-- `POST /api/orders` accepts `giftProductId` and `giftConfirmed`. The gift is valid only when the order has at least `minLensQuantity` units whose product is not in the gift (Cosmetics) category; `giftConfirmed` must be `true`. The server revalidates and adds a $0 "(Free gift)" line. Web and Flutter show a prominent confirmation card before placing the order.
+- `GET /api/storefront/deals` returns active deal records with `id`, `name`, `type`, `categoryIds`, `buyQuantity`, `freeQuantity`, `discountPercent`, `priority` and category labels. `type` is `buy_get_free` or `bundle_discount`. Each qualifying bundle must contain at least one distinct product item from every selected category; the number of selected categories cannot exceed the bundle size, and a product unit can count in only one bundle. For Buy X Get Y Free, the lowest-priced Y items in each qualifying bundle are free. For a percentage bundle discount, every item in the complete bundle receives the configured percentage.
+- Only the single offer that saves the most applies to an order. Equal savings are resolved by higher `priority`, then stable deal ID; offers do not stack. The website and Flutter app preview the same rules from `/api/storefront/deals`, and `POST /api/orders` independently recalculates with current product categories and prices. The discounted subtotal is used for delivery pricing, and discounted/free units are persisted on separate order-item lines.
+- Admin configuration uses `PUT /api/admin/content/settings/deals` with a validated array of at most 30 offers. `GET /api/admin/content` returns the current setting. Staff can read it; admins and owners can change it.
+- `GET /api/storefront/gift` returns the offer: `enabled`, `maxItems`, `minLensQuantity`, `badge`, `title`, `message`, `minimumSubtotalCents: 250000`, and eligible in-stock gift products. Admin config is the `free_gift` setting, managed in Admin > Free gift.
+- `POST /api/orders` accepts `giftProductId` and `giftConfirmed`. A separate gift is valid only when no lens deal applies, the discounted merchandise subtotal is at least PKR 2,500, the order has at least `minLensQuantity` units whose product is not in the gift (Cosmetics) category, and `giftConfirmed` is `true`. The server revalidates and adds a zero-price "(Free gift)" line. Web and Flutter show the confirmation card only for eligible orders.
 - Homepage carousels are full width. Section order and styles are identical on web and mobile: categories coverflow, shades infinite-loop, brands (6th) fade-slide, lens types continuous; product tabs use distinct styles.
 
 ## Gift banner, cart gift choice and Showcase section
 
-- A sticky flashing strip ("Choose a free gift on every order · New Launch Gift") appears on every storefront and mobile screen while `GET /api/storefront/gift` reports `config.enabled` with products; it links to the cart.
+- The gift strip appears while `GET /api/storefront/gift` reports an enabled offer with products; its copy says the PKR 2,500 minimum and no-deal combination rule, and it links to the cart.
 - The gift can be chosen in the cart or at checkout; both surfaces share one choice (web: `localStorage` key `isk-free-gift-choice`; mobile: shared app state). The order API contract is unchanged (`giftProductId` + `giftConfirmed`).
+- `GET /api/storefront/home` exposes `chrome.deliveryNotice`, `chrome.announcements`, and `chrome.trustNotice`. Web and mobile keep the configured delivery amount and the exact FDA notice in their continuous announcement ticker.
 - The homepage has a new big-image `showcase` section (home configuration id `showcase`, defaults to order 1). Default order: hero, showcase, categories, shades, catalog, brands (6th), lens types, guidance, reviews, contact. It is driven by `GET /api/storefront/home` products (featured first) on web and mobile.
 
 ## Bulk product price and power options

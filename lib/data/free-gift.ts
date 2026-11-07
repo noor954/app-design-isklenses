@@ -10,17 +10,19 @@ import {
   type FreeGiftOffer,
 } from '@/lib/free-gift'
 
+export const FREE_GIFT_MINIMUM_SUBTOTAL_CENTS = 250_000
+
 export async function getFreeGiftOffer(): Promise<FreeGiftOffer> {
   const settings = await getSettings()
   const config = normalizeFreeGiftConfig(settings.free_gift)
-  if (!config.enabled) return { config, categoryId: null, products: [] }
+  if (!config.enabled) return { config, categoryId: null, minimumSubtotalCents: FREE_GIFT_MINIMUM_SUBTOTAL_CENTS, products: [] }
 
   const categories = await readDb
     .select({ id: storeCategories.id, name: storeCategories.name, slug: storeCategories.slug })
     .from(storeCategories)
     .where(eq(storeCategories.isActive, true))
   const categoryId = resolveGiftCategoryId(config, categories)
-  if (!categoryId) return { config, categoryId: null, products: [] }
+  if (!categoryId) return { config, categoryId: null, minimumSubtotalCents: FREE_GIFT_MINIMUM_SUBTOTAL_CENTS, products: [] }
 
   const memberships = readDb
     .select({ id: storeProductCategories.productId })
@@ -49,6 +51,7 @@ export async function getFreeGiftOffer(): Promise<FreeGiftOffer> {
   return {
     config,
     categoryId,
+    minimumSubtotalCents: FREE_GIFT_MINIMUM_SUBTOTAL_CENTS,
     products: rows.map((row) => ({
       id: row.id,
       name: row.name,

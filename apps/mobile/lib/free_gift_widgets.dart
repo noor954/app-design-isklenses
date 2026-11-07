@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'promotions.dart';
 import 'store_api.dart';
 
 const _giftInk = Color(0xff0d3a52);
@@ -8,18 +9,30 @@ const _giftAccent = Color(0xff087ba5);
 class GiftSelectionState extends ChangeNotifier {
   FreeGiftOffer? offer;
   bool loading = true;
+  bool promotionsAvailable = false;
+  List<StorePromotion> promotions = const [];
   String? selectedProductId;
   bool decisionMade = false;
   bool confirmed = false;
   String? error;
 
+  PromotionResult? promotionFor(List<CartLine> cart) =>
+      calculateBestPromotion(cart, promotions);
+
   bool isEligible(List<CartLine> cart) {
     final currentOffer = offer;
     if (currentOffer == null ||
         !currentOffer.config.enabled ||
-        currentOffer.products.isEmpty) {
+        currentOffer.products.isEmpty ||
+        !promotionsAvailable ||
+        promotionFor(cart) != null) {
       return false;
     }
+    final subtotalCents = cart.fold<int>(
+      0,
+      (total, line) => total + (moneyToCents(line.price) ?? 0) * line.quantity,
+    );
+    if (subtotalCents < currentOffer.minimumSubtotalCents) return false;
     final giftCategoryId =
         currentOffer.categoryId ?? currentOffer.config.categoryId;
     final lensUnits = cart
@@ -44,6 +57,7 @@ class GiftSelectionState extends ChangeNotifier {
   void setOffer(FreeGiftOffer value, List<CartLine> cart) {
     offer = value;
     loading = false;
+    _lastCart = List.unmodifiable(cart);
     _clearIfIneligible(cart);
     notifyListeners();
   }
@@ -53,7 +67,22 @@ class GiftSelectionState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPromotions(List<StorePromotion> value) {
+    promotions = value;
+    promotionsAvailable = true;
+    _clearIfIneligible(offer == null ? const [] : _lastCart);
+    notifyListeners();
+  }
+
+  void setPromotionsUnavailable() {
+    promotionsAvailable = false;
+    notifyListeners();
+  }
+
+  List<CartLine> _lastCart = const [];
+
   void updateCart(List<CartLine> cart) {
+    _lastCart = List.unmodifiable(cart);
     if (_clearIfIneligible(cart)) notifyListeners();
   }
 

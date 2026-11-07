@@ -77,7 +77,7 @@ export function Showcase({ products, title, description }: { products: Product[]
 
       <ul className="mt-6 grid gap-3 sm:grid-cols-3">
         {([
-          [Gift, 'Free gift on every order', 'Pick a New Launch Gift in your cart.'],
+          [Gift, 'Free gift on eligible orders', 'PKR 2,500 minimum; cannot combine with a lens deal.'],
           [ShieldCheck, 'Authentic lenses', 'Genuine brands with full product details.'],
           [Truck, 'Cash on delivery', 'Pay when your order arrives.'],
         ] as const).map(([Icon, heading, body]) => (

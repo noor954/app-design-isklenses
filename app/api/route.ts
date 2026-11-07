@@ -13,9 +13,13 @@ export async function GET() {
       },
       sharedStorefrontConfiguration: {
         read: 'GET /api/storefront/home',
+        homeNotices: 'GET /api/storefront/home returns chrome.deliveryNotice, chrome.announcements, and chrome.trustNotice for the continuous web/mobile announcement ticker.',
+        deals: 'GET /api/storefront/deals',
         updateAppearance: 'PUT /api/admin/content/settings/appearance',
         updateHomepage: 'PUT /api/admin/content/settings/home_configuration',
-        note: 'The website and mobile storefronts consume the same validated palette, control styles, hero slides, section order/visibility/copy, hero layout/autoplay, and chrome.whatsappSupportUrl.',
+        updateDeals: 'PUT /api/admin/content/settings/deals',
+        giftEligibility: 'GET /api/storefront/gift returns minimumSubtotalCents=250000. POST /api/orders rejects a separate gift when any lens deal applies or the discounted merchandise subtotal is below PKR 2,500.',
+        note: 'The website and mobile storefronts consume the same validated palette, control styles, hero slides, section order/visibility/copy, hero layout/autoplay, store notices, and eligible lens deals.',
       },
       productSpecifications: {
         note: 'Admin product create/update accepts scalar diameterMm values 14, 14.2, 14.5 and 14.8 mm as well as legacy values from 0 to 12 in 0.1 increments. Customer-selectable diameter lists are not yet supported. Products with power options allow plain lenses via lensChoice=plain or power lenses with a value for each eye.',
@@ -35,6 +39,7 @@ export async function GET() {
           'GET /api/storefront/home/sections/{section}',
           'GET /api/storefront/home/products',
           'GET /api/storefront/gift',
+          'GET /api/storefront/deals',
           'GET /api/products',
           'GET /api/products/{slug}',
           'GET /api/product-categories',

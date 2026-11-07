@@ -148,7 +148,7 @@ class _AdminFreeGiftSettingsScreenState
                     activeThumbColor: _adminBlue,
                     title: const Text('Enable free gift'),
                     subtitle: const Text(
-                      'Offer one selected gift when the cart meets the lens quantity requirement.',
+                      'Eligible orders need the configured lens quantity and at least PKR 2,500 after discounts. Gifts cannot combine with lens deals.',
                     ),
                     value: _enabled,
                     onChanged: _saving

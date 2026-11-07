@@ -10,14 +10,33 @@ import { useProducts } from '@/lib/hooks/use-storefront-data'
 import { FreeGiftPicker } from '@/components/storefront/free-gift-picker'
 import { useFreeGiftOffer, useGiftChoice, useGiftEligibility } from '@/lib/hooks/use-free-gift'
 import { formatPrice } from '@/lib/store-config'
+import { usePromotions } from '@/lib/hooks/use-promotions'
+import { calculateBestPromotion } from '@/lib/promotions'
+import { moneyToCents } from '@/lib/delivery'
 
 export function CartPage() {
   const { lines, setQuantity, syncProducts, count } = useStorefrontCart()
   const { products, isLoading, isError } = useProducts()
   const totals = cartTotals(lines)
+  const promotions = usePromotions()
+  const currencies = new Set(lines.map((line) => getCartLinePrice(line).currency))
+  const originalSubtotalCents = lines.reduce((sum, line) => {
+    const cents = moneyToCents(getCartLinePrice(line).price) ?? 0
+    return sum + cents * line.quantity
+  }, 0)
+  const promotionResult = currencies.size === 1
+    ? calculateBestPromotion(lines.map((line) => ({
+        quantity: line.quantity,
+        unitPriceCents: moneyToCents(getCartLinePrice(line).price) ?? 0,
+        categoryIds: line.product.categoryIds?.length ? line.product.categoryIds : line.product.categoryId ? [line.product.categoryId] : [],
+      })), promotions.promotions)
+    : null
+  const discountCents = promotionResult?.discountCents ?? 0
+  const subtotalCents = Math.max(0, originalSubtotalCents - discountCents)
   const giftOffer = useFreeGiftOffer()
   const [giftChoice, setGiftChoice] = useGiftChoice()
-  const { eligible: giftEligible } = useGiftEligibility(giftOffer, lines)
+  const promotionUnavailable = promotions.isLoading || promotions.isError
+  const { eligible: giftEligible } = useGiftEligibility(giftOffer, lines, subtotalCents, Boolean(promotionResult) || promotionUnavailable)
 
   useEffect(() => {
     if (!isLoading && !isError) syncProducts(products)
@@ -39,9 +58,11 @@ export function CartPage() {
       <h1 className="text-3xl font-bold tracking-tight text-[#033473] sm:text-4xl">Cart</h1>
       <div className="mt-8 grid items-start gap-10 lg:grid-cols-[1fr_380px]">
         <ul className="divide-y divide-[#033473]/10 border-y border-[#033473]/10">
-          {lines.map((line) => {
+          {lines.map((line, lineIndex) => {
             const { price, currency } = getCartLinePrice(line)
             const max = line.variant?.stockQuantity ?? line.product.stockQuantity
+            const freeUnits = promotionResult?.freeUnitsByLine[lineIndex] ?? 0
+            const lineDiscount = promotionResult?.discountCentsByLine[lineIndex] ?? 0
             return (
               <li key={line.key} className="grid grid-cols-[88px_1fr] gap-4 py-5 sm:grid-cols-[112px_1fr_auto]">
                 <StorefrontProductImage
@@ -60,6 +81,12 @@ export function CartPage() {
                     <p className="mt-1 text-xs text-[#526b7b]">Left eye: {line.leftPowerRange ?? '—'} D · Right eye: {line.rightPowerRange ?? '—'} D</p>
                   )}
                   <p className="mt-1 text-sm">{formatPrice(price, currency)} each</p>
+                  {freeUnits > 0 && (
+                    <p className="mt-1 text-xs font-semibold text-[#075f7f]">{freeUnits} item{freeUnits === 1 ? '' : 's'} free in this deal</p>
+                  )}
+                  {promotionResult?.promotion.type === 'bundle_discount' && lineDiscount > 0 && (
+                    <p className="mt-1 text-xs font-semibold text-[#075f7f]">Bundle savings: {formatPrice(lineDiscount / 100, currency)}</p>
+                  )}
                   <div className="mt-3 flex items-center gap-4">
                     <div className="flex items-center overflow-hidden rounded-full border border-[#033473]/25">
                       <button type="button" aria-label={`Decrease quantity of ${line.product.name}`} onClick={() => setQuantity(line.key, line.quantity - 1)} className="size-9 hover:bg-[#eef3fa]">−</button>
@@ -79,15 +106,30 @@ export function CartPage() {
             <FreeGiftPicker offer={giftOffer} choice={giftChoice} invalid={false} onChange={setGiftChoice} />
           </div>
         )}
+        {giftOffer?.config.enabled && !giftEligible && (
+          <p className="border-y border-[#cfe2eb] py-3 text-sm leading-6 text-[#15384d]">
+            {promotionUnavailable
+              ? 'Deal eligibility is being verified. Free gifts are hidden until current promotions load.'
+              : promotionResult
+              ? 'A lens deal is applied. Free gifts cannot be combined with a deal.'
+              : 'Choose a free gift when your discounted cart reaches PKR 2,500 and includes the required lens quantity.'}
+          </p>
+        )}
         <aside className="lg:col-start-2 lg:row-start-1 lg:row-span-2 rounded-2xl border border-[#080b10]/10 bg-[#edf8fc] p-6 shadow-[var(--storefront-shadow)] lg:sticky lg:top-32">
           <h2 className="text-lg font-bold text-[#033473]">Cart totals</h2>
           <dl className="mt-5 space-y-3 text-sm">
             <div className="flex justify-between"><dt>Items</dt><dd>{count}</dd></div>
-            <div className="flex justify-between font-semibold"><dt>Subtotal</dt><dd>{totals.map((total) => formatPrice(total.amount, total.currency)).join(' + ')}</dd></div>
+            <div className="flex justify-between"><dt>Products</dt><dd>{totals.map((total) => formatPrice(total.amount, total.currency)).join(' + ')}</dd></div>
+            {promotionResult && <div className="flex justify-between font-semibold text-[#075f7f]"><dt>{promotionResult.promotion.name}</dt><dd>−{formatPrice(discountCents / 100, [...currencies][0])}</dd></div>}
+            <div className="flex justify-between font-semibold"><dt>Subtotal after deals</dt><dd>{currencies.size === 1 ? formatPrice(subtotalCents / 100, [...currencies][0]) : totals.map((total) => formatPrice(total.amount, total.currency)).join(' + ')}</dd></div>
             <div className="flex justify-between text-[#4a5568]"><dt>Delivery</dt><dd>Confirmed before dispatch</dd></div>
           </dl>
+          {promotions.isLoading && <p role="status" className="mt-4 text-xs leading-5 text-[#4a5568]">Checking current deal pricing…</p>}
+          {promotions.isError && <p role="alert" className="mt-4 text-xs leading-5 text-[#8d3341]">{promotions.error} Reload the page to verify current deal pricing.</p>}
           <p className="mt-4 text-xs leading-5 text-[#4a5568]">Payment is cash on delivery. No online payment is collected.</p>
-          <Link href="/checkout" className="mt-5 block rounded-full bg-[#033473] py-3.5 text-center text-sm font-semibold text-white hover:bg-[#0a4fa3]">Proceed to checkout</Link>
+          {promotionUnavailable
+            ? <button type="button" disabled className="mt-5 block w-full rounded-full bg-[#033473] py-3.5 text-center text-sm font-semibold text-white opacity-55">Deal pricing unavailable</button>
+            : <Link href="/checkout" className="mt-5 block rounded-full bg-[#033473] py-3.5 text-center text-sm font-semibold text-white hover:bg-[#0a4fa3]">Proceed to checkout</Link>}
           <Link href="/shop" className="mt-3 block text-center text-sm font-medium text-[#033473] hover:underline">Continue shopping</Link>
         </aside>
       </div>

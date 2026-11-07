@@ -18,6 +18,8 @@ import {
 } from '@/lib/db/schema'
 import { CustomerAuthError, getCustomerSession, getOrderReceipt, type StoreCustomerSession } from '@/lib/auth/store-customer'
 import { normalizeFreeGiftConfig, resolveGiftCategoryId } from '@/lib/free-gift'
+import { FREE_GIFT_MINIMUM_SUBTOTAL_CENTS } from '@/lib/data/free-gift'
+import { calculateBestPromotion, normalizePromotions } from '@/lib/promotions'
 import { isToricLensType, TORIC_ORDER_NOTICE } from '@/lib/toric'
 import {
   isPowerLensValue,
@@ -322,8 +324,47 @@ async function submitCodOrderImpl(value: unknown) {
         if (stockQuantity < item.quantity) {
           throw new CheckoutError(`${product.name}${variant ? ` — ${variant.name}` : ''} does not have enough stock for that quantity.`, 409)
         }
-        return { item, product, variant, unitPrice, lineTotalCents }
+        return { item, product, variant, unitPrice, unitPriceCents, lineTotalCents }
       })
+      const [dealsSetting] = await tx
+        .select({ value: storeSettings.value })
+        .from(storeSettings)
+        .where(eq(storeSettings.key, 'deals'))
+        .limit(1)
+      const promotions = normalizePromotions(dealsSetting?.value)
+      const categories = await tx
+        .select({ id: storeCategories.id, name: storeCategories.name, slug: storeCategories.slug })
+        .from(storeCategories)
+        .where(eq(storeCategories.isActive, true))
+      const activeCategoryIds = new Set(categories.map((category) => category.id))
+      const lineProductIds = [...new Set(resolvedLines.map((line) => line.product.id))]
+      const categoryMemberships = activeCategoryIds.size
+        ? await tx
+            .select({ productId: storeProductCategories.productId, categoryId: storeProductCategories.categoryId })
+            .from(storeProductCategories)
+            .where(and(
+              inArray(storeProductCategories.categoryId, [...activeCategoryIds]),
+              inArray(storeProductCategories.productId, lineProductIds),
+            ))
+        : []
+      const categoryIdsByProduct = new Map<string, Set<string>>()
+      for (const { product } of resolvedLines) {
+        const ids = categoryIdsByProduct.get(product.id) ?? new Set<string>()
+        if (product.categoryId && activeCategoryIds.has(product.categoryId)) ids.add(product.categoryId)
+        categoryIdsByProduct.set(product.id, ids)
+      }
+      for (const membership of categoryMemberships) {
+        categoryIdsByProduct.get(membership.productId)?.add(membership.categoryId)
+      }
+      const promotionResult = calculateBestPromotion(
+        resolvedLines.map(({ item, product, unitPriceCents }) => ({
+          quantity: item.quantity,
+          unitPriceCents,
+          categoryIds: [...(categoryIdsByProduct.get(product.id) ?? [])],
+        })),
+        promotions,
+      )
+      if (promotionResult) subtotalCents -= promotionResult.discountCents
       const reservations = new Map<string, { product: typeof products[number]; variant: (typeof variants)[number] | null; quantity: number }>()
       for (const { item, product, variant } of resolvedLines) {
         const key = variant ? `variant:${variant.id}` : `product:${product.id}`
@@ -337,13 +378,15 @@ async function submitCodOrderImpl(value: unknown) {
 
       let giftLine: { product: typeof products[number]; variant: (typeof variants)[number] | null } | null = null
       if (input.giftProductId) {
+        if (promotionResult) {
+          throw new CheckoutError('A lens deal is applied to this order. A separate free gift cannot be added.', 409)
+        }
+        if (subtotalCents < FREE_GIFT_MINIMUM_SUBTOTAL_CENTS) {
+          throw new CheckoutError('A free gift is available only when the discounted merchandise subtotal is at least PKR 2,500.', 409)
+        }
         const [giftSetting] = await tx.select({ value: storeSettings.value }).from(storeSettings).where(eq(storeSettings.key, 'free_gift')).limit(1)
         const giftConfig = normalizeFreeGiftConfig(giftSetting?.value)
         if (!giftConfig.enabled) throw new CheckoutError('The free gift offer is no longer available. Review your order and try again.', 409)
-        const categories = await tx
-          .select({ id: storeCategories.id, name: storeCategories.name, slug: storeCategories.slug })
-          .from(storeCategories)
-          .where(eq(storeCategories.isActive, true))
         const giftCategoryId = resolveGiftCategoryId(giftConfig, categories)
         if (!giftCategoryId) throw new CheckoutError('The free gift offer is no longer available. Review your order and try again.', 409)
         const productIds = [...new Set([...resolvedLines.map((line) => line.product.id), input.giftProductId])]
@@ -505,18 +548,45 @@ async function submitCodOrderImpl(value: unknown) {
         })
       if (!order) throw new Error('The order was not created.')
 
-      await tx.insert(storeOrderItems).values(resolvedLines.map(({ item, product, variant, unitPrice, lineTotalCents }) => ({
-        orderId: order.id,
-        productId: product.id,
-        variantId: variant?.id ?? null,
-        powerLeft: item.lensChoice === 'plain' ? 'plain' : item.leftPowerRange,
-        powerRight: item.lensChoice === 'plain' ? 'plain' : item.rightPowerRange,
-        inventoryReserved: true,
-        productName: variant ? `${product.name} — ${variant.name}` : product.name,
-        unitPrice,
-        quantity: item.quantity,
-        lineTotal: moneyString(lineTotalCents),
-      })).concat(giftLine ? [{
+      const dealItemName = promotionResult?.promotion.name
+      const paidItems = resolvedLines.flatMap(({ item, product, variant, unitPrice, unitPriceCents }, index) => {
+        const freeQuantity = promotionResult?.freeUnitsByLine[index] ?? 0
+        const discountedQuantity = promotionResult?.discountedUnitsByLine[index] ?? 0
+        const regularQuantity = item.quantity - freeQuantity - discountedQuantity
+        const name = variant ? `${product.name} — ${variant.name}` : product.name
+        const common = {
+          orderId: order.id,
+          productId: product.id,
+          variantId: variant?.id ?? null,
+          powerLeft: item.lensChoice === 'plain' ? 'plain' : item.leftPowerRange,
+          powerRight: item.lensChoice === 'plain' ? 'plain' : item.rightPowerRange,
+          inventoryReserved: true,
+        }
+        return [
+          ...(regularQuantity ? [{
+            ...common,
+            productName: name,
+            unitPrice,
+            quantity: regularQuantity,
+            lineTotal: moneyString(unitPriceCents * regularQuantity),
+          }] : []),
+          ...(discountedQuantity && promotionResult?.promotion.type === 'bundle_discount' ? [{
+            ...common,
+            productName: `${name} (${promotionResult.promotion.discountPercent}% deal: ${dealItemName})`,
+            unitPrice: moneyString(unitPriceCents - Math.round(unitPriceCents * promotionResult.promotion.discountPercent / 100)),
+            quantity: discountedQuantity,
+            lineTotal: moneyString((unitPriceCents - Math.round(unitPriceCents * promotionResult.promotion.discountPercent / 100)) * discountedQuantity),
+          }] : []),
+          ...(freeQuantity && dealItemName ? [{
+            ...common,
+            productName: `${name} (Free deal: ${dealItemName})`,
+            unitPrice: '0.00',
+            quantity: freeQuantity,
+            lineTotal: '0.00',
+          }] : []),
+        ]
+      })
+      await tx.insert(storeOrderItems).values(paidItems.concat(giftLine ? [{
         orderId: order.id,
         productId: giftLine.product.id,
         variantId: giftLine.variant?.id ?? null,

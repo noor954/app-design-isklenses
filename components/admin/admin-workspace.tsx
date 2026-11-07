@@ -39,6 +39,7 @@ import { ProductEditor } from '@/components/admin/product-editor'
 import { ContentManager } from '@/components/admin/content-manager'
 import { HomeDesignManager } from '@/components/admin/home-design-manager'
 import { FreeGiftManager } from '@/components/admin/free-gift-manager'
+import { DealsManager } from '@/components/admin/deals-manager'
 import { PowerLensOptionsManager } from '@/components/admin/power-lens-options-manager'
 import { BrandManager, ErrorLogManager, LensShadeManager, LensTypeManager } from '@/components/admin/catalog-taxonomy-manager'
 import { CatalogSyncManager } from '@/components/admin/catalog-sync-manager'
@@ -78,6 +79,7 @@ const sections: Array<{ id: Section; label: string; icon: typeof LayoutDashboard
   { id: 'home-design', label: 'Home and design', icon: Images },
   { id: 'power-options', label: 'Power lens options', icon: Eye },
   { id: 'free-gift', label: 'Free gift', icon: Gift },
+  { id: 'deals', label: 'Lens deals', icon: BadgePercent },
   { id: 'delivery', label: 'Delivery', icon: Truck },
   { id: 'system-users', label: 'System users', icon: Users },
   { id: 'project-plan', label: 'Project Kanban', icon: ClipboardList },
@@ -1240,6 +1242,7 @@ export function AdminWorkspace({ section = 'overview' }: { section?: AdminSectio
     'hero-slider': <HomeDesignManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
     'power-options': <PowerLensOptionsManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
     'free-gift': <FreeGiftManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
+    deals: <DealsManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
     delivery: <DeliveryManager canEdit={session.role === 'owner' || session.role === 'admin'} />,
     'system-users': session.role === 'owner' && session.userId
       ? <SystemUsersWorkspace signedInUserId={session.userId} signedInEmail={session.email ?? ''} />

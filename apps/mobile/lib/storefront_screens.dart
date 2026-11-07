@@ -1106,7 +1106,7 @@ class _ShowcaseSection extends StatelessWidget {
     );
 
     final perks = [
-      (Icons.card_giftcard, 'Free gift on every order'),
+      (Icons.card_giftcard, 'Free gift on eligible orders'),
       (Icons.verified_outlined, 'Authentic lenses'),
       (Icons.local_shipping_outlined, 'Cash on delivery'),
     ];

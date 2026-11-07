@@ -392,11 +392,26 @@ class StoreApi {
         Map<String, dynamic>.from(data['config'] as Map),
       ),
       categoryId: data['categoryId']?.toString(),
+      minimumSubtotalCents: data['minimumSubtotalCents'] is num
+          ? (data['minimumSubtotalCents'] as num).toInt()
+          : 250000,
       products: (data['products'] as List)
           .whereType<Map>()
           .map((value) => FreeGiftProduct.fromJson(value, origin))
           .toList(growable: false),
     );
+  }
+
+  Future<List<StorePromotion>> getPromotions() async {
+    final body = await _getObject('/api/storefront/deals');
+    final data = body['data'];
+    if (data is! Map || data['promotions'] is! List) {
+      throw const StoreApiException('The deals response is invalid.');
+    }
+    return (data['promotions'] as List)
+        .whereType<Map>()
+        .map(StorePromotion.fromJson)
+        .toList(growable: false);
   }
 
   Future<String> placeOrder({
@@ -690,12 +705,52 @@ class FreeGiftOffer {
   const FreeGiftOffer({
     required this.config,
     required this.categoryId,
+    required this.minimumSubtotalCents,
     required this.products,
   });
 
   final FreeGiftConfig config;
   final String? categoryId;
+  final int minimumSubtotalCents;
   final List<FreeGiftProduct> products;
+}
+
+class StorePromotion {
+  const StorePromotion({
+    required this.id,
+    required this.name,
+    required this.enabled,
+    required this.type,
+    required this.categoryIds,
+    required this.buyQuantity,
+    required this.freeQuantity,
+    required this.discountPercent,
+    required this.priority,
+  });
+
+  final String id;
+  final String name;
+  final bool enabled;
+  final String type;
+  final List<String> categoryIds;
+  final int buyQuantity;
+  final int freeQuantity;
+  final int discountPercent;
+  final int priority;
+
+  factory StorePromotion.fromJson(Map value) => StorePromotion(
+    id: value['id']?.toString() ?? '',
+    name: value['name']?.toString() ?? 'Lens deal',
+    enabled: value['enabled'] == true,
+    type: value['type']?.toString() ?? '',
+    categoryIds: value['categoryIds'] is List
+        ? (value['categoryIds'] as List).map((id) => id.toString()).toList()
+        : const [],
+    buyQuantity: _asInt(value['buyQuantity']),
+    freeQuantity: _asInt(value['freeQuantity']),
+    discountPercent: _asInt(value['discountPercent']),
+    priority: _asInt(value['priority']),
+  );
 }
 
 class FreeGiftConfig {
@@ -999,16 +1054,29 @@ class StoreChrome {
   const StoreChrome({
     required this.contact,
     required this.footer,
+    this.announcements = const [],
+    this.deliveryNotice,
+    this.trustNotice,
     this.whatsappSupportUrl,
   });
 
   final Map<String, dynamic> contact;
   final Map<String, dynamic> footer;
+  final List<String> announcements;
+  final String? deliveryNotice;
+  final String? trustNotice;
   final String? whatsappSupportUrl;
 
   factory StoreChrome.fromJson(Map value) => StoreChrome(
     contact: _asMap(value['contact']),
     footer: _asMap(value['footer']),
+    announcements: value['announcements'] is List
+        ? (value['announcements'] as List).whereType<String>().toList(
+            growable: false,
+          )
+        : const [],
+    deliveryNotice: value['deliveryNotice']?.toString(),
+    trustNotice: value['trustNotice']?.toString(),
     whatsappSupportUrl: value['whatsappSupportUrl'] as String?,
   );
 }

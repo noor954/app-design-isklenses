@@ -9,6 +9,7 @@ import 'admin_free_gift_settings.dart';
 import 'free_gift_widgets.dart';
 import 'admin_product_editor.dart';
 import 'isk_controls.dart';
+import 'promotions.dart';
 import 'store_api.dart';
 import 'storefront_screens.dart';
 
@@ -42,6 +43,7 @@ class _IskLensesAppState extends State<IskLensesApp> {
   final List<StoreProduct> _comparison = [];
   ShopperSession? _session;
   Map<String, dynamic> _appearance = const {};
+  List<String> _notices = const [];
   Uri? _whatsappSupportUri;
   var _tab = 0;
   StoreBrowseFilter _browseFilter = const StoreBrowseFilter();
@@ -69,6 +71,13 @@ class _IskLensesAppState extends State<IskLensesApp> {
       _giftSelection.finishLoading();
       if (mounted) setState(() {});
     }
+    try {
+      final promotions = await _api.getPromotions();
+      if (!mounted) return;
+      _giftSelection.setPromotions(promotions);
+    } on StoreApiException {
+      _giftSelection.setPromotionsUnavailable();
+    }
   }
 
   @override
@@ -85,6 +94,15 @@ class _IskLensesAppState extends State<IskLensesApp> {
         setState(() {
           _appearance = home.appearance;
           _whatsappSupportUri = supportUri;
+          _notices = [
+            if (home.chrome.deliveryNotice case final notice?
+                when notice.trim().isNotEmpty)
+              notice,
+            ...home.chrome.announcements,
+            if (home.chrome.trustNotice case final notice?
+                when notice.trim().isNotEmpty)
+              notice,
+          ];
         });
       }
     } on StoreApiException catch (error) {
@@ -797,6 +815,8 @@ class _IskLensesAppState extends State<IskLensesApp> {
             ),
             body: Column(
               children: [
+                if (_notices.isNotEmpty)
+                  _AnnouncementTicker(messages: _notices),
                 if (_giftOffer case final offer?
                     when offer.config.enabled && offer.products.isNotEmpty)
                   _FlashingGiftStrip(
@@ -875,6 +895,86 @@ class _IskLensesAppState extends State<IskLensesApp> {
   }
 }
 
+class _AnnouncementTicker extends StatefulWidget {
+  const _AnnouncementTicker({required this.messages});
+
+  final List<String> messages;
+
+  @override
+  State<_AnnouncementTicker> createState() => _AnnouncementTickerState();
+}
+
+class _AnnouncementTickerState extends State<_AnnouncementTicker>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 30),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final message = widget.messages.join('   •   ');
+    const textStyle = TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.w700,
+      fontSize: 12,
+    );
+    final painter = TextPainter(
+      text: const TextSpan(text: '', style: textStyle),
+      textDirection: Directionality.of(context),
+    )..text = TextSpan(text: message, style: textStyle);
+    painter.layout();
+    final distance = painter.width + 44;
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+
+    return Container(
+      height: 38,
+      color: _controlBlue,
+      alignment: Alignment.centerLeft,
+      child: reducedMotion
+          ? SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(message, style: textStyle, maxLines: 1),
+              ),
+            )
+          : LayoutBuilder(
+              builder: (context, constraints) => ClipRect(
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) => Transform.translate(
+                    offset: Offset(-distance * _controller.value, 0),
+                    child: SizedBox(
+                      width: distance * 2,
+                      child: Row(
+                        children: [
+                          Text(message, style: textStyle, maxLines: 1),
+                          const SizedBox(width: 44),
+                          Text(message, style: textStyle, maxLines: 1),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+}
+
 class _FlashingGiftStrip extends StatefulWidget {
   const _FlashingGiftStrip({required this.badge, required this.onTap});
 
@@ -947,7 +1047,7 @@ class _FlashingGiftStripState extends State<_FlashingGiftStrip>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Choose a free gift on every order · ${widget.badge.isEmpty ? 'New Launch Gift' : widget.badge}',
+                      'Free gift on qualifying orders · PKR 2,500 minimum · No lens deal · ${widget.badge.isEmpty ? 'New Launch Gift' : widget.badge}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1769,7 +1869,10 @@ class CartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtotalCents = _cartSubtotal(cart);
+    final originalSubtotalCents = _cartSubtotal(cart);
+    final promotion = giftSelection.promotionFor(cart);
+    final subtotalCents =
+        originalSubtotalCents - (promotion?.discountCents ?? 0);
     return Scaffold(
       appBar: AppBar(title: const Text('Your bag')),
       body: cart.isEmpty
@@ -1784,95 +1887,160 @@ class CartScreen extends StatelessWidget {
                 FreeGiftChooser(state: giftSelection, cart: cart),
                 if (giftSelection.isEligible(cart)) const SizedBox(height: 14),
                 FreeGiftSummaryLine(state: giftSelection),
-                for (final line in cart)
-                  Card(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 68,
-                            height: 68,
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(
-                              color: _paleBlue,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: line.product.imageUrl == null
-                                ? const Icon(
-                                    Icons.visibility_outlined,
-                                    color: _navy,
-                                  )
-                                : Image.network(
-                                    line.product.imageUrl!,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.visibility_outlined,
-                                      color: _navy,
-                                    ),
-                                  ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  line.product.name,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                for (var lineIndex = 0; lineIndex < cart.length; lineIndex++)
+                  Builder(
+                    builder: (context) {
+                      final line = cart[lineIndex];
+                      final freeUnits =
+                          promotion?.freeUnitsByLine[lineIndex] ?? 0;
+                      final lineSavings =
+                          promotion?.discountCentsByLine[lineIndex] ?? 0;
+                      return Card(
+                        color: Colors.white,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 68,
+                                height: 68,
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
+                                  color: _paleBlue,
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                if (line.variant != null)
-                                  Text(
-                                    line.variant!.name,
-                                    style: const TextStyle(
-                                      color: Colors.black54,
+                                child: line.product.imageUrl == null
+                                    ? const Icon(
+                                        Icons.visibility_outlined,
+                                        color: _navy,
+                                      )
+                                    : Image.network(
+                                        line.product.imageUrl!,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(
+                                              Icons.visibility_outlined,
+                                              color: _navy,
+                                            ),
+                                      ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      line.product.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  ),
-                                if (line.lensChoice == 'plain')
-                                  const Text('Plain lenses'),
-                                if (line.leftPowerRange != null)
-                                  Text(
-                                    'L ${line.leftPowerRange} · R ${line.rightPowerRange}',
-                                    style: const TextStyle(
-                                      color: Colors.black54,
+                                    if (line.variant != null)
+                                      Text(
+                                        line.variant!.name,
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    if (line.lensChoice == 'plain')
+                                      const Text('Plain lenses'),
+                                    if (line.leftPowerRange != null)
+                                      Text(
+                                        'L ${line.leftPowerRange} · R ${line.rightPowerRange}',
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    Text(
+                                      _money(line.price, line.currency),
+                                      style: const TextStyle(
+                                        color: _navy,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  ),
-                                Text(
-                                  _money(line.price, line.currency),
-                                  style: const TextStyle(
-                                    color: _navy,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                    if (freeUnits > 0)
+                                      Text(
+                                        '$freeUnits item${freeUnits == 1 ? '' : 's'} free in this deal',
+                                        style: const TextStyle(
+                                          color: _controlBlue,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    if (promotion?.promotion.type ==
+                                            'bundle_discount' &&
+                                        lineSavings > 0)
+                                      Text(
+                                        'Bundle savings: ${_money(_amount(lineSavings), 'PKR')}',
+                                        style: const TextStyle(
+                                          color: _controlBlue,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              IconButton(
+                                onPressed: () =>
+                                    onChange(line, line.quantity - 1),
+                                icon: const Icon(Icons.remove_circle_outline),
+                              ),
+                              Text(
+                                '${line.quantity}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () =>
+                                    onChange(line, line.quantity + 1),
+                                icon: const Icon(Icons.add_circle_outline),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            onPressed: () => onChange(line, line.quantity - 1),
-                            icon: const Icon(Icons.remove_circle_outline),
-                          ),
-                          Text(
-                            '${line.quantity}',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          IconButton(
-                            onPressed: () => onChange(line, line.quantity + 1),
-                            icon: const Icon(Icons.add_circle_outline),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   ),
                 const SizedBox(height: 10),
+                if (promotion != null) ...[
+                  _SummaryRow(
+                    label: promotion.promotion.name,
+                    value:
+                        '−${_money(_amount(promotion.discountCents), 'PKR')}',
+                  ),
+                  Text(
+                    'Best qualifying deal applied. A separate free gift cannot be combined.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: _navy),
+                  ),
+                ],
+                if (giftSelection.offer case final offer?
+                    when offer.config.enabled &&
+                        !giftSelection.isEligible(cart))
+                  Text(
+                    promotion != null
+                        ? 'Free gifts are not available with a lens deal.'
+                        : 'Free gifts require a discounted merchandise subtotal of at least PKR 2,500.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: _navy),
+                  ),
                 _SummaryRow(
-                  label: 'Subtotal',
+                  label: 'Products',
+                  value: _money(_amount(originalSubtotalCents), 'PKR'),
+                ),
+                _SummaryRow(
+                  label: 'Subtotal after deals',
                   value: _money(_amount(subtotalCents), 'PKR'),
                 ),
+                if (!giftSelection.promotionsAvailable)
+                  const Text(
+                    'Deal pricing could not be verified. Reopen the app before checkout.',
+                    style: TextStyle(color: Colors.red),
+                  ),
                 const SizedBox(height: 16),
                 if (giftSelection.loading)
                   const Padding(
@@ -1880,7 +2048,9 @@ class CartScreen extends StatelessWidget {
                     child: Text('Checking free-gift availability…'),
                   ),
                 FilledButton(
-                  onPressed: giftSelection.loading
+                  onPressed:
+                      giftSelection.loading ||
+                          !giftSelection.promotionsAvailable
                       ? null
                       : () async {
                           final result = await Navigator.of(context)
@@ -2053,7 +2223,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  int get _subtotalCents => _cartSubtotal(widget.cart);
+  int get _originalSubtotalCents => _cartSubtotal(widget.cart);
+
+  PromotionResult? get _promotion =>
+      widget.giftSelection.promotionFor(widget.cart);
+
+  int get _subtotalCents =>
+      _originalSubtotalCents - (_promotion?.discountCents ?? 0);
 
   bool get _giftEligible => widget.giftSelection.isEligible(widget.cart);
 
@@ -2123,6 +2299,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 10),
               FreeGiftChooser(state: widget.giftSelection, cart: widget.cart),
             ],
+            if (_promotion case final promotion?)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '${promotion.promotion.name} applied · You save ${_money(_amount(promotion.discountCents), 'PKR')}. A separate free gift is not available.',
+                  style: const TextStyle(
+                    color: _navy,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             const SizedBox(height: 8),
             Card(
               color: _paleBlue,
@@ -2132,7 +2319,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   children: [
                     FreeGiftSummaryLine(state: widget.giftSelection),
                     _SummaryRow(
-                      label: 'Subtotal',
+                      label: 'Products',
+                      value: _money(_amount(_originalSubtotalCents), 'PKR'),
+                    ),
+                    if (_promotion case final promotion?)
+                      _SummaryRow(
+                        label: promotion.promotion.name,
+                        value:
+                            '−${_money(_amount(promotion.discountCents), 'PKR')}',
+                      ),
+                    _SummaryRow(
+                      label: 'Subtotal after deals',
                       value: _money(_amount(_subtotalCents), 'PKR'),
                     ),
                     const SizedBox(height: 8),
@@ -2174,6 +2371,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               onPressed:
                   _submitting ||
                       widget.giftSelection.loading ||
+                      !widget.giftSelection.promotionsAvailable ||
                       _loadingRules ||
                       deliveryCents == null
                   ? null
@@ -2239,6 +2437,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _submit() async {
+    if (!widget.giftSelection.promotionsAvailable) {
+      setState(
+        () => _error =
+            'Deal pricing could not be verified. Check your connection and try again.',
+      );
+      return;
+    }
     if (_giftEligible && !widget.giftSelection.decisionMade) {
       widget.giftSelection.showError(
         'Choose a gift or select “No gift, thanks” to continue.',

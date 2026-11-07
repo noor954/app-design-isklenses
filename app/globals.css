@@ -216,6 +216,14 @@
   animation-play-state: paused;
 }
 
+.isk-announcement-viewport {
+  overflow: hidden;
+}
+
+.isk-announcement-track {
+  width: max-content;
+}
+
 @keyframes isk-review-marquee {
   to { transform: translateX(-50%); }
 }
@@ -350,6 +358,9 @@
   html { scroll-behavior: auto; }
   .isk-home .scroll-smooth { scroll-behavior: auto !important; }
   .isk-marquee { animation: none; }
+  .isk-announcement-viewport { overflow-x: auto; }
+  .isk-announcement-track { animation: none; }
+  .isk-announcement-track > p:not(:first-child) { display: none; }
   .isk-review-track { animation: none; }
   .isk-home-hero-image,
   .isk-home-hero-copy { animation: none !important; }

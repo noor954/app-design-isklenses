@@ -13,6 +13,8 @@ import { getCartLinePrice } from '@/lib/hooks/use-storefront-cart'
 import { priceWithPowerSurcharge } from '@/lib/power-lens-options'
 import { FreeGiftPicker, type GiftChoice } from '@/components/storefront/free-gift-picker'
 import { useFreeGiftOffer, useGiftChoice, useGiftEligibility } from '@/lib/hooks/use-free-gift'
+import { usePromotions } from '@/lib/hooks/use-promotions'
+import { calculateBestPromotion } from '@/lib/promotions'
 
 type Customer = { email: string }
 
@@ -56,6 +58,7 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
   const giftOffer = useFreeGiftOffer()
   const [giftChoice, setGiftChoice] = useGiftChoice()
   const [giftInvalid, setGiftInvalid] = useState(false)
+  const promotionState = usePromotions()
 
 
   useEffect(() => {
@@ -89,16 +92,25 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
 
   const currencies = new Set(lines.map((line) => getCartLinePrice(line).currency))
   const currency = lines.length ? getCartLinePrice(lines[0]).currency : 'PKR'
-  const subtotalCents = lines.reduce((sum, line) => {
+  const originalSubtotalCents = lines.reduce((sum, line) => {
     const { price } = getCartLinePrice(line)
     return sum + (moneyToCents(price) ?? 0) * line.quantity
   }, 0)
+  const promotionResult = currencies.size === 1
+    ? calculateBestPromotion(lines.map((line) => ({
+        quantity: line.quantity,
+        unitPriceCents: moneyToCents(getCartLinePrice(line).price) ?? 0,
+        categoryIds: line.product.categoryIds?.length ? line.product.categoryIds : line.product.categoryId ? [line.product.categoryId] : [],
+      })), promotionState.promotions)
+    : null
+  const discountCents = promotionResult?.discountCents ?? 0
+  const subtotalCents = Math.max(0, originalSubtotalCents - discountCents)
   const subtotal = subtotalCents / 100
   const deliveryFeeCents = getDeliveryFeeCents(deliveryRules, subtotalCents)
   const freeShippingThreshold = getFreeShippingThreshold(deliveryRules)
   const orderTotalCents = deliveryFeeCents === null ? null : subtotalCents + deliveryFeeCents
 
-  const { eligible: giftEligible } = useGiftEligibility(giftOffer, lines)
+  const { eligible: giftEligible } = useGiftEligibility(giftOffer, lines, subtotalCents, Boolean(promotionResult))
   const selectedGift = giftEligible ? giftOffer?.products.find((product) => product.id === giftChoice?.productId) ?? null : null
 
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
@@ -160,6 +172,11 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
     setOrderError('')
     if (productsError) {
       setOrderError('The catalogue could not be refreshed. Try again before placing your order.')
+      setSubmitting(false)
+      return
+    }
+    if (promotionState.isLoading || promotionState.isError) {
+      setOrderError(promotionState.error || 'Promotional offers could not be verified. Try again before placing your order.')
       setSubmitting(false)
       return
     }
@@ -296,6 +313,13 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
                 <button type="button" onClick={() => void readCustomerSession()} disabled={authLoading} className="font-bold underline underline-offset-4 disabled:opacity-50">Check again</button>
               </div>
             )}
+            {giftOffer?.config.enabled && !giftEligible && (
+              <p className="border-y border-[#152a52]/20 py-4 text-sm leading-6 text-[#314a63]">
+                {promotionResult
+                  ? 'A lens deal is applied. Free gifts cannot be combined with a deal.'
+                  : 'A free gift is available on eligible lens orders of at least PKR 2,500 after discounts.'}
+              </p>
+            )}
             {customer ? (
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-[#152a52]/20 bg-white px-4 py-3">
                 <p className="min-w-0 break-all text-sm"><LockKeyhole size={15} className="mr-2 inline-block" aria-hidden="true" />Signed in as <strong>{customer.email}</strong></p>
@@ -425,9 +449,10 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
               {productsError && <button type="button" onClick={() => void refreshProducts()} className="ml-2 font-bold underline underline-offset-4">Try again</button>}
             </div>
           )}
+          {promotionState.isError && <p role="alert" className="mb-4 border border-[#a52d3c]/35 bg-[#fff4f2] px-4 py-3 text-sm text-[#782b36]">{promotionState.error} Reload checkout to verify current deal pricing.</p>}
           <button
             type="submit"
-            disabled={submitting || authLoading || Boolean(authError) || productsLoading || productsError || deliveryFeeCents === null}
+            disabled={submitting || authLoading || Boolean(authError) || productsLoading || productsError || promotionState.isLoading || promotionState.isError || deliveryFeeCents === null}
             className="inline-flex min-h-14 w-full items-center justify-center gap-2 bg-[#152a52] px-5 py-4 text-sm font-black uppercase tracking-[.11em] text-[#d3ff48] hover:bg-[#16468a] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#16468a] disabled:cursor-wait disabled:opacity-55 sm:w-auto sm:min-w-72"
           >
             {submitting ? <LoaderCircle size={17} className="animate-spin" /> : <PackageCheck size={17} aria-hidden="true" />}
@@ -481,7 +506,10 @@ export function Checkout({ deliveryRules }: { deliveryRules: DeliveryRule[] }) {
             )}
           </ul>
           <div className="space-y-3 border-t border-[#152a52]/25 pt-4 text-sm">
-            <div className="flex items-start justify-between gap-4"><span>Products subtotal</span><strong className="font-mono text-right">{formatPrice(subtotal, currency)}</strong></div>
+            <div className="flex items-start justify-between gap-4"><span>Products subtotal</span><strong className="font-mono text-right">{formatPrice(originalSubtotalCents / 100, currency)}</strong></div>
+            {promotionResult && <div className="flex items-start justify-between gap-4 font-semibold text-[#075f7f]"><span>{promotionResult.promotion.name}</span><strong className="font-mono text-right">−{formatPrice(discountCents / 100, currency)}</strong></div>}
+            <div className="flex items-start justify-between gap-4"><span>Subtotal after deals</span><strong className="font-mono text-right">{formatPrice(subtotal, currency)}</strong></div>
+            {promotionResult && <p className="border-y border-[#152a52]/15 py-2 text-xs leading-5 text-[#314a63]">Your best eligible deal is applied automatically. Deals cannot be combined with a separate free gift.</p>}
             <div className="flex items-start justify-between gap-4 text-[#314a63]"><span>Delivery charge</span><strong className="font-mono text-right">{deliveryFeeCents === null ? 'Unavailable' : formatPrice(deliveryFeeCents / 100, currency)}</strong></div>
             <div className="flex items-start justify-between gap-4 border-t border-[#152a52]/20 pt-3 font-bold"><span>Cash on delivery total</span><strong className="font-mono text-right">{orderTotalCents === null ? 'Unavailable' : formatPrice(orderTotalCents / 100, currency)}</strong></div>
           </div>
