@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     await logApplicationError({ source, errorName, message: report.message, stack })
     return new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('[error-log] Could not persist browser error', error instanceof Error ? error.name : 'UnknownError')
+    console.error('[error-log] Could not persist browser error', error)
     return NextResponse.json({ error: 'Error report could not be recorded.' }, { status: 500 })
   }
 }

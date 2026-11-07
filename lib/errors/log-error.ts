@@ -10,10 +10,12 @@ export async function logApplicationError(input: {
   message: string
   stack?: string | null
 }) {
-  const redact = (value: string) => value.replace(
-    /\b(password|token|secret|authorization|cookie|api[-_ ]?key)\b(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
-    '$1$2[REDACTED]',
-  )
+  const redact = (value: string) => value
+    .replace(
+      /\b(password|token|secret|authorization|cookie|api[-_ ]?key)\b(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
+      '$1$2[REDACTED]',
+    )
+    .replace(/([?&][^\s&#=]+)=([^&#\s]*)/g, '$1=[REDACTED]')
   await db.delete(storeErrorLogs).where(sql`${storeErrorLogs.createdAt} < now() - interval '1 day'`)
   await db.insert(storeErrorLogs).values({
     source: redact(input.source).slice(0, 120),

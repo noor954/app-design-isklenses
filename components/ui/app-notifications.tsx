@@ -27,10 +27,16 @@ function NotificationStack() {
       }
     }
     const onWindowError = (event: ErrorEvent) => {
-      reportError(event.error, 'Something went wrong. Please try again.')
+      const error = event.error ?? new Error(event.message || 'An unknown browser runtime error occurred.')
+      reportError(error, 'Something went wrong. Please try again.', {
+        phase: 'runtime',
+        filename: event.filename || undefined,
+        line: event.lineno || undefined,
+        column: event.colno || undefined,
+      })
     }
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
-      reportError(event.reason, 'A request could not be completed. Please try again.')
+      reportError(event.reason, 'A request could not be completed. Please try again.', { phase: 'runtime' })
     }
     const unsubscribe = subscribeNotifications(add)
     window.addEventListener('error', onWindowError)

@@ -5,7 +5,10 @@ import { reportError } from '@/lib/ui/notifications'
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    reportError(error, 'This page could not be loaded. Please try again.')
+    reportError(error, 'This page could not be loaded. Please try again.', {
+      phase: 'next-error-boundary',
+      digest: error.digest,
+    })
   }, [error])
 
   return (

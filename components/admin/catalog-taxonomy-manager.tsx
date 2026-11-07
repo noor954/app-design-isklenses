@@ -319,7 +319,7 @@ export function ErrorLogManager() {
             { id: 'message', header: 'Message', searchValue: (entry) => entry.message, className: 'min-w-[280px] max-w-[42rem]', cell: (entry) => <div className="max-w-[42rem]">
               <p className="line-clamp-2 whitespace-pre-wrap break-words">{entry.message}</p>
               <p className="mt-1 text-xs text-[#526b7b]">Source: {entry.source}</p>
-              {entry.stack && <details className="mt-2"><summary className="cursor-pointer text-xs underline underline-offset-2">Stack trace</summary><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#f7fcff] p-3 text-xs">{entry.stack}</pre></details>}
+              {entry.stack && <details className="mt-2"><summary className="cursor-pointer text-xs underline underline-offset-2">Diagnostics and stack trace</summary><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#f7fcff] p-3 text-xs">{entry.stack}</pre></details>}
             </div> },
             { id: 'createdAt', header: 'Recorded', sortValue: (entry) => entry.createdAt.getTime(), className: 'min-w-[180px] text-xs', cell: (entry) => <time dateTime={entry.createdAt.toISOString()}>{entry.createdAt.toLocaleString()}</time> },
           ] as DataTableColumn<ErrorLog>[]}
