@@ -62,6 +62,8 @@ The latest complete import contains 495 distinct source listings; on 2026-10-10 
 
 An optional `DATABASE_READ_URL` provides a separate Neon reader pool for public catalog, content, chatbot, and gift-offer reads. The primary `DATABASE_URL` remains authoritative for writes, authentication, checkout, orders, media, and administrative work. The reader cache snapshot follows the reader's visible state so replica lag does not produce cache keys ahead of replicated data. Configure this variable only with a dedicated read-only Neon endpoint/role; without it, reads use the primary pool.
 
+For schema changes, a Neon read-only compute endpoint attached to the same primary branch replays DDL from the primary; wait for replication and verify the resulting schema on the reader rather than attempting to run migrations through its read-only connection. A separate Neon branch/database is an independent schema target: apply and validate each migration there using its writable migration connection before directing `DATABASE_READ_URL` to it. Do not configure a reader that is missing application tables or has not been confirmed read-only.
+
 ```text
 Storefront SWR ──> /api/products ──> public catalog reads ──> Neon reader (optional)
 Checkout ────────> /api/orders ────> reprice + reserve stock ──> Neon transaction + audit
