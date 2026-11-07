@@ -299,6 +299,7 @@ export function LensTypeManager({ canEdit }: { canEdit: boolean }) {
 export function ErrorLogManager() {
   const { data, error, isLoading, mutate } = useSWR('admin-error-logs', () => getRecentErrorLogs(), { refreshInterval: 30000 })
   type ErrorLog = Awaited<ReturnType<typeof getRecentErrorLogs>>[number]
+  const getDigest = (stack: string | null) => stack?.match(/"digest"\s*:\s*"([^"]+)"/)?.[1]
   return (
     <section className="min-w-0 flex-1">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -310,7 +311,7 @@ export function ErrorLogManager() {
         <DataTable
           rows={data}
           getRowId={(entry) => String(entry.id)}
-          getSearchValue={(entry) => `${entry.errorName} ${entry.message} ${entry.source}`}
+          getSearchValue={(entry) => `${entry.errorName} ${entry.message} ${entry.source} ${entry.stack ?? ''}`}
           itemLabel="error logs"
           initialPageSize={25}
           emptyMessage="No error logs are available."
@@ -319,11 +320,12 @@ export function ErrorLogManager() {
             { id: 'message', header: 'Message', searchValue: (entry) => entry.message, className: 'min-w-[280px] max-w-[42rem]', cell: (entry) => <div className="max-w-[42rem]">
               <p className="line-clamp-2 whitespace-pre-wrap break-words">{entry.message}</p>
               <p className="mt-1 text-xs text-[#526b7b]">Source: {entry.source}</p>
+              {getDigest(entry.stack) && <p className="mt-1 text-xs text-[#526b7b]">Error digest: <code className="break-all">{getDigest(entry.stack)}</code></p>}
               {entry.stack && <details className="mt-2"><summary className="cursor-pointer text-xs underline underline-offset-2">Diagnostics and stack trace</summary><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#f7fcff] p-3 text-xs">{entry.stack}</pre></details>}
             </div> },
             { id: 'createdAt', header: 'Recorded', sortValue: (entry) => entry.createdAt.getTime(), className: 'min-w-[180px] text-xs', cell: (entry) => <time dateTime={entry.createdAt.toISOString()}>{entry.createdAt.toLocaleString()}</time> },
           ] as DataTableColumn<ErrorLog>[]}
-          exportRow={(entry) => ({ Error: entry.errorName, Message: entry.message, Source: entry.source, Recorded: entry.createdAt.toISOString() })}
+          exportRow={(entry) => ({ Error: entry.errorName, Message: entry.message, Source: entry.source, Diagnostics: entry.stack ?? '', Recorded: entry.createdAt.toISOString() })}
         />
       )}
     </section>

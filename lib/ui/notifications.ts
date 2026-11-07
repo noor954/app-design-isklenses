@@ -29,6 +29,7 @@ type ErrorWithDiagnostics = {
 let notificationSequence = 0
 const subscribers = new Set<(notification: AppNotification) => void>()
 const pendingNotifications: AppNotification[] = []
+const recentErrorReports = new Map<string, number>()
 
 function getErrorDetails(error: unknown) {
   if (error instanceof Error) {
@@ -104,11 +105,7 @@ function describeReactProductionError(message: string, digest?: string) {
   const code = Number(match[1])
   const original = `Original production message: ${message}`
   if (code === 441) {
-    return [
-      'React Server Component rendering failed. React hides the underlying exception in production.',
-      digest ? `Correlate digest "${digest}" with the deployment/server logs for the original exception.` : 'No React digest was attached; inspect server logs for the same request and timestamp.',
-      original,
-    ].join(' ')
+    return `Server Component rendering failed (React #441). ${digest ? `Match server error logs using digest ${digest}.` : 'The server request error log contains the underlying exception when available.'} ${original}`
   }
   if (code === 418) {
     return `React hydration failed because server-rendered markup differed from the client render. Check browser-only branches, nondeterministic values, locale formatting, changing external data, invalid HTML nesting, and extensions. ${original}`
@@ -135,13 +132,14 @@ function buildDiagnosticStack(
   errorComponentStack?: string,
   cause?: unknown,
   errorDetails?: { code: unknown; status: unknown; statusCode: unknown },
+  digest?: string,
 ) {
   if (typeof window === 'undefined') return stack
   const diagnostics = {
     phase: context.phase ?? 'operation',
     route: window.location.pathname,
     reportedAt: new Date().toISOString(),
-    digest: context.digest,
+    digest,
     userAgent: navigator.userAgent,
     language: navigator.language,
     online: navigator.onLine,
@@ -185,18 +183,33 @@ export function reportError(error: unknown, fallback = 'Something went wrong. Pl
   const message = (reactMessage ?? (details.message.trim() ? details.message : fallback)).slice(0, 3000)
   const userMessage = reactMessage ? fallback : message
   const source = (typeof window !== 'undefined' ? window.location.pathname : 'browser').slice(0, 1000)
+  const digest = context.digest ?? details.digest
   const cause = summarizeCause(details.cause)
-  const stack = buildDiagnosticStack(details.stack, context, details.componentStack, details.cause, details)
-  console.error('[client-error] Unhandled application error', {
-    source,
-    phase: context.phase ?? 'operation',
-    errorName,
-    message,
-    digest: context.digest ?? details.digest,
-    stack,
-    cause,
-  })
-  if (typeof window !== 'undefined') {
+  const stack = buildDiagnosticStack(details.stack, context, details.componentStack, details.cause, details, digest)
+  const dedupeKey = `${source}\n${errorName}\n${digest ?? message}`
+  const now = Date.now()
+  for (const [key, reportedAt] of recentErrorReports) {
+    if (now - reportedAt > 30_000) recentErrorReports.delete(key)
+  }
+  const duplicate = recentErrorReports.has(dedupeKey)
+  recentErrorReports.set(dedupeKey, now)
+  while (recentErrorReports.size > 100) {
+    const oldestKey = recentErrorReports.keys().next().value
+    if (oldestKey === undefined) break
+    recentErrorReports.delete(oldestKey)
+  }
+  if (!duplicate) {
+    console.error('[client-error] Unhandled application error', {
+      source,
+      phase: context.phase ?? 'operation',
+      errorName,
+      message,
+      digest,
+      stack,
+      cause,
+    })
+  }
+  if (typeof window !== 'undefined' && !duplicate) {
     let reportMessage = message
     let reportStack = stack ?? ''
     const createBody = () => JSON.stringify({
