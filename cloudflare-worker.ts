@@ -8,6 +8,11 @@ let appPromise: Promise<typeof import("vinext/server/fetch-handler")> | undefine
 export default {
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
+    if (url.hostname === "isklenses.com" || url.hostname === "isklenses.online") {
+      url.hostname = `www.${url.hostname}`;
+      return Response.redirect(url.toString(), 308);
+    }
+
     if (url.pathname !== apkPath) {
       const connectionString = env.HYPERDRIVE?.connectionString;
       if (!connectionString) {

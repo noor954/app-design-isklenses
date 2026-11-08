@@ -5,6 +5,13 @@ export default defineConfig({
     name: "isk-lenses-storefront",
     entrypoint: "./cloudflare-worker.ts",
     compatibilityDate: "2026-11-04",
+    workersDev: true,
+    domains: [
+      "isklenses.com",
+      "www.isklenses.com",
+      "isklenses.online",
+      "www.isklenses.online",
+    ],
     assets: {
       htmlHandling: "none",
       notFoundHandling: "none",
