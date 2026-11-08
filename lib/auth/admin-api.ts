@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { AdminAuthError } from '@/lib/auth/admin'
 import { logApplicationError } from '@/lib/errors/log-error'
+import { errorLogDetails } from '@/lib/errors/redact'
 import { AdminRequestError } from '@/lib/http/admin-request-error'
 
 export async function adminApiError(error: unknown) {
@@ -16,7 +17,7 @@ export async function adminApiError(error: unknown) {
       { status: 400, headers: { 'Cache-Control': 'no-store' } },
     )
   }
-  console.error('[admin-api] Request failed', error instanceof Error ? error.name : 'UnknownError')
+  console.error('[admin-api] Request failed', errorLogDetails(error))
   try {
     await logApplicationError({
       source: 'admin-api',

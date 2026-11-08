@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCatalog, getCatalogPage } from '@/lib/data/catalog'
+import { errorLogDetails } from '@/lib/errors/redact'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
       },
     )
   } catch (error) {
-    console.error('[products-api] Catalog request failed', error instanceof Error ? error.name : 'UnknownError')
+    console.error('[products-api] Catalog request failed', errorLogDetails(error))
     return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 })
   }
 }

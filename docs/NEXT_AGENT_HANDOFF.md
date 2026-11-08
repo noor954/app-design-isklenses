@@ -1,6 +1,6 @@
 # Next Agent Handoff
 
-_Last updated: 2026-11-07_
+_Last updated: 2026-11-08_
 
 This document is the operational handoff for continuing the ecommerce storefront + admin CRM project. It intentionally records environment-variable **names and sources**, never secret values.
 
@@ -11,7 +11,7 @@ This document is the operational handoff for continuing the ecommerce storefront
 - Primary database: Neon Postgres.
 - File storage: Neon `store_media_objects`, served through the cacheable same-origin `/api/media/[...path]` route.
 - AI integration: the chatbot optionally uses a stateless Mastra agent through Vercel AI Gateway when `AI_GATEWAY_API_KEY` is configured; without it, the deterministic FAQ/catalog assistant remains active.
-- Deployment target: Vercel. The project is already linked in `.vercel/`.
+- Production deployment: Vercel remains the configured DNS target but its production routes currently return HTTP 402 (`DEPLOYMENT_DISABLED`). Cloudflare Worker version `5891bd04-1db3-4cff-9cea-2fd9fe827f5d` is deployed at `https://isk-lenses-storefront.isklenses.workers.dev` and uses Neon through Hyperdrive, but the migration is not ready for DNS cutover; see **Cloudflare migration status** below.
 - Database migration history: `db/migrations/`.
 - Drizzle schema mirror: `lib/db/schema.ts`.
 - Drizzle connection: `lib/db/index.ts`.
@@ -35,7 +35,7 @@ This document is the operational handoff for continuing the ecommerce storefront
 - **Deals migration status:** the operator reports applying `db/migrations/0026_lens_promotions.sql` to the main database. Verified against the configured `DATABASE_URL`: `store_settings_key_check` includes `deals`, and `node --env-file-if-exists=.env.local scripts/validate-schema.mjs` passes. These checks do not prove that a separate Neon branch has the migration.
 - **Read-replica migration guidance:** a Neon read-only compute endpoint attached to the same primary branch replays the primary's schema changes; do not run the migration on a read-only endpoint. Wait for replication and verify `store_settings_key_check` there. If `DATABASE_READ_URL` targets a separate Neon branch/database or independent replica, apply migration `0026` to that target through its writable migration connection and validate it before routing reads there. `DATABASE_READ_URL` is currently unset locally, so the app falls back to the primary. Do not reuse the previously checked candidate endpoint: it lacked `store_products`.
 - **Cross-platform direction:** retain Next.js as the web and API backend; the Flutter shopper app lives in `apps/mobile` and consumes the existing API/OpenAPI contract. TanStack DB and a sealed public-catalog Neon Realtime path are implemented; the optional Mastra chatbot reads the same current FAQ/catalog facts on every turn. See `docs/architect/ARCHITECTURE_OVERVIEW.md` for security boundaries. Do not introduce TanStack Start as a parallel backend or replace application-owned auth without an explicitly reviewed migration.
-- **Integration readiness:** Production Vercel has the existing database, admin-session/recovery, media, Meta, `NEON_REALTIME_URL`, and sensitive `NEON_REALTIME_SECRET` variables. Neon Realtime is enabled on the production `main` branch, restricted to `https://www.isklenses.online`, and the deployed sealed-query endpoint returns 200. `AI_GATEWAY_API_KEY` remains optional and unset; the chatbot's deterministic FAQ/catalog mode stays active without it. Production migration `0020_product_power_choices.sql` is applied and verified. Use Node.js 22.13+ for local and deployed runtime. Do not invent credentials or connect clients directly to Postgres.
+- **Integration readiness:** Production Vercel has the existing database, admin-session/recovery, media, Meta, `NEON_REALTIME_URL`, and sensitive `NEON_REALTIME_SECRET` variables. Neon Realtime is enabled on the production `main` branch, restricted to `https://www.isklenses.online`, and the deployed sealed-query endpoint returns 200. `AI_GATEWAY_API_KEY` remains optional and unset; the chatbot's deterministic FAQ/catalog mode stays active without it. Production migration `0020_product_power_choices.sql` is applied and verified. Use Node.js 22.18+ for the Cloudflare toolchain. Do not invent credentials or connect clients directly to Postgres.
 - Sync notes: `docs/DATABASE_SYNC.md`.
 - `.github/workflows/android-release.yml` remains an optional GitHub release workflow and does not publish the customer-facing download. The production `/mobile-app` page and `GET /api/mobile/android` use the static website APK described above.
 - GitHub operation identity: project agents must verify and use `@qaiserfccc` for GitHub mutations; see `AGENTS.md`.
@@ -57,7 +57,7 @@ Do not replace Neon with another database unless explicitly requested. Do not ad
 
 ## Environment variables
 
-The variables are managed by the Vercel/v0 project environment and mirrored into the local development environment. Use the project Vars/integration settings to inspect or change values. Never commit `.env*`, tokens, passwords, or full connection strings.
+The variables below are currently managed by the Vercel/v0 project environment and mirrored into local development. Vercel remains the production source of truth until a Cloudflare cutover is verified. For a future Cloudflare deployment, copy the required variables into Worker secrets using the platform secret manager; do not print or commit values, and do not upload `.env*` files.
 
 ### Required for current database, storage, and admin auth code
 
@@ -143,14 +143,28 @@ The current schema includes products, product assets, source product categories,
 
 ## Deployment reference
 
-- Vercel project is already linked locally via `.vercel/`.
-- Use the Vercel project UI for normal preview/production publishing.
+- Vercel project is already linked locally via `.vercel/` and remains the current production host.
+- Use the Vercel project UI for normal preview/production publishing until the Cloudflare migration has passed every cutover check below.
 - The local code session is the linked repository checkout; use its authenticated Vercel CLI context only after reviewing the diff, verifying required environment configuration, and ensuring the intended work is ready to publish.
 - Do not deploy from or commit the `.env` files.
 - Before deployment, verify Neon is configured for the target environment and apply all numbered database migrations.
 - After deployment, verify `/`, `/api/products`, `/api/media/...`, and `/api/admin/metrics` in the deployed environment and inspect runtime logs if a database error appears.
 - **Production deployment verified 2026-11-01:** `https://www.isklenses.online` is the Vercel alias that serves this project's API; `https://isklenses.com` does not serve these API routes. The Flutter default `ISK_API_ORIGIN` points to the working API alias. The latest deployment is `e-commerce-app-design-mtpgrkud0-qaiserfcccs-projects.vercel.app` (Production, Ready). `GET /`, `GET /api/products`, `GET /api/chatbot/knowledge`, a chatbot `POST /api/chatbot`, and `GET /api/realtime/catalog` returned 200; unauthenticated `GET /api/admin/metrics` returned the expected 401. Neon Realtime is enabled on the production `main` branch with `https://www.isklenses.online` as the allowed browser origin. Both Neon-provided Realtime variables are configured for Vercel Production, with the signing secret marked sensitive. The Realtime endpoint returns the URL and sealed public-catalog query without exposing the signing secret. An initial API smoke test found missing migration 0020 columns; the existing idempotent migration was applied and verified on Production. Vercel build artifacts under `apps/mobile/build` are excluded with `.vercelignore`. No environment values were displayed. `AI_GATEWAY_API_KEY` remains optional and unset.
 - **Shared-homepage deployment:** migration 0021 was applied and verified on the configured Neon database before deployment. The production deployment `e-commerce-app-design-5bb8ga9zo-qaiserfcccs-projects.vercel.app` is aliased to `https://www.isklenses.online`; `GET /`, `GET /api/storefront/home`, and `GET /api/openapi.json` returned 200. The live home response includes appearance, configuration, 26 banners, and nine configurable sections. Production environment-variable names for database, Realtime, media, Meta, and admin/session configuration were present; no values were displayed. The API contract validator and production build passed.
+
+### Cloudflare migration status (deployed, not cut over)
+
+- Cloudflare Workers Free is the selected candidate because it avoids bandwidth-based egress charges, addressing the reported Vercel transfer-limit issue. It is not unlimited: the current Free plan includes a 100,000 requests/day quota and 10 ms CPU per invocation. Confirm live plan limits and expected traffic before cutover.
+- `vite.config.ts` and `cloudflare.config.ts` configure the vinext Worker `isk-lenses-storefront`. `cloudflare-worker.ts` injects the Hyperdrive connection string before dynamically loading the application and streams `/isklenses.apk` from the tracked public GitHub raw URL, including byte-range support. The Vite public asset copy excludes the 50.6 MiB APK because Cloudflare's per-asset limit is 25 MiB. No R2 is required.
+- Hyperdrive `isk-lenses-neon-primary` (configuration ID `9c96e464feed4d7abbabb9772308999a`) connects to the Neon primary using the unpooled origin, with query caching disabled. It is bound as `HYPERDRIVE`; do not store its origin credentials in the repository. Worker version on 2026-11-08: `5891bd04-1db3-4cff-9cea-2fd9fe827f5d`.
+- `lib/db/index.ts` selects a request-scoped PostgreSQL pool through `AsyncLocalStorage`; `cloudflare-worker.ts` creates a one-connection pool per request and closes it when the streamed response finishes or is canceled. This replaces a shared isolate pool after repeated 1101 runtime cancellations. On 2026-11-08 the latest Worker passed three sequential and three concurrent rounds for `/`, `/api/products`, `/api/storefront/home`, `/api/storefront/deals`, and `/api/storefront/gift` (all 200); unauthenticated `/api/admin/metrics` returned the expected 401 three times; APK HEAD/range returned 200/206. The root route remained relatively slow (about 10–12 seconds). Public product media, `/api/mobile/android`, checkout page, shopper session, blogs, chatbot knowledge, product categories, and OpenAPI also returned 200. Authenticated admin, order-free checkout validation, remaining APIs, and longer monitoring still need verification. Cloudflare TypeScript and vinext build passed with Node 22.
+- `/api/realtime/catalog` returns 503 (`Catalog live updates are not configured.`): the Worker lacks `NEON_REALTIME_SECRET`; it also lacks the existing Meta app secret, page access token, and webhook verify token. Vercel CLI `env pull` returned empty values for these sensitive variables, so none were transferred. Provision them directly in Cloudflare using its secret manager before claiming parity for Realtime or Meta lead integrations. Do not copy the unverified `DATABASE_READ_URL`.
+- Cloudflare CLI OAuth authentication is configured for the selected account. The `isklenses.online` zone is still `pending` (zone ID `3748d0c8bd7d7e4b45445ea9681dfb03`) with assigned nameservers `annalise.ns.cloudflare.com` and `chip.ns.cloudflare.com`. No nameserver/registrar change was made. Cloudflare's DNS scan found ten candidate records (Vercel A records, CAA, and `_domainconnect`); none were imported, and mail/TXT records were not reconciled. R2 is unavailable without dashboard enablement but is not required by the current Worker path.
+- **Production incident (2026-11-08):** read-only `curl` checks of `https://www.isklenses.online/`, `/api/openapi.json`, the apex domain, and the latest direct Vercel Production deployment URL return HTTP 402 with `x-vercel-error: DEPLOYMENT_DISABLED`. Vercel CLI still lists recent deployment builds as Ready, but their HTTP routes are disabled. Treat the live web/API as unavailable until a host with required runtime configuration is deployed and verified.
+- Before DNS cutover, reconcile every current DNS record (including mail, TXT, CAA, and Vercel records), then activate the zone; the domain is registered at Hostinger and Cloudflare cannot change its registrar nameservers. Do not update nameservers until all Worker checks pass and DNS records are accounted for.
+- The Worker currently has secrets named `ADMIN_RECOVERY_KEY`, `ADMIN_SESSION_SECRET`, `DATABASE_URL`, `META_GRAPH_API_VERSION`, `META_PAGE_ID`, and `NEON_REALTIME_URL`. `DATABASE_URL` is overwritten with `HYPERDRIVE.connectionString` before the application imports its database module. `ADMIN_SESSION_SECRET` was newly generated, so existing Vercel admin/shopper signed sessions are invalid on this Worker and users would need to sign in again. `CUSTOMER_SESSION_SECRET` falls back to the admin secret; `NEON_REALTIME_SECRET`, Meta access/webhook/app secrets, and `AI_GATEWAY_API_KEY` are not configured. Keep `DATABASE_READ_URL` unset unless its endpoint is confirmed current and read-only. Never place secrets in `cloudflare.config.ts`, Vite variables, or browser code.
+- To redeploy, use `pnpm run deploy:vinext` with Node.js 22.18+. Verify the Worker URL first: `/`, `/api/openapi.json`, `/api/products`, `/api/storefront/home`, `/api/storefront/deals`, `/api/storefront/gift`, `/api/media/...`, unauthenticated `/api/admin/metrics` (expected 401), authenticated admin and checkout flows, and full/range APK downloads. Test Realtime origin allow-listing and any optional AI Gateway integration.
+- Only after successful production checks should DNS for the verified API host `www.isklenses.online` be pointed to Cloudflare. Do not assume `isklenses.com` is the project API host; it was previously verified not to serve these API routes. Vercel is not a working rollback target while its routes return 402; keep its project/configuration untouched so it can be restored if service is re-enabled. Set up Cloudflare Web Analytics separately if analytics are required; Vercel Analytics was removed from the app shell because it does not collect on Cloudflare.
 
 ## Validation checklist
 
@@ -169,7 +183,7 @@ Also inspect:
 
 - `git diff -- db/migrations lib/db app/actions app/api lib/hooks docs`
 - live Neon schema through the integration tool when available
-- Vercel deployment/build logs after publishing
+- deployment/build logs on the currently active platform after publishing
 
 ## Safe handoff rules
 

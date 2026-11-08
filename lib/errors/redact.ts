@@ -6,3 +6,15 @@ export function redactErrorLogValue(value: string) {
     )
     .replace(/([?&][^\s&#=]+)=([^&#\s]*)/g, '$1=[REDACTED]')
 }
+
+export function errorLogDetails(error: unknown) {
+  if (!(error instanceof Error)) return { name: 'UnknownError', message: 'An unknown error occurred.' }
+  const code = 'code' in error && (typeof error.code === 'string' || typeof error.code === 'number')
+    ? error.code
+    : undefined
+  return {
+    name: error.name,
+    message: redactErrorLogValue(error.message || error.name),
+    ...(code === undefined ? {} : { code }),
+  }
+}

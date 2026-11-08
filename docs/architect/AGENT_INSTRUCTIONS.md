@@ -28,7 +28,7 @@ pnpm build
   - Admin sessions require `ADMIN_SESSION_SECRET`. Shopper sessions use `CUSTOMER_SESSION_SECRET` or derive from admin secret.
   - Admin password recovery (`/admin/forgot-password`) is enabled only when `ADMIN_RECOVERY_KEY` (8+ characters) is set; owners can also reset other accounts from the System users panel.
   - Media uploads are stored in `store_media_objects` in Neon and served through `/api/media/[...path]`. Do not reintroduce a hosted object-store dependency.
-  - Do not commit secret values; use the Vercel UI for environment variables.
+  - Do not commit secret values. Use the active platform's secret manager. Vercel remains the configured DNS target but currently returns HTTP 402 (`DEPLOYMENT_DISABLED`); the Cloudflare Worker is deployed but not production-ready until database-backed route checks pass and DNS is explicitly cut over.
 
 - **Areas of responsibility**:
   - Keep server-side data access inside `app/actions/` and HTTP endpoints under `app/api/`.

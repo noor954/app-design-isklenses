@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNotNull, or, sql } from 'drizzle-orm'
 import { db, readDb } from '@/lib/db'
 import { storeCategories, storeLensTypes, storeProductCategories, storeProducts } from '@/lib/db/schema'
 import { getSettings } from '@/lib/data/site-content'
@@ -24,10 +24,6 @@ export async function getFreeGiftOffer(): Promise<FreeGiftOffer> {
   const categoryId = resolveGiftCategoryId(config, categories)
   if (!categoryId) return { config, categoryId: null, minimumSubtotalCents: FREE_GIFT_MINIMUM_SUBTOTAL_CENTS, products: [] }
 
-  const memberships = readDb
-    .select({ id: storeProductCategories.productId })
-    .from(storeProductCategories)
-    .where(eq(storeProductCategories.categoryId, categoryId))
   const rows = await readDb
     .select({
       id: storeProducts.id,
@@ -40,10 +36,14 @@ export async function getFreeGiftOffer(): Promise<FreeGiftOffer> {
     })
     .from(storeProducts)
     .leftJoin(storeLensTypes, eq(storeProducts.lensTypeId, storeLensTypes.id))
+    .leftJoin(storeProductCategories, and(
+      eq(storeProductCategories.productId, storeProducts.id),
+      eq(storeProductCategories.categoryId, categoryId),
+    ))
     .where(and(
       eq(storeProducts.status, 'active'),
       gt(storeProducts.stockQuantity, 0),
-      sql`(${storeProducts.categoryId} = ${categoryId} OR ${storeProducts.id} IN (${memberships}))`,
+      or(eq(storeProducts.categoryId, categoryId), isNotNull(storeProductCategories.productId)),
       sql`(${storeLensTypes.name} IS NULL OR lower(btrim(${storeLensTypes.name})) <> 'toric')`,
     ))
     .orderBy(asc(storeProducts.name))

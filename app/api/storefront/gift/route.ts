@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getFreeGiftOffer } from '@/lib/data/free-gift'
+import { errorLogDetails } from '@/lib/errors/redact'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export async function GET() {
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
-    console.error('[storefront-gift-api] Request failed', error instanceof Error ? error.name : 'UnknownError')
+    console.error('[storefront-gift-api] Request failed', errorLogDetails(error))
     return NextResponse.json({ error: 'The free gift offer is unavailable.' }, { status: 500 })
   }
 }

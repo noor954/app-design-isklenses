@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "noEmit": true,
+    "tsBuildInfoFile": ".cloudflare/tsconfig.cloudflare.tsbuildinfo"
+  },
+  "include": [
+    "cloudflare.config.ts",
+    "cloudflare-worker.ts",
+    "vite.config.ts",
+    ".cloudflare/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

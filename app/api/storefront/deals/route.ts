@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getPromotionOffers } from '@/lib/data/promotions'
+import { errorLogDetails } from '@/lib/errors/redact'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export async function GET() {
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
-    console.error('[storefront-deals-api] Request failed', error instanceof Error ? error.name : 'UnknownError')
+    console.error('[storefront-deals-api] Request failed', errorLogDetails(error))
     return NextResponse.json({ error: 'Promotional offers are unavailable.' }, { status: 500 })
   }
 }

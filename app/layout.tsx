@@ -1,4 +1,3 @@
-import { Analytics } from '@vercel/analytics/next'
 import { Outfit } from 'next/font/google'
 import type { Metadata, Viewport } from 'next'
 import type { CSSProperties } from 'react'
@@ -68,7 +67,6 @@ export default async function RootLayout({
         <AppNotifications>
           <StorefrontCartProvider>{children}</StorefrontCartProvider>
         </AppNotifications>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )

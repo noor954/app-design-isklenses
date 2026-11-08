@@ -8,6 +8,7 @@ import {
   getStorefrontShades,
 } from '@/lib/data/catalog'
 import { getHomeContent, getSiteChrome } from '@/lib/data/site-content'
+import { errorLogDetails } from '@/lib/errors/redact'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,10 +43,7 @@ export async function GET() {
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
-    console.error(
-      '[storefront-home-api] Home content request failed',
-      error instanceof Error ? error.name : 'UnknownError',
-    )
+    console.error('[storefront-home-api] Home content request failed', errorLogDetails(error))
     return NextResponse.json(
       { error: 'Storefront home content is unavailable.' },
       { status: 500 },
