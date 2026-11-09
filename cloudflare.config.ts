@@ -32,6 +32,10 @@ export default defineConfig({
       HYPERDRIVE: bindings.hyperdrive({
         id: "9c96e464feed4d7abbabb9772308999a",
       }),
+      DB: bindings.d1({
+        id: "270cb8ab-710a-4d7c-b2d1-fc4e09cf00ad",
+        name: "isk-lenses-storefront",
+      }),
     },
   }),
 });

@@ -8,7 +8,7 @@
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "validate:openapi": "node scripts/validate-openapi.mjs",
     "dev:vinext": "vite dev --port 3001",

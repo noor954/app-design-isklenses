@@ -15,7 +15,8 @@ export async function cached<T>(namespace: string, key: string, ttlSeconds: numb
     // MVCC snapshots change when transactions become visible, including writes
     // outside this app, without introducing write-side locks.
     const result = await readPool.query<{ revision: string }>(
-      'SELECT pg_current_snapshot()::text AS revision',
+      `SELECT current_database() || '@' || COALESCE(inet_server_addr()::text, 'local')
+        || ':' || pg_current_snapshot()::text AS revision`,
     )
     if (!result.rows[0]) throw new Error('Database snapshot is missing')
     revision = result.rows[0].revision
