@@ -6,6 +6,16 @@ export default defineConfig({
     entrypoint: "./cloudflare-worker.ts",
     compatibilityDate: "2026-11-04",
     workersDev: true,
+    observability: {
+      enabled: true,
+      redactQueryString: true,
+      logs: {
+        enabled: true,
+        headSamplingRate: 1,
+        invocationLogs: true,
+        persist: true,
+      },
+    },
     domains: [
       "isklenses.com",
       "www.isklenses.com",

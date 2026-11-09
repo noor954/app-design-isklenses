@@ -26,18 +26,18 @@ Install the Flutter SDK and an Android emulator or Xcode/iOS simulator. From thi
 
 ```sh
 flutter pub get
-flutter run --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
+flutter run
 ```
 
-Set `ISK_API_ORIGIN` to the origin that serves this project's API. For a local Android emulator, the host machine is usually reachable at `http://10.0.2.2:3000`; for an iOS simulator use `http://localhost:3000`. Do not use plain HTTP for production. The default production origin is `https://www.isklenses.online`.
+Set `ISK_API_ORIGIN` to the origin that serves this project's API. For a local Android emulator, the host machine is usually reachable at `http://10.0.2.2:3000`; for an iOS simulator use `http://localhost:3000`. Do not use plain HTTP for production. The current default is the verified Cloudflare Worker origin, `https://isk-lenses-storefront.isklenses.workers.dev`, because the custom domains still point to Hostinger. Once their DNS cutover is complete, builds can override it with `--dart-define=ISK_API_ORIGIN=https://www.isklenses.online`.
 
 ## Build
 
 ```sh
 flutter analyze
 flutter test
-flutter build appbundle --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
-flutter build ipa --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
+flutter build appbundle
+flutter build ipa
 ```
 
 The generated application/bundle identifiers are provisional. Before store distribution, the owner must confirm the permanent Android application ID and Apple bundle ID, configure signing certificates/profiles, provide store accounts and review privacy/store listing requirements. This repository does not contain release credentials.
@@ -48,7 +48,7 @@ The Android NDK version is pinned in `android/app/build.gradle.kts` to the valid
 
 ### Android APK
 ```sh
-flutter build apk --release --dart-define=ISK_API_ORIGIN=https://www.isklenses.online
+flutter build apk --release
 # output: build/app/outputs/flutter-apk/app-release.apk
 ```
 Share the APK, then on the phone allow "Install unknown apps" for the app used to open it (Files/Chrome) and tap the file. Or with USB debugging: `adb install -r app-release.apk`. Without release signing environment variables the local build uses the debug key and is for testing only; never publish it.
@@ -63,5 +63,5 @@ For an explicitly signed local build, provide `ISK_ANDROID_KEYSTORE` (absolute f
 
 ### iPhone
 Apple only installs signed apps, so an unsigned bundle needs signing with the tester's Apple ID or a developer account.
-1. Build: `flutter build ios --release --no-codesign --dart-define=ISK_API_ORIGIN=https://www.isklenses.online`, then zip `build/ios/iphoneos/Runner.app` inside a `Payload/` folder and rename the zip to `.ipa` (an unsigned `isk-lenses-unsigned.ipa` can be produced this way).
+1. Build: `flutter build ios --release --no-codesign`, then zip `build/ios/iphoneos/Runner.app` inside a `Payload/` folder and rename the zip to `.ipa` (an unsigned `isk-lenses-unsigned.ipa` can be produced this way).
 2. Install on a device: (a) open `ios/Runner.xcworkspace` in Xcode, pick your team under Signing & Capabilities, connect the iPhone and Run; (b) sideload the unsigned IPA with AltStore/Sideloadly using a free Apple ID (re-sign every 7 days); or (c) for wider testers, run `flutter build ipa`, upload to App Store Connect and invite testers via TestFlight (requires an Apple Developer account).

@@ -28,8 +28,8 @@ if (process.env.NODE_ENV !== 'production') globalForDb.pool = pool
 export function createRequestPool(connectionString: string) {
   return new Pool({
     connectionString: normalizePostgresConnectionString(connectionString),
-    max: 1,
-    connectionTimeoutMillis: 5_000,
+    max: 10,
+    connectionTimeoutMillis: 10_000,
   })
 }
 

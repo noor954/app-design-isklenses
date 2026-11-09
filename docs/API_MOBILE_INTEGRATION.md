@@ -107,7 +107,7 @@ The admin API covers the completed commerce workflows. The web-only Project Kanb
 
 The Flutter Android/iOS storefront and commerce-admin client is in `apps/mobile`. See its README for local setup, API-origin configuration, build commands, admin module coverage, and the current release-readiness boundary.
 
-1. Use the deployed site origin as the base URL, for example `https://shop.example.com`; all API paths above are relative to that origin.
+1. Use the deployed site origin as the base URL; all API paths above are relative to that origin. While the custom domains still point to Hostinger, the verified API origin is `https://isk-lenses-storefront.isklenses.workers.dev`. After the Cloudflare DNS cutover is complete, `https://www.isklenses.online` can be used as the production origin.
 2. Open `/api/openapi.json` in an OpenAPI client generator or use it as the reference when configuring FlutterFlow API Calls. Set `Accept: application/json` and `Content-Type: application/json` on JSON writes.
 3. Use a cookie jar/session-preserving HTTP client for shopper login. Login/register sets the HttpOnly `isk-lenses-customer-session` cookie; send it on later order-history and checkout requests. Retain the cookie securely, honor its expiry, and clear it on logout. The API does **not** issue bearer tokens. On FlutterFlow, if its API-call client does not retain `Set-Cookie`, implement the login/checkout sequence in a custom action with a cookie-aware client rather than copying the password into app state.
 4. Admin cookies use `isk-lenses-admin-session`; keep admin credentials and session access out of logs, URLs, analytics, and client source. Staff/admin/owner permissions are still enforced server-side.
